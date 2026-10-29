@@ -1,0 +1,2749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map It - Dynamic Product Roadmap</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- html2canvas and jsPDF for reliable in-place PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            200: '#bae0fd',
+                            300: '#7cc8fb',
+                            400: '#36aaf5',
+                            500: '#0c8ee9',
+                            600: '#0270c7',
+                            700: '#0359a1',
+                            800: '#074b85',
+                            900: '#0c3f6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(241, 245, 249, 0.5);
+            border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .snap-container {
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+        .snap-item {
+            scroll-snap-align: start;
+        }
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 12mm 10mm;
+            }
+            body { 
+                background: white !important; 
+                color: #0f172a !important;
+                height: auto !important;
+                overflow: visible !important;
+            }
+            header, nav, #perspective-controls, .no-print, #roadmaps-tab-list, button, select { 
+                display: none !important; 
+            }
+            main {
+                padding: 0 !important;
+                overflow: visible !important;
+                display: block !important;
+            }
+            #roadmap-view {
+                display: block !important;
+                overflow: visible !important;
+                height: auto !important;
+                max-width: 100% !important;
+            }
+            #roadmap-scroll-wrapper { 
+                overflow: visible !important; 
+                height: auto !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                background: transparent !important;
+            }
+            #timeline-vertical-guide {
+                display: block !important;
+            }
+            .snap-item {
+                break-inside: avoid;
+                page-break-inside: avoid;
+                margin-bottom: 2rem !important;
+            }
+            .print-only { 
+                display: block !important; 
+            }
+            /* Preserve background colors and borders in print */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased h-screen flex flex-col overflow-hidden select-none">
+
+    <!-- Global App Header -->
+    <header class="bg-white border-b border-slate-200 px-4 md:px-6 py-2.5 flex items-center justify-between shrink-0 z-30 shadow-xs">
+        <!-- Logo & Title -->
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+                <i class="ph-bold ph-git-commit rotate-90 text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-sm font-extrabold text-slate-900 tracking-tight flex items-center gap-1.5">
+                    Map It
+                    <span class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200">Roadmap</span>
+                </h1>
+                <p id="workspace-status" class="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span id="workspace-user-label">Syncing Workspace</span>
+                </p>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+            <button id="nav-roadmap" onclick="switchView('roadmap')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-brand-700 shadow-sm transition-all">
+                <i class="ph ph-tree-structure text-sm"></i> Roadmap
+            </button>
+            <button id="nav-editor" onclick="switchView('editor')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
+                <i class="ph ph-sliders text-sm"></i> Editor
+            </button>
+            <button id="nav-feedback" onclick="switchView('feedback')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
+                <i class="ph ph-chat-centered-text text-sm"></i> Feedback & Suggestions
+                <span id="nav-feedback-count" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700 font-bold ml-0.5">0</span>
+            </button>
+        </nav>
+
+        <!-- Right Side: Roadmap Quick Select & Actions -->
+        <div class="flex items-center gap-2">
+            <!-- Header Roadmap Dropdown -->
+            <div class="relative hidden sm:flex items-center">
+                <select id="header-roadmap-select" onchange="selectRoadmap(this.value)" class="text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 pr-7 appearance-none cursor-pointer outline-none">
+                    <!-- Populated dynamically -->
+                </select>
+                <i class="ph-bold ph-caret-down absolute right-2 pointer-events-none text-slate-400 text-xs"></i>
+            </div>
+
+            <!-- New Roadmap Button -->
+            <button onclick="openNewRoadmapModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold shadow-sm shadow-brand-500/20 transition-all">
+                <i class="ph-bold ph-plus"></i> <span class="hidden md:inline">New Roadmap</span>
+            </button>
+
+            <!-- Sign Out -->
+            <button onclick="handleSignOut()" title="Sign Out" class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all">
+                <i class="ph-bold ph-sign-out text-lg"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Canvas -->
+    <main class="flex-1 overflow-hidden relative p-3 md:p-6 flex flex-col">
+
+        <!-- ======================================================= -->
+        <!-- VIEW 1: ROADMAP TIMELINE (Unified with Roadmap Tabs)   -->
+        <!-- ======================================================= -->
+        <div id="roadmap-view" class="max-w-6xl mx-auto w-full h-full flex flex-col gap-4 overflow-hidden">
+            
+            <!-- Roadmaps Horizontal Switcher Bar -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm shrink-0 flex items-center justify-between gap-3 overflow-x-auto custom-scrollbar">
+                <div class="flex items-center gap-2 shrink-0">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400 px-2 flex items-center gap-1">
+                        <i class="ph-bold ph-folder"></i> Roadmaps:
+                    </span>
+                    <div id="roadmaps-tab-list" class="flex items-center gap-1.5">
+                        <!-- Populated dynamically with roadmap pills -->
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0 pl-2 border-l border-slate-100">
+                    <button id="export-pdf-btn" onclick="exportRoadmapPDF()" title="Export Roadmap as PDF" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all shadow-xs">
+                        <i class="ph-bold ph-file-pdf text-sm"></i> <span id="export-pdf-text">Export PDF</span>
+                    </button>
+                    <button onclick="switchView('editor')" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
+                        <i class="ph-bold ph-plus"></i> Add Deliverables
+                    </button>
+                </div>
+            </div>
+
+            <!-- Perspective Selector & Filter Bar (Annual, Quarterly, Monthly, Modules) -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">View:</span>
+                    <!-- Rearranged Order: Annual, Quarterly, Monthly, Modules -->
+                    <div id="perspective-buttons" class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                        <button id="view-btn-year" onclick="setPerspective('year')" class="px-3 py-1 rounded-lg text-xs font-semibold bg-white text-brand-700 shadow-sm transition-all">
+                            Annual
+                        </button>
+                        <button id="view-btn-quarter" onclick="setPerspective('quarter')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
+                            Quarterly
+                        </button>
+                        <button id="view-btn-month" onclick="setPerspective('month')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
+                            Monthly
+                        </button>
+                        <button id="view-btn-module" onclick="setPerspective('module')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
+                            Modules
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Contextual Subfilter -->
+                <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <span id="subfilter-label" class="text-xs font-medium text-slate-500">Filter:</span>
+                    <select id="perspective-subfilter" onchange="applySubfilter(this.value)" class="text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 cursor-pointer outline-none">
+                        <option value="ALL">Show All</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Print Header -->
+            <div class="print-only hidden py-4 border-b border-slate-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 id="print-roadmap-title" class="text-2xl font-extrabold text-slate-900">Map It Roadmap</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Perspective: <span id="print-perspective-label" class="font-bold text-slate-700">Annual</span> • Filter: <span id="print-filter-label" class="font-bold text-slate-700">All</span>
+                        </p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-slate-400 block font-medium">Map It Workspace Export</span>
+                        <span class="text-xs text-slate-600 font-semibold" id="print-date"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scrollable Timeline Canvas -->
+            <div id="roadmap-scroll-wrapper" class="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-y-auto custom-scrollbar snap-container relative p-4 md:p-8">
+                <!-- Timeline Central Vertical Guide Line -->
+                <div id="timeline-vertical-guide" class="hidden md:block absolute left-[140px] top-8 bottom-8 w-0.5 bg-slate-200 pointer-events-none"></div>
+
+                <!-- Dynamic Container for Timeline Sections -->
+                <div id="roadmap-container" class="space-y-10 relative">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================================================= -->
+        <!-- VIEW 2: EDITOR (Full-width Table + Modal Edit)         -->
+        <!-- ======================================================= -->
+        <div id="editor-view" class="hidden max-w-6xl mx-auto w-full h-full overflow-hidden flex-col gap-4">
+            <!-- Header Controls Bar -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div class="flex items-center gap-3">
+                    <div>
+                        <h2 class="text-lg font-extrabold text-slate-800">Deliverables & Milestones</h2>
+                        <p class="text-xs text-slate-500">Manage roadmap schedule, modules, and target dates.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+                    <button onclick="openDataExportModal('editor')" title="Export Milestones (CSV/Excel/JSON)" class="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all border border-slate-200">
+                        <i class="ph-bold ph-download-simple"></i> Export
+                    </button>
+                    <button onclick="openAddMilestoneModal()" class="flex items-center gap-2 px-3.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-brand-500/20 transition-all">
+                        <i class="ph-bold ph-plus"></i> Add Milestone
+                    </button>
+                </div>
+            </div>
+
+            <!-- Editor Table Container -->
+            <div class="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                <!-- Search and Filters Bar -->
+                <div class="px-4 py-2.5 bg-white border-b border-slate-100 flex flex-wrap items-center gap-2.5 text-xs shrink-0">
+                    <div class="relative flex-1 min-w-[180px]">
+                        <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" id="editor-search-input" oninput="applyEditorFilters()" placeholder="Search deliverables, modules, or scope..." class="w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 focus:border-brand-500 rounded-xl outline-none transition-all text-xs text-slate-700">
+                    </div>
+
+                    <div class="flex items-center">
+                        <select id="editor-module-filter" onchange="applyEditorFilters()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
+                            <option value="ALL">All Modules</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center">
+                        <select id="editor-status-filter" onchange="applyEditorFilters()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
+                            <option value="ALL">All Statuses</option>
+                            <option value="planned">Planned</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="done">Completed</option>
+                        </select>
+                    </div>
+
+                    <div id="editor-filter-count-badge" class="hidden text-[11px] font-semibold text-brand-700 bg-brand-50 px-2 py-1 rounded-lg border border-brand-200">
+                        0 matches
+                    </div>
+                </div>
+
+                <!-- Table Content -->
+                <div class="flex-1 overflow-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 sticky top-0 z-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200">
+                            <tr>
+                                <th class="py-3 px-4">Deliverable / Feature</th>
+                                <th class="py-3 px-4">Module</th>
+                                <th class="py-3 px-4">Target Date</th>
+                                <th class="py-3 px-4">Status</th>
+                                <th class="py-3 px-4">Scope / Inclusions</th>
+                                <th class="py-3 px-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="editor-table-body" class="divide-y divide-slate-100 text-xs">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================================================= -->
+        <!-- VIEW 3: FEEDBACK & SUGGESTIONS                         -->
+        <!-- ======================================================= -->
+        <div id="feedback-view" class="hidden max-w-6xl mx-auto w-full h-full overflow-hidden flex-col gap-4">
+            <!-- Feedback Controls Bar -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-lg font-extrabold text-slate-800">Feedback & User Suggestions</h2>
+                        <span id="feedback-total-badge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200">0 items</span>
+                    </div>
+                    <p class="text-xs text-slate-500">Customer requests, feature ideas, and suggestions linked to deliverables.</p>
+                </div>
+
+                <div class="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+                    <button onclick="openDataExportModal('feedback')" title="Export Feedback (CSV/Excel/JSON)" class="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all border border-slate-200">
+                        <i class="ph-bold ph-download-simple"></i> Export
+                    </button>
+                    <button onclick="openAddFeedbackModal()" class="flex items-center gap-2 px-3.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-brand-500/20 transition-all">
+                        <i class="ph-bold ph-plus"></i> New Suggestion
+                    </button>
+                </div>
+            </div>
+
+            <!-- Feedback Table Container -->
+            <div class="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                <!-- Search and Filtering -->
+                <div class="px-4 py-2.5 bg-white border-b border-slate-100 flex flex-wrap items-center gap-2.5 text-xs shrink-0">
+                    <div class="relative flex-1 min-w-[180px]">
+                        <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" id="feedback-search-input" oninput="renderFeedbackTable()" placeholder="Search feedback by title, requester, or tags..." class="w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 focus:border-brand-500 rounded-xl outline-none transition-all text-xs text-slate-700">
+                    </div>
+
+                    <div class="flex items-center">
+                        <select id="feedback-status-filter" onchange="renderFeedbackTable()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
+                            <option value="ALL">All Statuses</option>
+                            <option value="backlog">Backlog / Unlinked</option>
+                            <option value="planned">Planned</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="done">Completed</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center">
+                        <select id="feedback-category-filter" onchange="renderFeedbackTable()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
+                            <option value="ALL">All Categories</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Table Content -->
+                <div class="flex-1 overflow-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 sticky top-0 z-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200">
+                            <tr>
+                                <th class="py-3 px-4">Suggestion / Feedback</th>
+                                <th class="py-3 px-4">Category</th>
+                                <th class="py-3 px-4">Submitted By</th>
+                                <th class="py-3 px-4">Status (from Milestone)</th>
+                                <th class="py-3 px-4">Related Milestone(s)</th>
+                                <th class="py-3 px-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="feedback-table-body" class="divide-y divide-slate-100 text-xs">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================================================= -->
+        <!-- VIEW 4: SIGNED OUT VIEW                                 -->
+        <!-- ======================================================= -->
+        <div id="signed-out-view" class="hidden flex-1 items-center justify-center p-6">
+            <div class="bg-white rounded-3xl border border-slate-200 p-8 max-w-md w-full shadow-xl text-center space-y-4">
+                <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center text-2xl mx-auto">
+                    <i class="ph-bold ph-lock-key"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-extrabold text-slate-900">Signed Out of Map It</h2>
+                    <p class="text-xs text-slate-500 mt-1">Your session is closed. Click below to reconnect to your workspace roadmaps.</p>
+                </div>
+                <button onclick="reconnectWorkspace()" class="w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-md shadow-brand-500/20 transition-all flex items-center justify-center gap-2">
+                    <i class="ph-bold ph-arrow-counter-clockwise"></i> Reconnect Workspace
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ======================================================= -->
+    <!-- MODALS SECTION                                          -->
+    <!-- ======================================================= -->
+
+    <!-- Modal: View Deliverable Details -->
+    <div id="detail-modal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 relative">
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-all">
+                <i class="ph-bold ph-x text-base"></i>
+            </button>
+            <div class="flex items-center gap-2 mb-2">
+                <span id="modal-status-badge" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">Planned</span>
+                <span id="modal-target-date" class="text-xs text-slate-500 font-medium">Q3 2026</span>
+            </div>
+            <h3 id="modal-feature-name" class="text-lg font-bold text-slate-900 leading-snug">Feature Title</h3>
+            <p id="modal-module-name" class="text-xs text-brand-600 font-semibold mb-4">Module Name</p>
+            <div class="space-y-3 border-t border-slate-100 pt-3 text-xs">
+                <div>
+                    <h4 class="font-bold text-slate-400 uppercase tracking-wider text-[10px] mb-1">Scope & Inclusions</h4>
+                    <div id="modal-inclusions-list" class="flex flex-wrap gap-1.5"></div>
+                </div>
+                <div>
+                    <h4 class="font-bold text-slate-400 uppercase tracking-wider text-[10px] mb-1">Details & Rationale</h4>
+                    <p id="modal-description" class="text-slate-600 leading-relaxed"></p>
+                </div>
+                <div id="modal-linked-feedback-box"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Milestone Details -->
+    <div id="edit-milestone-modal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-4xl w-full border border-slate-200 shadow-2xl p-6 relative max-h-[92vh] flex flex-col overflow-hidden">
+            <button onclick="closeEditMilestoneModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all z-10">
+                <i class="ph-bold ph-x text-lg"></i>
+            </button>
+            <div class="flex items-center gap-2 mb-4 shrink-0">
+                <div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-lg">
+                    <i class="ph-bold ph-sliders"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Edit Milestone Details</h3>
+                    <p class="text-xs text-slate-500">Update deliverable parameters, review history logs, and collaborate.</p>
+                </div>
+            </div>
+
+            <!-- Two-Column Body: Form on Left, History & Comments on Right -->
+            <div class="flex-1 overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-12 gap-6 pr-1">
+                
+                <!-- Left Column: Milestone Configuration (7 cols) -->
+                <form id="edit-detail-form" class="md:col-span-7 space-y-3.5 flex flex-col justify-between">
+                    <div class="space-y-3.5">
+                        <input type="hidden" id="detail-item-id">
+                        
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-700">Feature / Deliverable Name</label>
+                            <input type="text" id="detail-item-name" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="space-y-1">
+                                <label class="text-xs font-semibold text-slate-700">Module / Category</label>
+                                <input type="text" id="detail-item-module" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-semibold text-slate-700">Target Date (Month-Year)</label>
+                                <input type="month" id="detail-item-date" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                            </div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-700">Status</label>
+                            <select id="detail-item-status" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                                <option value="planned">Planned</option>
+                                <option value="in-progress">In Progress</option>
+                                <option value="done">Completed</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-700">Scope Inclusions (comma-separated)</label>
+                            <input type="text" id="detail-item-inclusions" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-700">Description & Context</label>
+                            <textarea id="detail-item-description" rows="3" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all custom-scrollbar"></textarea>
+                        </div>
+
+                        <!-- Related Feedback Multi-selector -->
+                        <div class="space-y-1 pt-1">
+                            <label class="text-xs font-semibold text-slate-700 flex items-center justify-between">
+                                <span>Related Feedback & Suggestions</span>
+                                <span class="text-[10px] text-slate-400 font-normal">Connect user requests</span>
+                            </label>
+                            <div id="edit-milestone-feedback-list" class="max-h-28 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1 bg-slate-50/50 custom-scrollbar text-xs">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 mt-4">
+                        <button type="button" onclick="deleteFromDetailModal()" class="px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5">
+                            <i class="ph-bold ph-trash"></i> Delete
+                        </button>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="closeEditMilestoneModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+                                Cancel
+                            </button>
+                            <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
+                                <i class="ph-bold ph-check"></i> Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Right Column: Activity History Logs & Comments (5 cols) -->
+                <div class="md:col-span-5 bg-slate-50/80 border border-slate-200 rounded-xl p-3.5 flex flex-col justify-between overflow-hidden">
+                    <div>
+                        <!-- Header with sub-tabs for History & Comments -->
+                        <div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
+                            <div class="flex items-center gap-1 bg-slate-200/70 p-0.5 rounded-lg text-xs font-semibold">
+                                <button type="button" id="tab-btn-logs" onclick="switchMilestoneSideTab('logs')" class="px-2.5 py-1 rounded-md bg-white text-brand-700 shadow-2xs transition-all">
+                                    <i class="ph-bold ph-clock-counter-clockwise mr-1"></i> History
+                                </button>
+                                <button type="button" id="tab-btn-comments" onclick="switchMilestoneSideTab('comments')" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all">
+                                    <i class="ph-bold ph-chat-teardrop-text mr-1"></i> Comments
+                                    <span id="milestone-comments-count" class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-300 text-slate-700 font-bold">0</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Panel 1: Activity History Logs -->
+                        <div id="milestone-logs-panel" class="space-y-2.5 max-h-[340px] overflow-y-auto custom-scrollbar pr-1">
+                            <div id="milestone-history-list" class="space-y-2 text-xs">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Panel 2: Comments Feed -->
+                        <div id="milestone-comments-panel" class="hidden space-y-2.5 max-h-[280px] overflow-y-auto custom-scrollbar pr-1">
+                            <div id="milestone-comments-list" class="space-y-2.5 text-xs">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Comment Input Box (active when in comments tab) -->
+                    <div id="milestone-comment-input-box" class="hidden pt-3 border-t border-slate-200 mt-2">
+                        <div class="flex items-center gap-1.5">
+                            <input type="text" id="milestone-new-comment-input" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); addMilestoneComment(); }" placeholder="Write a comment or note..." class="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-200 focus:border-brand-500 rounded-xl outline-none">
+                            <button type="button" onclick="addMilestoneComment()" class="p-1.5 px-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold transition-all">
+                                <i class="ph-bold ph-paper-plane-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add New Milestone -->
+    <div id="add-milestone-modal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <button onclick="closeAddMilestoneModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all">
+                <i class="ph-bold ph-x text-lg"></i>
+            </button>
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-lg">
+                    <i class="ph-bold ph-plus-circle"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900 leading-snug">Add New Deliverable</h3>
+                    <p class="text-xs text-slate-500">Create a new milestone on this roadmap.</p>
+                </div>
+            </div>
+
+            <form id="modal-add-item-form" class="space-y-3.5">
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-700">Deliverable Name</label>
+                    <input type="text" id="modal-item-name" required placeholder="e.g. Export Reports to CSV" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-700">Module / Domain</label>
+                        <input type="text" id="modal-item-module" required placeholder="e.g. Analytics" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-700">Target Month (Month-Year)</label>
+                        <input type="month" id="modal-item-date" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-700">Initial Status</label>
+                    <select id="modal-item-status" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                        <option value="planned">Planned</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="done">Completed</option>
+                    </select>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-700">Inclusions (comma-separated)</label>
+                    <input type="text" id="modal-item-inclusions" placeholder="e.g. Filter by date, Background download" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-700">Extended Description</label>
+                    <textarea id="modal-item-description" rows="3" placeholder="Context, rationale, and technical goals..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all custom-scrollbar"></textarea>
+                </div>
+
+                <!-- Related Feedback Multi-selector -->
+                <div class="space-y-1 pt-1">
+                    <label class="text-xs font-semibold text-slate-700 flex items-center justify-between">
+                        <span>Related Feedback & Suggestions</span>
+                        <span class="text-[10px] text-slate-400 font-normal">Link user requests</span>
+                    </label>
+                    <div id="add-milestone-feedback-list" class="max-h-32 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1 bg-slate-50/50 custom-scrollbar text-xs">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="closeAddMilestoneModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
+                        <i class="ph-bold ph-plus"></i> Add Deliverable
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add/Edit Feedback -->
+    <div id="feedback-modal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative">
+            <button onclick="closeFeedbackModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all">
+                <i class="ph-bold ph-x text-lg"></i>
+            </button>
+            <div class="flex items-center gap-2 mb-2">
+                <div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-lg">
+                    <i class="ph-bold ph-chat-centered-text"></i>
+                </div>
+                <div>
+                    <h3 id="feedback-modal-title" class="text-lg font-bold text-slate-900 leading-snug">New Feedback / Suggestion</h3>
+                    <p class="text-xs text-slate-500">Log customer requests and user feedback.</p>
+                </div>
+            </div>
+
+            <form id="feedback-form" class="mt-4 space-y-3.5">
+                <input type="hidden" id="feedback-item-id">
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-700">Suggestion Title</label>
+                    <input type="text" id="feedback-form-title" required placeholder="e.g. Export reports to Excel & CSV" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-700">Category</label>
+                        <input type="text" id="feedback-form-category" required placeholder="e.g. Analytics, Usability, API" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-700">Submitted By / Source</label>
+                        <input type="text" id="feedback-form-source" placeholder="e.g. Acme Corp / Intercom" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-700">Description / User Story</label>
+                    <textarea id="feedback-form-description" rows="3" placeholder="Customer pain points, desired behavior..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all custom-scrollbar"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="closeFeedbackModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
+                        <i class="ph-bold ph-check"></i> Save Suggestion
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Create New Roadmap -->
+    <div id="new-roadmap-modal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full border border-slate-200 shadow-2xl p-6 relative">
+            <button onclick="closeNewRoadmapModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all">
+                <i class="ph-bold ph-x text-lg"></i>
+            </button>
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-lg">
+                    <i class="ph-bold ph-tree-structure"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">New Roadmap</h3>
+                    <p class="text-xs text-slate-500">Create another roadmap view.</p>
+                </div>
+            </div>
+
+            <form id="new-roadmap-form" class="space-y-4">
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-700">Roadmap Title</label>
+                    <input type="text" id="new-roadmap-title-input" required placeholder="e.g. 2027 Core Architecture" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="closeNewRoadmapModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all">
+                        Create Roadmap
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Export Options -->
+    <div id="export-modal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full border border-slate-200 shadow-2xl p-6 relative">
+            <button onclick="closeExportModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all">
+                <i class="ph-bold ph-x text-lg"></i>
+            </button>
+            <div class="flex items-center gap-2.5 mb-2">
+                <div class="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center text-lg">
+                    <i class="ph-bold ph-export"></i>
+                </div>
+                <div>
+                    <h3 id="export-modal-title" class="text-base font-bold text-slate-900">Export Data</h3>
+                    <p id="export-modal-subtitle" class="text-xs text-slate-500">Choose your preferred file format.</p>
+                </div>
+            </div>
+
+            <div id="export-modal-options" class="mt-4 space-y-2.5 text-left">
+                <!-- Dynamically populated based on context (Editor or Feedback) -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Logic & Firebase Integration -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDocs, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Application State
+        let currentUser = null;
+        let currentRoadmapId = 'roadmap-default-sample';
+        let roadmaps = [];
+        let activePerspective = 'year'; // Default: Annual
+        let activeSubfilter = 'ALL';
+        let selectedMilestoneId = null;
+        let activeMilestoneSideTab = 'logs'; // 'logs' or 'comments'
+        let auth = null;
+        let db = null;
+        let useCloudPersistence = false;
+
+        const defaultAppId = typeof __app_id !== 'undefined' ? __app_id : 'map-it-roadmap-app';
+
+        // Sample initial feedback pool
+        const sampleFeedback = [
+            {
+                id: 'fb-1',
+                title: 'Support Okta and Google Workspace SSO logins',
+                category: 'Authentication & Security',
+                source: 'Enterprise Sales',
+                description: 'Enterprise SSO enablement needed to satisfy corporate customer security reviews.'
+            },
+            {
+                id: 'fb-2',
+                title: 'Role-based access permissions for external contractors',
+                category: 'Authentication & Security',
+                source: 'Customer Success',
+                description: 'Contractors should only view their assigned modules without accessing global settings.'
+            },
+            {
+                id: 'fb-3',
+                title: 'Pay invoices in EUR and GBP currencies',
+                category: 'Billing & Subscriptions',
+                source: 'European Customers',
+                description: 'Support international currencies on checkout and billing statements.'
+            },
+            {
+                id: 'fb-4',
+                title: 'Weekly automated email summary of KPI metrics',
+                category: 'Analytics & Insights',
+                source: 'Product Ops Team',
+                description: 'Scheduled weekly digest summarizing feature usage and progress.'
+            },
+            {
+                id: 'fb-5',
+                title: 'Public REST API & outgoing webhooks',
+                category: 'Developer Platform',
+                source: 'Dev Community Forum',
+                description: 'Allow webhook subscription so automated notifications arrive in Slack or Teams.'
+            }
+        ];
+
+        // Sample initial dataset
+        const sampleRoadmap = {
+            id: 'roadmap-default-sample',
+            title: 'Q3/Q4 Product Launch Roadmap',
+            updatedAt: new Date().toISOString(),
+            feedback: sampleFeedback,
+            items: [
+                {
+                    id: 'm-1',
+                    module: 'Authentication & Security',
+                    name: 'Single Sign-On (SSO)',
+                    date: '2026-08',
+                    status: 'done',
+                    inclusions: ['Google Workspace', 'SAML 2.0', 'Audit Logs'],
+                    description: 'Enterprise SSO enablement for seamless organization onboarding.',
+                    feedbackIds: ['fb-1']
+                },
+                {
+                    id: 'm-2',
+                    module: 'Authentication & Security',
+                    name: 'Role-Based Access Control',
+                    date: '2026-08',
+                    status: 'done',
+                    inclusions: ['Admin / Editor roles', 'Fine-grained permissions'],
+                    description: 'Restricts sensitive configuration updates to organization admins.',
+                    feedbackIds: ['fb-2']
+                },
+                {
+                    id: 'm-3',
+                    module: 'Billing & Subscriptions',
+                    name: 'Multi-Currency Payments',
+                    date: '2026-09',
+                    status: 'in-progress',
+                    inclusions: ['USD, EUR, GBP checkout', 'Automated tax calculation'],
+                    description: 'International expansion support with local checkout currency selection.',
+                    feedbackIds: ['fb-3']
+                },
+                {
+                    id: 'm-4',
+                    module: 'Analytics & Insights',
+                    name: 'Real-time Telemetry Dashboard',
+                    date: '2026-10',
+                    status: 'planned',
+                    inclusions: ['Active user count', 'Latency graphs', 'CSV exports'],
+                    description: 'Provides team managers visibility into feature usage and load benchmarks.',
+                    feedbackIds: []
+                },
+                {
+                    id: 'm-5',
+                    module: 'Analytics & Insights',
+                    name: 'Scheduled Email Digest',
+                    date: '2026-10',
+                    status: 'planned',
+                    inclusions: ['Weekly summaries', 'Custom recipients'],
+                    description: 'Automated Monday morning digest containing previous week metrics.',
+                    feedbackIds: ['fb-4']
+                },
+                {
+                    id: 'm-6',
+                    module: 'Developer Platform',
+                    name: 'Public REST API & Webhooks',
+                    date: '', // Unscheduled / Backlog
+                    status: 'planned',
+                    inclusions: ['API keys generator', 'Rate limiter', 'Outgoing webhooks'],
+                    description: 'Open ecosystem allowing third-party services to listen to product events.',
+                    feedbackIds: ['fb-5']
+                }
+            ]
+        };
+
+        // Format relative timestamp
+        function formatRelativeTime(isoString) {
+            if (!isoString) return 'Just now';
+            const date = new Date(isoString);
+            const now = new Date();
+            const diffInSeconds = Math.floor((now - date) / 1000);
+
+            if (diffInSeconds < 60) return 'Just now';
+            if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+            if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        }
+
+        // DOM Handles
+        const roadmapView = document.getElementById('roadmap-view');
+        const editorView = document.getElementById('editor-view');
+        const feedbackView = document.getElementById('feedback-view');
+        const signedOutView = document.getElementById('signed-out-view');
+
+        const navRoadmap = document.getElementById('nav-roadmap');
+        const navEditor = document.getElementById('nav-editor');
+        const navFeedback = document.getElementById('nav-feedback');
+        const navFeedbackCount = document.getElementById('nav-feedback-count');
+
+        const headerRoadmapSelect = document.getElementById('header-roadmap-select');
+        const roadmapsTabList = document.getElementById('roadmaps-tab-list');
+        const perspectiveSubfilter = document.getElementById('perspective-subfilter');
+        const roadmapContainer = document.getElementById('roadmap-container');
+        const printRoadmapTitle = document.getElementById('print-roadmap-title');
+        const printDate = document.getElementById('print-date');
+
+        const editorTableBody = document.getElementById('editor-table-body');
+        const editorSearchInput = document.getElementById('editor-search-input');
+        const editorModuleFilter = document.getElementById('editor-module-filter');
+        const editorStatusFilter = document.getElementById('editor-status-filter');
+        const editorFilterCountBadge = document.getElementById('editor-filter-count-badge');
+
+        const feedbackTableBody = document.getElementById('feedback-table-body');
+        const feedbackTotalBadge = document.getElementById('feedback-total-badge');
+        const feedbackSearchInput = document.getElementById('feedback-search-input');
+        const feedbackStatusFilter = document.getElementById('feedback-status-filter');
+        const feedbackCategoryFilter = document.getElementById('feedback-category-filter');
+
+        const detailModal = document.getElementById('detail-modal');
+        const editMilestoneModal = document.getElementById('edit-milestone-modal');
+        const addMilestoneModal = document.getElementById('add-milestone-modal');
+        const feedbackModal = document.getElementById('feedback-modal');
+        const newRoadmapModal = document.getElementById('new-roadmap-modal');
+        const exportModal = document.getElementById('export-modal');
+
+        // Helper: Active Roadmap accessor
+        function getActiveRoadmap() {
+            let r = roadmaps.find(item => item.id === currentRoadmapId);
+            if (!r) {
+                if (roadmaps.length === 0) {
+                    roadmaps = [JSON.parse(JSON.stringify(sampleRoadmap))];
+                }
+                r = roadmaps[0];
+                currentRoadmapId = r.id;
+            }
+            if (!r.feedback) r.feedback = [...sampleFeedback];
+            if (!r.items) r.items = [];
+            r.items.forEach(item => {
+                if (!item.feedbackIds) item.feedbackIds = [];
+            });
+            return r;
+        }
+
+        // View Navigation Switcher
+        window.switchView = function(view) {
+            roadmapView.classList.add('hidden');
+            roadmapView.classList.remove('flex');
+            editorView.classList.add('hidden');
+            editorView.classList.remove('flex');
+            feedbackView.classList.add('hidden');
+            feedbackView.classList.remove('flex');
+            signedOutView.classList.add('hidden');
+            signedOutView.classList.remove('flex');
+
+            const inactiveNav = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all";
+            const activeNav = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-brand-700 shadow-sm transition-all";
+
+            navRoadmap.className = inactiveNav;
+            navEditor.className = inactiveNav;
+            navFeedback.className = inactiveNav;
+
+            if (view === 'roadmap') {
+                roadmapView.classList.remove('hidden');
+                roadmapView.classList.add('flex');
+                navRoadmap.className = activeNav;
+                updateUI();
+            } else if (view === 'editor') {
+                editorView.classList.remove('hidden');
+                editorView.classList.add('flex');
+                navEditor.className = activeNav;
+                updateUI();
+            } else if (view === 'feedback') {
+                feedbackView.classList.remove('hidden');
+                feedbackView.classList.add('flex');
+                navFeedback.className = activeNav;
+                updateUI();
+            } else if (view === 'signed-out') {
+                signedOutView.classList.remove('hidden');
+                signedOutView.classList.add('flex');
+            }
+        };
+
+        // Perspectives Switcher
+        window.setPerspective = function(perspective) {
+            activePerspective = perspective;
+            activeSubfilter = 'ALL';
+
+            const buttons = ['year', 'quarter', 'month', 'module'];
+            buttons.forEach(p => {
+                const btn = document.getElementById(`view-btn-${p}`);
+                if (!btn) return;
+                if (p === perspective) {
+                    btn.className = "px-3 py-1 rounded-lg text-xs font-semibold bg-white text-brand-700 shadow-sm transition-all";
+                } else {
+                    btn.className = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all";
+                }
+            });
+
+            const activeRoadmap = getActiveRoadmap();
+            if (activeRoadmap) {
+                populateSubfilterOptions(activeRoadmap.items);
+                renderTimeline(activeRoadmap.items);
+            }
+        };
+
+        window.applySubfilter = function(val) {
+            activeSubfilter = val;
+            const activeRoadmap = getActiveRoadmap();
+            if (activeRoadmap) {
+                renderTimeline(activeRoadmap.items);
+            }
+        };
+
+        // Populate Perspective Subfilter
+        function populateSubfilterOptions(items) {
+            if (!perspectiveSubfilter) return;
+            perspectiveSubfilter.innerHTML = '<option value="ALL">Show All</option>';
+
+            const labelEl = document.getElementById('subfilter-label');
+
+            if (activePerspective === 'year') {
+                if (labelEl) labelEl.textContent = 'Year:';
+                const years = Array.from(new Set(items.map(i => i.date ? i.date.slice(0, 4) : 'Unscheduled'))).sort();
+                years.forEach(y => {
+                    const opt = document.createElement('option');
+                    opt.value = y;
+                    opt.textContent = y;
+                    perspectiveSubfilter.appendChild(opt);
+                });
+            } else if (activePerspective === 'quarter') {
+                if (labelEl) labelEl.textContent = 'Quarter:';
+                const quarters = Array.from(new Set(items.map(i => {
+                    if (!i.date) return 'Unscheduled';
+                    const [y, m] = i.date.split('-');
+                    const q = Math.ceil(parseInt(m, 10) / 3);
+                    return `Q${q} ${y}`;
+                }))).sort();
+                quarters.forEach(q => {
+                    const opt = document.createElement('option');
+                    opt.value = q;
+                    opt.textContent = q;
+                    perspectiveSubfilter.appendChild(opt);
+                });
+            } else if (activePerspective === 'month') {
+                if (labelEl) labelEl.textContent = 'Month:';
+                const months = Array.from(new Set(items.map(i => i.date || 'Unscheduled'))).sort();
+                months.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    opt.textContent = m === 'Unscheduled' ? 'Unscheduled' : formatMonthYear(m);
+                    perspectiveSubfilter.appendChild(opt);
+                });
+            } else if (activePerspective === 'module') {
+                if (labelEl) labelEl.textContent = 'Module:';
+                const modules = Array.from(new Set(items.map(i => i.module).filter(Boolean))).sort();
+                modules.forEach(mod => {
+                    const opt = document.createElement('option');
+                    opt.value = mod;
+                    opt.textContent = mod;
+                    perspectiveSubfilter.appendChild(opt);
+                });
+            }
+
+            perspectiveSubfilter.value = activeSubfilter || 'ALL';
+        }
+
+        // Format Utilities
+        function formatMonthYear(ym) {
+            if (!ym) return 'Unscheduled';
+            const parts = ym.split('-');
+            if (parts.length < 2) return ym;
+            const year = parts[0];
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const mIdx = parseInt(parts[1], 10) - 1;
+            return `${monthNames[mIdx] || parts[1]} ${year}`;
+        }
+
+        function formatMonthFull(mNum) {
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            return monthNames[mNum - 1] || `Month ${mNum}`;
+        }
+
+        // Status Derivation for Feedback
+        function getFeedbackDerivedStatus(feedbackId, activeRoadmap) {
+            if (!activeRoadmap || !activeRoadmap.items) return { status: 'backlog', label: 'Backlog / Unlinked', milestones: [] };
+            
+            const linkedMilestones = activeRoadmap.items.filter(m => (m.feedbackIds || []).includes(feedbackId));
+            
+            if (linkedMilestones.length === 0) {
+                return { status: 'backlog', label: 'Backlog / Unlinked', milestones: [] };
+            }
+
+            if (linkedMilestones.some(m => m.status === 'in-progress')) {
+                return { status: 'in-progress', label: 'In Progress', milestones: linkedMilestones };
+            }
+            if (linkedMilestones.every(m => m.status === 'done')) {
+                return { status: 'done', label: 'Completed', milestones: linkedMilestones };
+            }
+            return { status: 'planned', label: 'Planned', milestones: linkedMilestones };
+        }
+
+        // Update UI View
+        function updateUI() {
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+
+            if (printRoadmapTitle) printRoadmapTitle.textContent = activeRoadmap.title;
+            if (printDate) printDate.textContent = new Date().toLocaleDateString();
+
+            const feedbackList = activeRoadmap.feedback || [];
+            if (navFeedbackCount) navFeedbackCount.textContent = feedbackList.length;
+            if (feedbackTotalBadge) feedbackTotalBadge.textContent = `${feedbackList.length} items`;
+
+            renderRoadmapSwitcher();
+            populateSubfilterOptions(activeRoadmap.items);
+            populateEditorModuleFilterOptions(activeRoadmap.items);
+            populateFeedbackCategoryOptions(feedbackList);
+            renderEditorTable(activeRoadmap.items);
+            renderFeedbackTable();
+            renderTimeline(activeRoadmap.items);
+        }
+
+        // Render Roadmaps Switcher Bars
+        function renderRoadmapSwitcher() {
+            if (headerRoadmapSelect) {
+                headerRoadmapSelect.innerHTML = '';
+                roadmaps.forEach(r => {
+                    const opt = document.createElement('option');
+                    opt.value = r.id;
+                    opt.textContent = r.title;
+                    if (r.id === currentRoadmapId) opt.selected = true;
+                    headerRoadmapSelect.appendChild(opt);
+                });
+            }
+
+            if (roadmapsTabList) {
+                roadmapsTabList.innerHTML = '';
+                roadmaps.forEach(r => {
+                    const isActive = r.id === currentRoadmapId;
+                    const items = r.items || [];
+                    const doneCount = items.filter(i => i.status === 'done').length;
+                    const pct = items.length ? Math.round((doneCount / items.length) * 100) : 0;
+
+                    const btn = document.createElement('div');
+                    btn.className = `flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
+                        isActive 
+                            ? 'bg-brand-50 text-brand-700 border border-brand-200 shadow-xs' 
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`;
+                    btn.onclick = () => selectRoadmap(r.id);
+
+                    btn.innerHTML = `
+                        <i class="ph-bold ph-tree-structure text-sm ${isActive ? 'text-brand-600' : 'text-slate-400'}"></i>
+                        <span class="max-w-[140px] truncate">${r.title}</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isActive ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-600'}">
+                            ${pct}%
+                        </span>
+                    `;
+                    roadmapsTabList.appendChild(btn);
+                });
+            }
+        }
+
+        window.selectRoadmap = function(id) {
+            currentRoadmapId = id;
+            updateUI();
+        };
+
+        // Render Timeline with 4 perspectives
+        function renderTimeline(items) {
+            if (!roadmapContainer) return;
+            roadmapContainer.innerHTML = '';
+
+            const guideLine = document.getElementById('timeline-vertical-guide');
+            if (guideLine) {
+                guideLine.style.display = (activePerspective === 'module') ? 'none' : 'block';
+            }
+
+            if (items.length === 0) {
+                roadmapContainer.innerHTML = `
+                    <div class="text-center py-20 text-slate-400">
+                        <i class="ph-bold ph-git-commit rotate-90 text-4xl mb-2 text-slate-300"></i>
+                        <p class="font-bold text-sm text-slate-700">No deliverables added yet</p>
+                        <p class="text-xs text-slate-400 mt-1">Switch to the Editor tab or click "+ New Deliverable" to build your timeline.</p>
+                        <button onclick="switchView('editor')" class="mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all">
+                            Open Editor
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            if (activePerspective === 'year') {
+                renderAnnualTimeline(items);
+            } else if (activePerspective === 'quarter') {
+                renderQuarterlyTimeline(items);
+            } else if (activePerspective === 'month') {
+                renderMonthlyTimeline(items);
+            } else if (activePerspective === 'module') {
+                renderModulesView(items);
+            }
+        }
+
+        // 1. Annual Perspective: Left Year, Right 4 Quarters
+        function renderAnnualTimeline(items) {
+            const yearGroups = {};
+            const unscheduled = [];
+
+            items.forEach(item => {
+                if (!item.date) {
+                    unscheduled.push(item);
+                    return;
+                }
+                const year = item.date.slice(0, 4);
+                if (!yearGroups[year]) {
+                    yearGroups[year] = { Q1: [], Q2: [], Q3: [], Q4: [] };
+                }
+                const month = parseInt(item.date.slice(5, 7), 10);
+                const qKey = `Q${Math.ceil(month / 3)}`;
+                yearGroups[year][qKey].push(item);
+            });
+
+            const sortedYears = Object.keys(yearGroups).sort();
+            const yearsToDisplay = activeSubfilter === 'ALL' ? sortedYears : sortedYears.filter(y => y === activeSubfilter);
+
+            yearsToDisplay.forEach(year => {
+                const quarters = yearGroups[year];
+                const yearItems = [...quarters.Q1, ...quarters.Q2, ...quarters.Q3, ...quarters.Q4];
+                const doneCount = yearItems.filter(i => i.status === 'done').length;
+                const isAllDone = yearItems.length > 0 && doneCount === yearItems.length;
+
+                const section = document.createElement('div');
+                section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
+
+                section.innerHTML = `
+                    <!-- Left Timeline Axis: Year -->
+                    <div class="w-full md:w-32 shrink-0 flex md:flex-col items-center md:items-end justify-between md:justify-start pr-0 md:pr-6 text-left md:text-right">
+                        <div>
+                            <span class="text-2xl md:text-3xl font-black text-slate-900 tracking-tight block">${year}</span>
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-brand-600 block">Annual Plan</span>
+                            <span class="text-[11px] font-semibold text-slate-400 block">${doneCount}/${yearItems.length} Done</span>
+                        </div>
+                    </div>
+
+                    <!-- Timeline Marker Node -->
+                    <div class="hidden md:flex absolute left-[124px] top-4 w-8 h-8 rounded-full bg-white border-4 ${isAllDone ? 'border-emerald-500' : 'border-brand-600'} shadow-md items-center justify-center z-10">
+                        <div class="w-2.5 h-2.5 rounded-full ${isAllDone ? 'bg-emerald-500' : 'bg-brand-600'}"></div>
+                    </div>
+
+                    <!-- Right Card Panel: 4 Quarters Breakdown -->
+                    <div class="flex-1 w-full bg-slate-50/70 border border-slate-200 rounded-2xl p-5 shadow-xs md:ml-12">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${['Q1', 'Q2', 'Q3', 'Q4'].map(qKey => {
+                                const qItems = quarters[qKey];
+                                const qDone = qItems.filter(i => i.status === 'done').length;
+                                return `
+                                    <div class="bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
+                                        <div>
+                                            <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+                                                <div class="flex items-center gap-1.5">
+                                                    <span class="text-xs font-black text-slate-900">${qKey}</span>
+                                                    <span class="text-[10px] text-slate-400 font-medium">${year}</span>
+                                                </div>
+                                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${qItems.length > 0 && qDone === qItems.length ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-slate-600'}">
+                                                    ${qItems.length ? `${qDone}/${qItems.length} Done` : 'No plans'}
+                                                </span>
+                                            </div>
+
+                                            <div class="space-y-2">
+                                                ${qItems.length > 0 
+                                                    ? qItems.map(item => `
+                                                        <div onclick="openItemDetails('${item.id}')" class="p-2.5 rounded-xl border border-slate-100 hover:border-brand-200 bg-slate-50/50 hover:bg-brand-50/30 cursor-pointer transition-all">
+                                                            <div class="flex items-center justify-between gap-1">
+                                                                <span class="text-xs font-bold text-slate-800 line-clamp-1">${item.name}</span>
+                                                                <span class="w-2 h-2 rounded-full shrink-0 ${item.status === 'done' ? 'bg-emerald-500' : item.status === 'in-progress' ? 'bg-brand-500' : 'bg-amber-400'}"></span>
+                                                            </div>
+                                                            <div class="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                                                                <span class="font-medium text-brand-600 truncate">${item.module}</span>
+                                                                <span>${formatMonthYear(item.date)}</span>
+                                                            </div>
+                                                        </div>
+                                                    `).join('') 
+                                                    : `<div class="py-6 text-center text-slate-300 text-[11px] italic">No deliverables scheduled</div>`
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+                roadmapContainer.appendChild(section);
+            });
+
+            if (unscheduled.length > 0 && (activeSubfilter === 'ALL' || activeSubfilter === 'Unscheduled')) {
+                renderUnscheduledSection(unscheduled);
+            }
+        }
+
+        // 2. Quarterly Perspective: Left Quarter-Year, Right Deliverables by Month
+        function renderQuarterlyTimeline(items) {
+            const quarterGroups = {};
+            const unscheduled = [];
+
+            items.forEach(item => {
+                if (!item.date) {
+                    unscheduled.push(item);
+                    return;
+                }
+                const [y, mStr] = item.date.split('-');
+                const m = parseInt(mStr, 10);
+                const qNum = Math.ceil(m / 3);
+                const qKey = `Q${qNum} ${y}`;
+                if (!quarterGroups[qKey]) {
+                    quarterGroups[qKey] = {
+                        year: y,
+                        quarterNum: qNum,
+                        months: {}
+                    };
+                    const startMonth = (qNum - 1) * 3 + 1;
+                    for (let i = startMonth; i <= startMonth + 2; i++) {
+                        quarterGroups[qKey].months[i] = [];
+                    }
+                }
+                quarterGroups[qKey].months[m].push(item);
+            });
+
+            const sortedQuarterKeys = Object.keys(quarterGroups).sort((a, b) => {
+                const [qA, yA] = a.split(' ');
+                const [qB, yB] = b.split(' ');
+                return yA !== yB ? yA.localeCompare(yB) : qA.localeCompare(qB);
+            });
+
+            const quartersToDisplay = activeSubfilter === 'ALL' ? sortedQuarterKeys : sortedQuarterKeys.filter(k => k === activeSubfilter);
+
+            quartersToDisplay.forEach(qKey => {
+                const group = quarterGroups[qKey];
+                const allQItems = Object.values(group.months).flat();
+                const doneCount = allQItems.filter(i => i.status === 'done').length;
+                const isAllDone = allQItems.length > 0 && doneCount === allQItems.length;
+
+                const section = document.createElement('div');
+                section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
+
+                section.innerHTML = `
+                    <!-- Left Timeline Axis: Quarter & Year -->
+                    <div class="w-full md:w-32 shrink-0 flex md:flex-col items-center md:items-end justify-between md:justify-start pr-0 md:pr-6 text-left md:text-right">
+                        <div>
+                            <span class="text-2xl md:text-3xl font-black text-slate-900 tracking-tight block">${qKey.split(' ')[0]}</span>
+                            <span class="text-sm font-bold text-brand-600 block">${qKey.split(' ')[1]}</span>
+                            <span class="text-[11px] font-semibold text-slate-400 block">${doneCount}/${allQItems.length} Done</span>
+                        </div>
+                    </div>
+
+                    <!-- Marker Node -->
+                    <div class="hidden md:flex absolute left-[124px] top-4 w-8 h-8 rounded-full bg-white border-4 ${isAllDone ? 'border-emerald-500' : 'border-brand-600'} shadow-md items-center justify-center z-10">
+                        <div class="w-2.5 h-2.5 rounded-full ${isAllDone ? 'bg-emerald-500' : 'bg-brand-600'}"></div>
+                    </div>
+
+                    <!-- Right Card Panel: Grouped by Month -->
+                    <div class="flex-1 w-full bg-slate-50/70 border border-slate-200 rounded-2xl p-5 shadow-xs md:ml-12">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            ${Object.keys(group.months).map(mNum => {
+                                const mItems = group.months[mNum];
+                                const monthName = formatMonthFull(parseInt(mNum, 10));
+                                return `
+                                    <div class="bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
+                                        <div>
+                                            <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+                                                <span class="text-xs font-black text-slate-800">${monthName}</span>
+                                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${mItems.length > 0 && mItems.every(i => i.status === 'done') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}">
+                                                    ${mItems.length} items
+                                                </span>
+                                            </div>
+
+                                            <div class="space-y-2">
+                                                ${mItems.length > 0 
+                                                    ? mItems.map(item => `
+                                                        <div onclick="openItemDetails('${item.id}')" class="p-2.5 rounded-xl border border-slate-100 hover:border-brand-200 bg-slate-50/50 hover:bg-brand-50/30 cursor-pointer transition-all">
+                                                            <div class="flex items-center justify-between gap-1">
+                                                                <span class="text-xs font-bold text-slate-800 line-clamp-1">${item.name}</span>
+                                                                <span class="w-2 h-2 rounded-full shrink-0 ${item.status === 'done' ? 'bg-emerald-500' : item.status === 'in-progress' ? 'bg-brand-500' : 'bg-amber-400'}"></span>
+                                                            </div>
+                                                            <div class="text-[10px] text-brand-600 font-semibold mt-1 truncate">${item.module}</div>
+                                                        </div>
+                                                    `).join('')
+                                                    : `<div class="py-8 text-center text-slate-300 text-[11px] italic">No items</div>`
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+                roadmapContainer.appendChild(section);
+            });
+
+            if (unscheduled.length > 0 && (activeSubfilter === 'ALL' || activeSubfilter === 'Unscheduled')) {
+                renderUnscheduledSection(unscheduled);
+            }
+        }
+
+        // 3. Monthly Perspective: Chronological Month breakdown
+        function renderMonthlyTimeline(items) {
+            const monthGroups = {};
+            const unscheduled = [];
+
+            items.forEach(item => {
+                if (!item.date) {
+                    unscheduled.push(item);
+                    return;
+                }
+                if (!monthGroups[item.date]) monthGroups[item.date] = [];
+                monthGroups[item.date].push(item);
+            });
+
+            const sortedMonths = Object.keys(monthGroups).sort();
+            const monthsToDisplay = activeSubfilter === 'ALL' ? sortedMonths : sortedMonths.filter(m => m === activeSubfilter);
+
+            monthsToDisplay.forEach(ym => {
+                const mItems = monthGroups[ym];
+                const doneCount = mItems.filter(i => i.status === 'done').length;
+                const isAllDone = mItems.length > 0 && doneCount === mItems.length;
+
+                const section = document.createElement('div');
+                section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
+
+                section.innerHTML = `
+                    <!-- Left Timeline Axis: Month -->
+                    <div class="w-full md:w-32 shrink-0 flex md:flex-col items-center md:items-end justify-between md:justify-start pr-0 md:pr-6 text-left md:text-right">
+                        <div>
+                            <span class="text-xl md:text-2xl font-black text-slate-900 tracking-tight block">${formatMonthYear(ym).split(' ')[0]}</span>
+                            <span class="text-sm font-bold text-brand-600 block">${formatMonthYear(ym).split(' ')[1]}</span>
+                            <span class="text-[11px] font-semibold text-slate-400 block">${doneCount}/${mItems.length} Done</span>
+                        </div>
+                    </div>
+
+                    <!-- Marker Node -->
+                    <div class="hidden md:flex absolute left-[124px] top-4 w-8 h-8 rounded-full bg-white border-4 ${isAllDone ? 'border-emerald-500' : 'border-brand-600'} shadow-md items-center justify-center z-10">
+                        <div class="w-2.5 h-2.5 rounded-full ${isAllDone ? 'bg-emerald-500' : 'bg-brand-600'}"></div>
+                    </div>
+
+                    <!-- Right Card Panel -->
+                    <div class="flex-1 w-full bg-white border border-slate-200 rounded-2xl p-5 shadow-xs md:ml-12">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            ${mItems.map(item => `
+                                <div onclick="openItemDetails('${item.id}')" class="p-4 rounded-xl border border-slate-200 hover:border-brand-300 hover:shadow-xs bg-slate-50/50 hover:bg-white cursor-pointer transition-all">
+                                    <div class="flex items-center justify-between gap-2 mb-1.5">
+                                        <span class="text-xs font-bold text-slate-900">${item.name}</span>
+                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${item.status === 'done' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : item.status === 'in-progress' ? 'bg-brand-50 text-brand-600 border border-brand-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">
+                                            ${item.status}
+                                        </span>
+                                    </div>
+                                    <p class="text-xs text-brand-600 font-semibold mb-2">${item.module}</p>
+                                    ${item.inclusions && item.inclusions.length ? `
+                                        <div class="flex flex-wrap gap-1">
+                                            ${item.inclusions.map(inc => `<span class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded">${inc}</span>`).join('')}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                roadmapContainer.appendChild(section);
+            });
+
+            if (unscheduled.length > 0 && (activeSubfilter === 'ALL' || activeSubfilter === 'Unscheduled')) {
+                renderUnscheduledSection(unscheduled);
+            }
+        }
+
+        // 4. Modules Perspective (Grouped by Module / Swimlanes)
+        function renderModulesView(items) {
+            const moduleGroups = {};
+            items.forEach(item => {
+                const mod = item.module || 'General';
+                if (!moduleGroups[mod]) moduleGroups[mod] = [];
+                moduleGroups[mod].push(item);
+            });
+
+            const sortedModules = Object.keys(moduleGroups).sort();
+            const modulesToDisplay = activeSubfilter === 'ALL' ? sortedModules : sortedModules.filter(m => m === activeSubfilter);
+
+            const grid = document.createElement('div');
+            grid.className = "grid grid-cols-1 md:grid-cols-2 gap-6 w-full";
+
+            modulesToDisplay.forEach(mod => {
+                const mItems = moduleGroups[mod];
+                const doneCount = mItems.filter(i => i.status === 'done').length;
+                const pct = Math.round((doneCount / mItems.length) * 100);
+
+                const card = document.createElement('div');
+                card.className = "bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between";
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-900">${mod}</h3>
+                                <p class="text-[11px] text-slate-400 font-medium">${mItems.length} Deliverable(s)</p>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs font-bold text-brand-700">${pct}% Done</span>
+                                <div class="w-20 bg-slate-100 h-1.5 rounded-full mt-1 overflow-hidden">
+                                    <div class="bg-brand-600 h-full rounded-full" style="width: ${pct}%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2.5">
+                            ${mItems.map(item => `
+                                <div onclick="openItemDetails('${item.id}')" class="p-3 rounded-xl border border-slate-100 hover:border-brand-300 bg-slate-50/70 hover:bg-white cursor-pointer transition-all">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-xs font-bold text-slate-800">${item.name}</span>
+                                        <span class="text-[10px] font-semibold text-slate-500 whitespace-nowrap">${formatMonthYear(item.date)}</span>
+                                    </div>
+                                    ${item.description ? `<p class="text-[11px] text-slate-500 mt-1 line-clamp-1">${item.description}</p>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            roadmapContainer.appendChild(grid);
+        }
+
+        // Render Unscheduled Section
+        function renderUnscheduledSection(items) {
+            const section = document.createElement('div');
+            section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
+
+            section.innerHTML = `
+                <div class="w-full md:w-32 shrink-0 flex md:flex-col items-center md:items-end justify-between md:justify-start pr-0 md:pr-6 text-left md:text-right">
+                    <div>
+                        <span class="text-xl md:text-2xl font-black text-slate-500 tracking-tight block">TBD</span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block">Backlog</span>
+                    </div>
+                </div>
+
+                <div class="hidden md:flex absolute left-[124px] top-4 w-8 h-8 rounded-full bg-white border-4 border-slate-300 shadow-md items-center justify-center z-10">
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                </div>
+
+                <div class="flex-1 w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-xs md:ml-12">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        ${items.map(item => `
+                            <div onclick="openItemDetails('${item.id}')" class="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-brand-300 cursor-pointer transition-all">
+                                <span class="text-xs font-bold text-slate-900 block">${item.name}</span>
+                                <span class="text-[11px] text-brand-600 font-semibold">${item.module}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            roadmapContainer.appendChild(section);
+        }
+
+        // =======================================================
+        // EDITOR TABLE & FILTERS
+        // =======================================================
+        function populateEditorModuleFilterOptions(items) {
+            if (!editorModuleFilter) return;
+            const currentSelected = editorModuleFilter.value;
+            editorModuleFilter.innerHTML = '<option value="ALL">All Modules</option>';
+
+            const modules = Array.from(new Set(items.map(i => i.module).filter(Boolean))).sort();
+            modules.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                editorModuleFilter.appendChild(opt);
+            });
+
+            if (modules.includes(currentSelected)) {
+                editorModuleFilter.value = currentSelected;
+            } else {
+                editorModuleFilter.value = 'ALL';
+            }
+        }
+
+        window.applyEditorFilters = function() {
+            const activeRoadmap = getActiveRoadmap();
+            if (activeRoadmap) {
+                renderEditorTable(activeRoadmap.items);
+            }
+        };
+
+        function renderEditorTable(items) {
+            if (!editorTableBody) return;
+            editorTableBody.innerHTML = '';
+
+            const searchVal = (editorSearchInput?.value || '').trim().toLowerCase();
+            const modVal = editorModuleFilter?.value || 'ALL';
+            const statusVal = editorStatusFilter?.value || 'ALL';
+
+            let filtered = items;
+
+            if (searchVal) {
+                filtered = filtered.filter(i => 
+                    (i.name || '').toLowerCase().includes(searchVal) ||
+                    (i.module || '').toLowerCase().includes(searchVal) ||
+                    (i.description || '').toLowerCase().includes(searchVal) ||
+                    (i.inclusions || []).some(inc => inc.toLowerCase().includes(searchVal))
+                );
+            }
+
+            if (modVal !== 'ALL') {
+                filtered = filtered.filter(i => i.module === modVal);
+            }
+
+            if (statusVal !== 'ALL') {
+                filtered = filtered.filter(i => i.status === statusVal);
+            }
+
+            if (editorFilterCountBadge) {
+                if (searchVal || modVal !== 'ALL' || statusVal !== 'ALL') {
+                    editorFilterCountBadge.textContent = `${filtered.length} of ${items.length} matched`;
+                    editorFilterCountBadge.classList.remove('hidden');
+                } else {
+                    editorFilterCountBadge.classList.add('hidden');
+                }
+            }
+
+            if (filtered.length === 0) {
+                editorTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-12 text-slate-400">
+                            <i class="ph ph-sliders text-3xl mb-1 text-slate-300"></i>
+                            <p class="font-medium text-xs">No deliverables match your search or filter.</p>
+                            <button onclick="openAddMilestoneModal()" class="mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
+                                <i class="ph-bold ph-plus"></i> Add new deliverable
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            filtered.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors cursor-pointer";
+                tr.onclick = () => selectMilestoneForEdit(item.id);
+
+                let statusBadge = 'bg-slate-100 text-slate-600';
+                if (item.status === 'done') statusBadge = 'bg-emerald-50 text-emerald-600 border border-emerald-200';
+                else if (item.status === 'in-progress') statusBadge = 'bg-brand-50 text-brand-600 border border-brand-200';
+                else if (item.status === 'planned') statusBadge = 'bg-amber-50 text-amber-700 border border-amber-200';
+
+                const inclusionsHtml = (item.inclusions || []).length > 0 
+                    ? item.inclusions.map(inc => `<span class="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-[10px] text-slate-600">${inc}</span>`).join(' ')
+                    : '<span class="text-slate-400 italic text-[11px]">None</span>';
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-bold text-slate-900">
+                        <div class="text-xs font-bold text-slate-900">${item.name}</div>
+                        ${item.description ? `<p class="text-[11px] font-normal text-slate-500 mt-0.5 max-w-xs truncate">${item.description}</p>` : ''}
+                    </td>
+                    <td class="py-3 px-4 text-brand-600 font-semibold whitespace-nowrap">
+                        <span class="text-xs">${item.module}</span>
+                    </td>
+                    <td class="py-3 px-4 text-slate-600 whitespace-nowrap">
+                        <span class="text-xs font-medium">${formatMonthYear(item.date)}</span>
+                    </td>
+                    <td class="py-3 px-4 whitespace-nowrap">
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${statusBadge}">
+                            ${item.status}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <div class="flex flex-wrap gap-1 max-w-xs">
+                            ${inclusionsHtml}
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-right whitespace-nowrap">
+                        <button onclick="event.stopPropagation(); selectMilestoneForEdit('${item.id}')" class="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all" title="Edit Milestone">
+                            <i class="ph ph-pencil-simple text-base"></i>
+                        </button>
+                    </td>
+                `;
+                editorTableBody.appendChild(tr);
+            });
+        }
+
+        // =======================================================
+        // FEEDBACK & SUGGESTIONS DASHBOARD
+        // =======================================================
+        function populateFeedbackCategoryOptions(feedbackList) {
+            if (!feedbackCategoryFilter) return;
+            const currentSelected = feedbackCategoryFilter.value;
+            feedbackCategoryFilter.innerHTML = '<option value="ALL">All Categories</option>';
+
+            const categories = Array.from(new Set(feedbackList.map(f => f.category).filter(Boolean))).sort();
+            categories.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                feedbackCategoryFilter.appendChild(opt);
+            });
+
+            if (categories.includes(currentSelected)) {
+                feedbackCategoryFilter.value = currentSelected;
+            } else {
+                feedbackCategoryFilter.value = 'ALL';
+            }
+        }
+
+        window.renderFeedbackTable = function() {
+            if (!feedbackTableBody) return;
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+
+            const allFeedback = activeRoadmap.feedback || [];
+            const query = (feedbackSearchInput ? feedbackSearchInput.value : '').trim().toLowerCase();
+            const statusFilter = feedbackStatusFilter ? feedbackStatusFilter.value : 'ALL';
+            const catFilter = feedbackCategoryFilter ? feedbackCategoryFilter.value : 'ALL';
+
+            feedbackTableBody.innerHTML = '';
+
+            let filtered = allFeedback.map(fb => {
+                const derivation = getFeedbackDerivedStatus(fb.id, activeRoadmap);
+                return {
+                    ...fb,
+                    derivedStatus: derivation.status,
+                    statusLabel: derivation.label,
+                    linkedMilestones: derivation.milestones
+                };
+            });
+
+            if (query) {
+                filtered = filtered.filter(f => 
+                    (f.title || '').toLowerCase().includes(query) ||
+                    (f.category || '').toLowerCase().includes(query) ||
+                    (f.source || '').toLowerCase().includes(query) ||
+                    (f.description || '').toLowerCase().includes(query)
+                );
+            }
+
+            if (statusFilter !== 'ALL') {
+                filtered = filtered.filter(f => f.derivedStatus === statusFilter);
+            }
+
+            if (catFilter !== 'ALL') {
+                filtered = filtered.filter(f => f.category === catFilter);
+            }
+
+            if (filtered.length === 0) {
+                feedbackTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-12 text-slate-400">
+                            <i class="ph ph-chat-centered-text text-3xl mb-1 text-slate-300"></i>
+                            <p class="font-medium text-xs">No feedback or suggestions found.</p>
+                            <button onclick="openAddFeedbackModal()" class="mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
+                                <i class="ph-bold ph-plus"></i> Add new suggestion
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            filtered.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors";
+
+                let statusBadge = 'bg-slate-100 text-slate-500 border border-slate-200';
+                if (item.derivedStatus === 'done') statusBadge = 'bg-emerald-50 text-emerald-600 border border-emerald-200';
+                else if (item.derivedStatus === 'in-progress') statusBadge = 'bg-brand-50 text-brand-600 border border-brand-200';
+                else if (item.derivedStatus === 'planned') statusBadge = 'bg-amber-50 text-amber-700 border border-amber-200';
+
+                const milestonesHtml = item.linkedMilestones.length > 0 
+                    ? item.linkedMilestones.map(m => `
+                        <span onclick="event.stopPropagation(); jumpToMilestone('${m.id}')" title="Target: ${formatMonthYear(m.date)}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-[11px] font-semibold cursor-pointer border border-brand-200 transition-colors">
+                            <i class="ph-bold ph-git-commit rotate-90 text-[10px]"></i> ${m.name}
+                        </span>
+                      `).join(' ')
+                    : `<span class="text-slate-400 italic text-[11px]">Unlinked (Not in any milestone)</span>`;
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-bold text-slate-800">
+                        <div class="text-xs font-bold text-slate-900">${item.title}</div>
+                        ${item.description ? `<p class="text-[11px] font-normal text-slate-500 mt-0.5 max-w-sm line-clamp-1">${item.description}</p>` : ''}
+                    </td>
+                    <td class="py-3 px-4 text-slate-600 font-medium">
+                        <span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700">${item.category}</span>
+                    </td>
+                    <td class="py-3 px-4 text-slate-600 whitespace-nowrap">
+                        <span class="text-xs">${item.source || 'User'}</span>
+                    </td>
+                    <td class="py-3 px-4 whitespace-nowrap">
+                        <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${statusBadge}">
+                            ${item.statusLabel}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <div class="flex flex-wrap gap-1.5 items-center">
+                            ${milestonesHtml}
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-right whitespace-nowrap">
+                        <div class="flex items-center justify-end gap-1">
+                            <button onclick="editFeedbackItem('${item.id}')" title="Edit Feedback" class="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all">
+                                <i class="ph ph-pencil-simple text-base"></i>
+                            </button>
+                            <button onclick="deleteFeedbackItem('${item.id}')" title="Delete Feedback" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
+                                <i class="ph ph-trash text-base"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                feedbackTableBody.appendChild(tr);
+            });
+        };
+
+        window.jumpToMilestone = function(milestoneId) {
+            switchView('editor');
+            selectMilestoneForEdit(milestoneId);
+        };
+
+        // Feedback Modals
+        window.openAddFeedbackModal = function() {
+            const form = document.getElementById('feedback-form');
+            if (form) form.reset();
+            const idInput = document.getElementById('feedback-item-id');
+            if (idInput) idInput.value = '';
+            const titleEl = document.getElementById('feedback-modal-title');
+            if (titleEl) titleEl.textContent = 'New Feedback / Suggestion';
+            if (feedbackModal) feedbackModal.classList.remove('hidden');
+        };
+
+        window.editFeedbackItem = function(id) {
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+            const item = (activeRoadmap.feedback || []).find(f => f.id === id);
+            if (!item) return;
+
+            document.getElementById('feedback-item-id').value = item.id;
+            document.getElementById('feedback-form-title').value = item.title;
+            document.getElementById('feedback-form-category').value = item.category;
+            document.getElementById('feedback-form-source').value = item.source || '';
+            document.getElementById('feedback-form-description').value = item.description || '';
+            document.getElementById('feedback-modal-title').textContent = 'Edit Feedback / Suggestion';
+            if (feedbackModal) feedbackModal.classList.remove('hidden');
+        };
+
+        window.closeFeedbackModal = function() {
+            if (feedbackModal) feedbackModal.classList.add('hidden');
+        };
+
+        const feedbackForm = document.getElementById('feedback-form');
+        if (feedbackForm) {
+            feedbackForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const activeRoadmap = getActiveRoadmap();
+                if (!activeRoadmap) return;
+
+                if (!activeRoadmap.feedback) activeRoadmap.feedback = [];
+
+                const id = document.getElementById('feedback-item-id')?.value;
+                const title = document.getElementById('feedback-form-title')?.value.trim() || '';
+                const category = document.getElementById('feedback-form-category')?.value.trim() || '';
+                const source = document.getElementById('feedback-form-source')?.value.trim() || '';
+                const description = document.getElementById('feedback-form-description')?.value.trim() || '';
+
+                if (id) {
+                    const existing = activeRoadmap.feedback.find(f => f.id === id);
+                    if (existing) {
+                        existing.title = title;
+                        existing.category = category;
+                        existing.source = source;
+                        existing.description = description;
+                    }
+                } else {
+                    activeRoadmap.feedback.push({
+                        id: 'fb-' + Date.now(),
+                        title,
+                        category,
+                        source,
+                        description
+                    });
+                }
+
+                activeRoadmap.updatedAt = new Date().toISOString();
+                await saveRoadmapToCloud(activeRoadmap);
+                closeFeedbackModal();
+                updateUI();
+            });
+        }
+
+        window.deleteFeedbackItem = async function(id) {
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+
+            activeRoadmap.feedback = (activeRoadmap.feedback || []).filter(f => f.id !== id);
+            (activeRoadmap.items || []).forEach(m => {
+                if (m.feedbackIds) {
+                    m.feedbackIds = m.feedbackIds.filter(fId => fId !== id);
+                }
+            });
+
+            activeRoadmap.updatedAt = new Date().toISOString();
+            await saveRoadmapToCloud(activeRoadmap);
+            updateUI();
+        };
+
+        // Render Checkboxes for Feedback Linking inside Milestone Modals
+        function populateFeedbackCheckboxes(containerId, selectedIds = []) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const activeRoadmap = getActiveRoadmap();
+            const feedbackList = (activeRoadmap && activeRoadmap.feedback) ? activeRoadmap.feedback : [];
+
+            if (feedbackList.length === 0) {
+                container.innerHTML = `<span class="text-slate-400 italic text-[11px] block p-1">No feedback logged yet. You can add feedback under the "Feedback & Suggestions" tab.</span>`;
+                return;
+            }
+
+            container.innerHTML = feedbackList.map(fb => {
+                const checked = selectedIds.includes(fb.id) ? 'checked' : '';
+                return `
+                    <label class="flex items-start gap-2 p-1.5 hover:bg-white rounded-lg cursor-pointer transition-colors">
+                        <input type="checkbox" name="${containerId}-fb" value="${fb.id}" ${checked} class="mt-0.5 rounded text-brand-600 focus:ring-brand-500">
+                        <div class="flex-1 min-w-0">
+                            <span class="font-semibold text-slate-800 text-xs block truncate">${fb.title}</span>
+                            <span class="text-[10px] text-slate-400">${fb.category} • ${fb.source || 'User'}</span>
+                        </div>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        function getCheckedFeedbackIds(containerId) {
+            const checkedBoxes = document.querySelectorAll(`input[name="${containerId}-fb"]:checked`);
+            return Array.from(checkedBoxes).map(cb => cb.value);
+        }
+
+        // =======================================================
+        // MILESTONE DETAIL MODAL & EDIT ACTIONS
+        // =======================================================
+        window.openItemDetails = function(id) {
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+            const item = activeRoadmap.items.find(i => i.id === id);
+            if (!item) return;
+
+            document.getElementById('modal-feature-name').textContent = item.name;
+            document.getElementById('modal-module-name').textContent = item.module;
+            document.getElementById('modal-target-date').textContent = formatMonthYear(item.date);
+
+            const badge = document.getElementById('modal-status-badge');
+            badge.textContent = item.status.toUpperCase();
+            if (item.status === 'done') {
+                badge.className = 'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200';
+            } else if (item.status === 'in-progress') {
+                badge.className = 'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-50 text-brand-600 border border-brand-200';
+            } else {
+                badge.className = 'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200';
+            }
+
+            document.getElementById('modal-description').textContent = item.description || 'No additional context provided.';
+
+            const incContainer = document.getElementById('modal-inclusions-list');
+            incContainer.innerHTML = '';
+            if (item.inclusions && item.inclusions.length) {
+                item.inclusions.forEach(inc => {
+                    const tag = document.createElement('span');
+                    tag.className = 'text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg';
+                    tag.textContent = inc;
+                    incContainer.appendChild(tag);
+                });
+            } else {
+                incContainer.innerHTML = '<span class="text-xs text-slate-400">No inclusions specified.</span>';
+            }
+
+            // Linked Feedback in View Modal
+            const fbBox = document.getElementById('modal-linked-feedback-box');
+            if (fbBox) {
+                fbBox.innerHTML = '';
+                if (item.feedbackIds && item.feedbackIds.length && activeRoadmap.feedback) {
+                    const linked = activeRoadmap.feedback.filter(f => item.feedbackIds.includes(f.id));
+                    if (linked.length) {
+                        fbBox.innerHTML = `
+                            <div class="mt-3 pt-3 border-t border-slate-100">
+                                <h4 class="font-bold text-slate-400 uppercase tracking-wider text-[10px] mb-1.5 flex items-center gap-1">
+                                    <i class="ph-bold ph-chat-centered-text text-brand-600"></i> Linked Feedback (${linked.length})
+                                </h4>
+                                <div class="flex flex-col gap-1.5">
+                                    ${linked.map(f => `
+                                        <div class="p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+                                            <span class="font-semibold text-slate-800">${f.title}</span>
+                                            <span class="text-slate-400 text-[10px] block mt-0.5">${f.category} • ${f.source || 'User'}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            }
+
+            if (detailModal) detailModal.classList.remove('hidden');
+        };
+
+        window.closeModal = function() {
+            if (detailModal) detailModal.classList.add('hidden');
+        };
+
+        // Switch side tab in Edit Milestone Modal (History Logs vs Comments)
+        window.switchMilestoneSideTab = function(tab) {
+            activeMilestoneSideTab = tab;
+            const btnLogs = document.getElementById('tab-btn-logs');
+            const btnComments = document.getElementById('tab-btn-comments');
+            const panelLogs = document.getElementById('milestone-logs-panel');
+            const panelComments = document.getElementById('milestone-comments-panel');
+            const commentInputBox = document.getElementById('milestone-comment-input-box');
+
+            if (tab === 'logs') {
+                btnLogs.className = "px-2.5 py-1 rounded-md bg-white text-brand-700 shadow-2xs transition-all";
+                btnComments.className = "px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all";
+                panelLogs.classList.remove('hidden');
+                panelComments.classList.add('hidden');
+                commentInputBox.classList.add('hidden');
+            } else {
+                btnComments.className = "px-2.5 py-1 rounded-md bg-white text-brand-700 shadow-2xs transition-all";
+                btnLogs.className = "px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all";
+                panelComments.classList.remove('hidden');
+                panelLogs.classList.add('hidden');
+                commentInputBox.classList.remove('hidden');
+            }
+        };
+
+        // Render History Logs & Comments for selected milestone
+        function renderMilestoneActivity(item) {
+            const logsList = document.getElementById('milestone-history-list');
+            const commentsList = document.getElementById('milestone-comments-list');
+            const countBadge = document.getElementById('milestone-comments-count');
+
+            if (!item.history) {
+                item.history = [
+                    {
+                        id: 'hist-init-' + item.id,
+                        action: 'Milestone created',
+                        timestamp: item.createdAt || new Date().toISOString(),
+                        user: 'System'
+                    }
+                ];
+            }
+            if (!item.comments) item.comments = [];
+
+            if (countBadge) countBadge.textContent = item.comments.length;
+
+            // Render Logs
+            if (logsList) {
+                logsList.innerHTML = item.history.map(log => `
+                    <div class="flex items-start gap-2.5 p-2 rounded-lg bg-white border border-slate-100 shadow-2xs">
+                        <div class="w-6 h-6 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 mt-0.5 text-xs">
+                            <i class="ph-bold ph-git-commit"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-1">
+                                <span class="font-semibold text-slate-800 text-[11px] truncate">${log.action}</span>
+                                <span class="text-[10px] text-slate-400 shrink-0">${formatRelativeTime(log.timestamp)}</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400 block">${log.user || 'Member'}</span>
+                        </div>
+                    </div>
+                `).reverse().join('');
+            }
+
+            // Render Comments
+            if (commentsList) {
+                if (item.comments.length === 0) {
+                    commentsList.innerHTML = `
+                        <div class="py-8 text-center text-slate-400 text-xs italic">
+                            No comments yet. Start a discussion below!
+                        </div>
+                    `;
+                } else {
+                    commentsList.innerHTML = item.comments.map(c => `
+                        <div class="p-2.5 rounded-xl bg-white border border-slate-100 shadow-2xs space-y-1">
+                            <div class="flex items-center justify-between text-[11px]">
+                                <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                                    <span class="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[9px] font-bold">
+                                        ${(c.author || 'U').charAt(0).toUpperCase()}
+                                    </span>
+                                    ${c.author || 'User'}
+                                </span>
+                                <span class="text-[10px] text-slate-400">${formatRelativeTime(c.timestamp)}</span>
+                            </div>
+                            <p class="text-xs text-slate-600 leading-relaxed">${c.text}</p>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        // Add a new comment
+        window.addMilestoneComment = async function() {
+            const input = document.getElementById('milestone-new-comment-input');
+            if (!input || !input.value.trim() || !selectedMilestoneId) return;
+
+            const text = input.value.trim();
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+
+            const item = activeRoadmap.items.find(i => i.id === selectedMilestoneId);
+            if (!item) return;
+
+            if (!item.comments) item.comments = [];
+            if (!item.history) item.history = [];
+
+            const newComment = {
+                id: 'comm-' + Date.now(),
+                text: text,
+                author: currentUser?.uid ? `User (${currentUser.uid.slice(0, 5)})` : 'Team Member',
+                timestamp: new Date().toISOString()
+            };
+
+            item.comments.push(newComment);
+            item.history.push({
+                id: 'hist-' + Date.now(),
+                action: 'Added comment',
+                timestamp: new Date().toISOString(),
+                user: newComment.author
+            });
+
+            activeRoadmap.updatedAt = new Date().toISOString();
+            await saveRoadmapToCloud(activeRoadmap);
+            input.value = '';
+            renderMilestoneActivity(item);
+        };
+
+        // Edit Milestone Modal
+        window.selectMilestoneForEdit = function(id) {
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+            const item = activeRoadmap.items.find(i => i.id === id);
+            if (!item) return;
+
+            selectedMilestoneId = id;
+            document.getElementById('detail-item-id').value = item.id;
+            document.getElementById('detail-item-name').value = item.name;
+            document.getElementById('detail-item-module').value = item.module;
+            document.getElementById('detail-item-date').value = item.date || '';
+            document.getElementById('detail-item-status').value = item.status;
+            document.getElementById('detail-item-inclusions').value = (item.inclusions || []).join(', ');
+            document.getElementById('detail-item-description').value = item.description || '';
+
+            populateFeedbackCheckboxes('edit-milestone-feedback-list', item.feedbackIds || []);
+            renderMilestoneActivity(item);
+            switchMilestoneSideTab('logs');
+
+            if (editMilestoneModal) editMilestoneModal.classList.remove('hidden');
+        };
+
+        window.closeEditMilestoneModal = function() {
+            selectedMilestoneId = null;
+            if (editMilestoneModal) editMilestoneModal.classList.add('hidden');
+        };
+
+        const editDetailForm = document.getElementById('edit-detail-form');
+        if (editDetailForm) {
+            editDetailForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const activeRoadmap = getActiveRoadmap();
+                if (!activeRoadmap) return;
+
+                const id = document.getElementById('detail-item-id')?.value;
+                const item = activeRoadmap.items.find(i => i.id === id);
+                if (!item) return;
+
+                if (!item.history) item.history = [];
+
+                const newName = document.getElementById('detail-item-name')?.value.trim() || '';
+                const newModule = document.getElementById('detail-item-module')?.value.trim() || '';
+                const newDate = document.getElementById('detail-item-date')?.value || '';
+                const newStatus = document.getElementById('detail-item-status')?.value || 'planned';
+                const newInclusions = (document.getElementById('detail-item-inclusions')?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+                const newDescription = document.getElementById('detail-item-description')?.value.trim() || '';
+                const newFeedbackIds = getCheckedFeedbackIds('edit-milestone-feedback-list');
+
+                // Detect changes for history logs
+                const authorName = currentUser?.uid ? `User (${currentUser.uid.slice(0, 5)})` : 'Team Member';
+                const changes = [];
+                if (item.status !== newStatus) changes.push(`Status changed from ${item.status} to ${newStatus}`);
+                if (item.date !== newDate) changes.push(`Target date changed to ${formatMonthYear(newDate)}`);
+                if (item.name !== newName) changes.push(`Renamed to "${newName}"`);
+                if (item.module !== newModule) changes.push(`Module changed to "${newModule}"`);
+                if ((item.feedbackIds || []).length !== newFeedbackIds.length) changes.push(`Updated linked feedback items`);
+
+                if (changes.length > 0) {
+                    changes.forEach(ch => {
+                        item.history.push({
+                            id: 'hist-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+                            action: ch,
+                            timestamp: new Date().toISOString(),
+                            user: authorName
+                        });
+                    });
+                }
+
+                item.name = newName;
+                item.module = newModule;
+                item.date = newDate;
+                item.status = newStatus;
+                item.inclusions = newInclusions;
+                item.description = newDescription;
+                item.feedbackIds = newFeedbackIds;
+
+                activeRoadmap.updatedAt = new Date().toISOString();
+                await saveRoadmapToCloud(activeRoadmap);
+                closeEditMilestoneModal();
+                updateUI();
+            });
+        }
+
+        window.deleteFromDetailModal = async function() {
+            if (!selectedMilestoneId) return;
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+
+            activeRoadmap.items = activeRoadmap.items.filter(i => i.id !== selectedMilestoneId);
+            activeRoadmap.updatedAt = new Date().toISOString();
+            await saveRoadmapToCloud(activeRoadmap);
+            closeEditMilestoneModal();
+            updateUI();
+        };
+
+        // Add Milestone Modal
+        window.openAddMilestoneModal = function() {
+            const form = document.getElementById('modal-add-item-form');
+            if (form) form.reset();
+            populateFeedbackCheckboxes('add-milestone-feedback-list', []);
+            if (addMilestoneModal) addMilestoneModal.classList.remove('hidden');
+        };
+
+        window.closeAddMilestoneModal = function() {
+            if (addMilestoneModal) addMilestoneModal.classList.add('hidden');
+        };
+
+        const modalAddItemForm = document.getElementById('modal-add-item-form');
+        if (modalAddItemForm) {
+            modalAddItemForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const activeRoadmap = getActiveRoadmap();
+                if (!activeRoadmap) return;
+
+                const newItem = {
+                    id: 'm-' + Date.now(),
+                    name: document.getElementById('modal-item-name')?.value.trim() || '',
+                    module: document.getElementById('modal-item-module')?.value.trim() || '',
+                    date: document.getElementById('modal-item-date')?.value || '',
+                    status: document.getElementById('modal-item-status')?.value || 'planned',
+                    inclusions: (document.getElementById('modal-item-inclusions')?.value || '').split(',').map(s => s.trim()).filter(Boolean),
+                    description: document.getElementById('modal-item-description')?.value.trim() || '',
+                    feedbackIds: getCheckedFeedbackIds('add-milestone-feedback-list'),
+                    history: [
+                        {
+                            id: 'hist-' + Date.now(),
+                            action: 'Milestone created',
+                            timestamp: new Date().toISOString(),
+                            user: currentUser?.uid ? `User (${currentUser.uid.slice(0, 5)})` : 'Team Member'
+                        }
+                    ],
+                    comments: []
+                };
+
+                activeRoadmap.items.push(newItem);
+                activeRoadmap.updatedAt = new Date().toISOString();
+                await saveRoadmapToCloud(activeRoadmap);
+                closeAddMilestoneModal();
+                updateUI();
+            });
+        }
+
+        // New Roadmap Modal
+        window.openNewRoadmapModal = function() {
+            const titleInput = document.getElementById('new-roadmap-title-input');
+            if (titleInput) titleInput.value = '';
+            if (newRoadmapModal) newRoadmapModal.classList.remove('hidden');
+        };
+
+        window.closeNewRoadmapModal = function() {
+            if (newRoadmapModal) newRoadmapModal.classList.add('hidden');
+        };
+
+        // =======================================================
+        // EXPORT LOGIC
+        // Roadmap -> PDF format
+        // Editor & Feedback -> CSV / Excel / JSON format
+        // =======================================================
+        
+        // Direct, Reliable PDF Export for Roadmap using in-place html2canvas + jsPDF
+        window.exportRoadmapPDF = async function() {
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+
+            // Make sure we are on the roadmap view
+            switchView('roadmap');
+
+            const btnText = document.getElementById('export-pdf-text');
+            const origText = btnText ? btnText.textContent : 'Export PDF';
+            if (btnText) btnText.textContent = 'Generating PDF...';
+
+            const perspectiveNames = {
+                year: 'Annual Overview (Yearly & Quarters)',
+                quarter: 'Quarterly Breakdown (Quarters & Months)',
+                month: 'Monthly Timeline',
+                module: 'Module & Swimlane View'
+            };
+
+            try {
+                const targetWrapper = document.getElementById('roadmap-scroll-wrapper');
+                if (!targetWrapper) throw new Error("Roadmap container not found");
+
+                // Save previous style states
+                const prevOverflow = targetWrapper.style.overflow;
+                const prevHeight = targetWrapper.style.height;
+                const prevMaxHeight = targetWrapper.style.maxHeight;
+
+                // Temporarily expand to full height for complete capture
+                targetWrapper.style.overflow = 'visible';
+                targetWrapper.style.height = 'auto';
+                targetWrapper.style.maxHeight = 'none';
+
+                // Prepend a temporary clean print header inside the element so it captures cleanly in the image
+                const exportHeader = document.createElement('div');
+                exportHeader.id = 'temp-pdf-capture-header';
+                exportHeader.className = 'pb-5 mb-6 border-b-2 border-slate-200 flex justify-between items-end bg-white';
+                exportHeader.innerHTML = `
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="w-3 h-3 rounded-full bg-blue-600 inline-block"></span>
+                            <h1 class="text-2xl font-black text-slate-900 leading-tight">${activeRoadmap.title}</h1>
+                        </div>
+                        <p class="text-xs text-slate-500">
+                            Perspective: <strong class="text-blue-600">${perspectiveNames[activePerspective]}</strong> &nbsp;|&nbsp; 
+                            Filter: <strong class="text-slate-700">${activeSubfilter === 'ALL' ? 'All Deliverables' : activeSubfilter}</strong>
+                        </p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[11px] font-black text-blue-600 uppercase tracking-wider block">Map It Workspace</span>
+                        <span class="text-xs text-slate-400 block">${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                    </div>
+                `;
+
+                targetWrapper.insertBefore(exportHeader, targetWrapper.firstChild);
+
+                // Small tick for DOM reflow
+                await new Promise(resolve => setTimeout(resolve, 80));
+
+                // Capture canvas directly from visible DOM
+                const canvas = await html2canvas(targetWrapper, {
+                    scale: 2, // High resolution
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff',
+                    scrollX: 0,
+                    scrollY: -window.scrollY
+                });
+
+                // Remove temporary print header and restore styles immediately
+                if (exportHeader.parentNode) {
+                    exportHeader.parentNode.removeChild(exportHeader);
+                }
+                targetWrapper.style.overflow = prevOverflow;
+                targetWrapper.style.height = prevHeight;
+                targetWrapper.style.maxHeight = prevMaxHeight;
+
+                // Build PDF using jsPDF
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                const pageWidth = 297; // A4 landscape width in mm
+                const pageHeight = 210; // A4 landscape height in mm
+                const margin = 10;
+                const printableWidth = pageWidth - (margin * 2);
+                const printableHeight = pageHeight - (margin * 2);
+
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const imgWidth = printableWidth;
+                const imgHeight = (canvas.height * printableWidth) / canvas.width;
+
+                // Handle single or multi-page output cleanly
+                if (imgHeight <= printableHeight) {
+                    // Fits on one page
+                    pdf.addImage(imgData, 'JPEG', margin, margin, imgWidth, imgHeight);
+                } else {
+                    // Multi-page slicing
+                    let heightLeft = imgHeight;
+                    let position = margin;
+
+                    pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+                    heightLeft -= printableHeight;
+
+                    while (heightLeft > 0) {
+                        position = margin - (imgHeight - heightLeft);
+                        pdf.addPage();
+                        pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+                        heightLeft -= printableHeight;
+                    }
+                }
+
+                // Download the generated PDF directly
+                pdf.save(`${sanitizeFilename(activeRoadmap.title)}_${activePerspective}_view.pdf`);
+
+            } catch (err) {
+                console.error("PDF generation failed:", err);
+                // Fallback to window print if canvas capture encounters error
+                try {
+                    window.print();
+                } catch (pErr) {
+                    console.error("Print fallback error:", pErr);
+                }
+            } finally {
+                if (btnText) btnText.textContent = origText;
+            }
+        };
+
+        // 2. Data Export Modal for Editor & Feedback
+        let currentExportContext = 'editor'; // 'editor' or 'feedback'
+
+        window.openDataExportModal = function(context = 'editor') {
+            currentExportContext = context;
+            const titleEl = document.getElementById('export-modal-title');
+            const subtitleEl = document.getElementById('export-modal-subtitle');
+            const optionsContainer = document.getElementById('export-modal-options');
+
+            if (!optionsContainer) return;
+
+            if (context === 'editor') {
+                if (titleEl) titleEl.textContent = 'Export Milestones';
+                if (subtitleEl) subtitleEl.textContent = 'Export deliverables and roadmap schedule.';
+                
+                optionsContainer.innerHTML = `
+                    <!-- CSV / Excel -->
+                    <button onclick="exportMilestonesCSV()" class="w-full p-3 rounded-xl border border-slate-200 hover:border-brand-300 hover:bg-brand-50/40 text-left transition-all flex items-start gap-3 group">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                            <i class="ph-bold ph-file-csv"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs font-bold text-slate-900 block group-hover:text-brand-700">CSV Spreadsheet (Excel Compatible)</span>
+                            <span class="text-[11px] text-slate-400 leading-tight block mt-0.5">Features, modules, target dates, status, scope, and linked feedback.</span>
+                        </div>
+                    </button>
+
+                    <!-- JSON Backup -->
+                    <button onclick="exportMilestonesJSON()" class="w-full p-3 rounded-xl border border-slate-200 hover:border-brand-300 hover:bg-brand-50/40 text-left transition-all flex items-start gap-3 group">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                            <i class="ph-bold ph-code"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs font-bold text-slate-900 block group-hover:text-brand-700">JSON File</span>
+                            <span class="text-[11px] text-slate-400 leading-tight block mt-0.5">Full milestone structure including comments and audit history.</span>
+                        </div>
+                    </button>
+                `;
+            } else if (context === 'feedback') {
+                if (titleEl) titleEl.textContent = 'Export Feedback & Suggestions';
+                if (subtitleEl) subtitleEl.textContent = 'Export user suggestions and status alignments.';
+
+                optionsContainer.innerHTML = `
+                    <!-- CSV / Excel -->
+                    <button onclick="exportFeedbackCSV()" class="w-full p-3 rounded-xl border border-slate-200 hover:border-brand-300 hover:bg-brand-50/40 text-left transition-all flex items-start gap-3 group">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                            <i class="ph-bold ph-file-csv"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs font-bold text-slate-900 block group-hover:text-brand-700">CSV Spreadsheet (Excel Compatible)</span>
+                            <span class="text-[11px] text-slate-400 leading-tight block mt-0.5">Suggestions, source/requester, derived status, and linked milestones.</span>
+                        </div>
+                    </button>
+
+                    <!-- JSON Backup -->
+                    <button onclick="exportFeedbackJSON()" class="w-full p-3 rounded-xl border border-slate-200 hover:border-brand-300 hover:bg-brand-50/40 text-left transition-all flex items-start gap-3 group">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                            <i class="ph-bold ph-code"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs font-bold text-slate-900 block group-hover:text-brand-700">JSON File</span>
+                            <span class="text-[11px] text-slate-400 leading-tight block mt-0.5">Complete feedback entries and category metadata.</span>
+                        </div>
+                    </button>
+                `;
+            }
+
+            if (exportModal) exportModal.classList.remove('hidden');
+        };
+
+        window.closeExportModal = function() {
+            if (exportModal) exportModal.classList.add('hidden');
+        };
+
+        // Export Milestones -> CSV (Excel-ready with UTF-8 BOM)
+        window.exportMilestonesCSV = function() {
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+
+            const items = activeRoadmap.items || [];
+            const feedbackMap = {};
+            (activeRoadmap.feedback || []).forEach(f => {
+                feedbackMap[f.id] = f.title;
+            });
+
+            const headers = ['"Deliverable Name"', '"Module"', '"Target Date"', '"Quarter"', '"Status"', '"Scope Inclusions"', '"Description"', '"Linked Feedback"'];
+            
+            const rows = items.map(item => {
+                let quarter = 'Unscheduled';
+                if (item.date) {
+                    const [y, m] = item.date.split('-');
+                    quarter = `Q${Math.ceil(parseInt(m, 10) / 3)} ${y}`;
+                }
+
+                const inclusions = (item.inclusions || []).join('; ');
+                const linkedFb = (item.feedbackIds || []).map(fId => feedbackMap[fId] || fId).join('; ');
+
+                const escape = (val) => `"${String(val || '').replace(/"/g, '""')}"`;
+
+                return [
+                    escape(item.name),
+                    escape(item.module),
+                    escape(item.date),
+                    escape(quarter),
+                    escape(item.status),
+                    escape(inclusions),
+                    escape(item.description),
+                    escape(linkedFb)
+                ].join(',');
+            });
+
+            const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+            downloadFile(csvContent, `${sanitizeFilename(activeRoadmap.title)}-milestones.csv`, 'text/csv;charset=utf-8;');
+            closeExportModal();
+        };
+
+        // Export Milestones -> JSON
+        window.exportMilestonesJSON = function() {
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+
+            const payload = {
+                roadmapTitle: activeRoadmap.title,
+                exportedAt: new Date().toISOString(),
+                milestones: activeRoadmap.items || []
+            };
+
+            const jsonStr = JSON.stringify(payload, null, 2);
+            downloadFile(jsonStr, `${sanitizeFilename(activeRoadmap.title)}-milestones.json`, 'application/json;charset=utf-8;');
+            closeExportModal();
+        };
+
+        // Export Feedback -> CSV (Excel-ready with UTF-8 BOM)
+        window.exportFeedbackCSV = function() {
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+
+            const feedbackList = activeRoadmap.feedback || [];
+            const headers = ['"Suggestion / Title"', '"Category"', '"Submitted By"', '"Status (from Milestone)"', '"Linked Milestone(s)"', '"Description"'];
+
+            const rows = feedbackList.map(f => {
+                const derivation = getFeedbackDerivedStatus(f.id, activeRoadmap);
+                const linkedMilestoneNames = derivation.milestones.map(m => m.name).join('; ');
+
+                const escape = (val) => `"${String(val || '').replace(/"/g, '""')}"`;
+
+                return [
+                    escape(f.title),
+                    escape(f.category),
+                    escape(f.source || 'User'),
+                    escape(derivation.label),
+                    escape(linkedMilestoneNames || 'None (Backlog)'),
+                    escape(f.description)
+                ].join(',');
+            });
+
+            const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+            downloadFile(csvContent, `${sanitizeFilename(activeRoadmap.title)}-feedback-suggestions.csv`, 'text/csv;charset=utf-8;');
+            closeExportModal();
+        };
+
+        // Export Feedback -> JSON
+        window.exportFeedbackJSON = function() {
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+
+            const payload = {
+                roadmapTitle: activeRoadmap.title,
+                exportedAt: new Date().toISOString(),
+                feedbackSuggestions: (activeRoadmap.feedback || []).map(f => {
+                    const derivation = getFeedbackDerivedStatus(f.id, activeRoadmap);
+                    return {
+                        ...f,
+                        derivedStatus: derivation.status,
+                        statusLabel: derivation.label,
+                        linkedMilestones: derivation.milestones.map(m => ({ id: m.id, name: m.name, date: m.date, status: m.status }))
+                    };
+                })
+            };
+
+            const jsonStr = JSON.stringify(payload, null, 2);
+            downloadFile(jsonStr, `${sanitizeFilename(activeRoadmap.title)}-feedback-suggestions.json`, 'application/json;charset=utf-8;');
+            closeExportModal();
+        };
+
+        // File download helper (works in iframes using data URI/blob URL)
+        function downloadFile(content, fileName, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 200);
+        }
+
+        function sanitizeFilename(name) {
+            return (name || 'roadmap').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+        }
+
+        // =======================================================
+        // PERSISTENCE & CLOUD SYNC
+        // =======================================================
+        async function saveRoadmapToCloud(roadmap) {
+            if (!useCloudPersistence || !db || !currentUser) return;
+            try {
+                const docRef = doc(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps', roadmap.id);
+                await setDoc(docRef, roadmap);
+            } catch (err) {
+                console.warn("Firestore sync error:", err);
+            }
+        }
+
+        async function loadRoadmapsFromCloud() {
+            if (!useCloudPersistence || !db || !currentUser) return;
+            try {
+                const colRef = collection(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps');
+                const snap = await getDocs(colRef);
+                const loaded = [];
+                snap.forEach(d => loaded.push(d.data()));
+                if (loaded.length > 0) {
+                    roadmaps = loaded;
+                    currentRoadmapId = roadmaps[0].id;
+                }
+            } catch (err) {
+                console.warn("Could not load from Firestore, using memory:", err);
+            }
+        }
+
+        // Auth & Init
+        window.handleSignOut = async function() {
+            if (auth) {
+                try {
+                    await signOut(auth);
+                } catch (e) {
+                    console.warn(e);
+                }
+            }
+            currentUser = null;
+            switchView('signed-out');
+        };
+
+        window.reconnectWorkspace = function() {
+            initAuth();
+            switchView('roadmap');
+        };
+
+        async function initAuth() {
+            const userLabel = document.getElementById('workspace-user-label');
+            try {
+                if (typeof __firebase_config !== 'undefined') {
+                    const firebaseConfig = JSON.parse(__firebase_config);
+                    const app = initializeApp(firebaseConfig);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+
+                    currentUser = auth.currentUser;
+                    useCloudPersistence = true;
+                    if (userLabel) userLabel.textContent = `Cloud Sync • ${currentUser ? currentUser.uid.slice(0, 8) : 'Active'}`;
+                    await loadRoadmapsFromCloud();
+                } else {
+                    throw new Error("No firebase config found");
+                }
+            } catch (err) {
+                // In-memory fallback
+                useCloudPersistence = false;
+                currentUser = { uid: 'guest-session' };
+                if (userLabel) userLabel.textContent = 'Local Memory Workspace';
+            }
+
+            if (roadmaps.length === 0) {
+                roadmaps = [JSON.parse(JSON.stringify(sampleRoadmap))];
+                currentRoadmapId = roadmaps[0].id;
+            }
+
+            updateUI();
+        }
+
+        // Initialize Application
+        window.addEventListener('DOMContentLoaded', () => {
+            initAuth();
+        });
+    </script>
+</body>
+</html>
