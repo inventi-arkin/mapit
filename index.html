@@ -144,10 +144,19 @@
                 <i class="ph-bold ph-caret-down absolute right-2 pointer-events-none text-slate-400 text-xs"></i>
             </div>
 
-            <!-- User Avatar & Profile Badge -->
-            <div id="header-user-badge" class="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-xl border border-slate-200">
-                <img id="header-user-avatar" src="" class="hidden w-5 h-5 rounded-full object-cover">
-                <span id="header-user-name" class="text-xs font-semibold text-slate-700 max-w-[100px] truncate">Member</span>
+            <!-- Enhanced User Identity Indicator Badge -->
+            <div id="header-user-badge" class="flex items-center gap-2 px-2.5 py-1.5 bg-slate-100/90 hover:bg-slate-200/80 rounded-xl border border-slate-200 transition-all cursor-default" title="Logged in user">
+                <div class="relative shrink-0 flex items-center justify-center">
+                    <img id="header-user-avatar" src="" class="hidden w-6 h-6 rounded-full object-cover border border-slate-200">
+                    <div id="header-user-initials" class="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px] font-black uppercase shadow-2xs">
+                        U
+                    </div>
+                    <span class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+                </div>
+                <div class="flex flex-col text-left leading-none max-w-[120px] md:max-w-[150px]">
+                    <span id="header-user-name" class="text-xs font-bold text-slate-800 truncate">Workspace User</span>
+                    <span id="header-user-email" class="text-[10px] text-slate-400 font-medium truncate mt-0.5">user@example.com</span>
+                </div>
             </div>
 
             <!-- New Roadmap Button -->
@@ -187,6 +196,9 @@
                     </button>
                     <button onclick="switchView('editor')" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
                         <i class="ph-bold ph-plus"></i> Add Deliverables
+                    </button>
+                    <button onclick="confirmDeleteCurrentRoadmap()" title="Delete Current Roadmap" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
+                        <i class="ph-bold ph-trash text-sm"></i>
                     </button>
                 </div>
             </div>
@@ -735,6 +747,37 @@
         </div>
     </div>
 
+    <!-- Modal: Delete Roadmap Confirmation -->
+    <div id="delete-roadmap-modal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full border border-slate-200 shadow-2xl p-6 relative">
+            <button onclick="closeDeleteRoadmapModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all">
+                <i class="ph-bold ph-x text-lg"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl shrink-0">
+                    <i class="ph-bold ph-warning"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">Delete Roadmap</h3>
+                    <p class="text-xs text-slate-500">This action cannot be undone.</p>
+                </div>
+            </div>
+
+            <p class="text-xs text-slate-600 mb-4 leading-relaxed">
+                Are you sure you want to delete <strong id="delete-roadmap-target-title" class="text-slate-900 font-bold">this roadmap</strong>? All deliverables, feedback links, comments, and audit history associated with it will be permanently removed.
+            </p>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="closeDeleteRoadmapModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+                    Cancel
+                </button>
+                <button type="button" onclick="executeRoadmapDeletion()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-rose-500/20 transition-all flex items-center gap-1.5">
+                    <i class="ph-bold ph-trash"></i> Delete Roadmap
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Export Options -->
     <div id="export-modal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-sm w-full border border-slate-200 shadow-2xl p-6 relative">
@@ -771,6 +814,7 @@
         let activeSubfilter = 'ALL';
         let selectedMilestoneId = null;
         let activeMilestoneSideTab = 'logs'; // 'logs' or 'comments'
+        let roadmapToDeleteId = null;
         let auth = null;
         let db = null;
         let useCloudPersistence = false;
@@ -938,12 +982,261 @@
         const addMilestoneModal = document.getElementById('add-milestone-modal');
         const feedbackModal = document.getElementById('feedback-modal');
         const newRoadmapModal = document.getElementById('new-roadmap-modal');
+        const deleteRoadmapModal = document.getElementById('delete-roadmap-modal');
         const exportModal = document.getElementById('export-modal');
 
         // Helper: Active Roadmap accessor
         function getActiveRoadmap() {
             return roadmaps.find(r => r.id === currentRoadmapId) || roadmaps[0];
         }
+
+        // =======================================================
+        // CORE NAVIGATION & PERSPECTIVE HELPERS
+        // =======================================================
+        window.switchView = function(viewName) {
+            // Hide all main views
+            if (roadmapView) roadmapView.classList.add('hidden');
+            if (editorView) editorView.classList.add('hidden');
+            if (feedbackView) feedbackView.classList.add('hidden');
+            if (signedOutView) signedOutView.classList.add('hidden');
+
+            // Reset navigation tab button styles
+            const navButtons = [
+                { el: navRoadmap, id: 'roadmap' },
+                { el: navEditor, id: 'editor' },
+                { el: navFeedback, id: 'feedback' }
+            ];
+
+            navButtons.forEach(item => {
+                if (!item.el) return;
+                if (item.id === viewName) {
+                    item.el.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-brand-700 shadow-sm transition-all";
+                } else {
+                    item.el.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all";
+                }
+            });
+
+            // Display selected view & refresh its content
+            if (viewName === 'roadmap') {
+                if (roadmapView) {
+                    roadmapView.classList.remove('hidden');
+                    roadmapView.classList.add('flex');
+                }
+                const active = getActiveRoadmap();
+                if (active) renderTimeline(active.items || []);
+            } else if (viewName === 'editor') {
+                if (editorView) {
+                    editorView.classList.remove('hidden');
+                    editorView.classList.add('flex');
+                }
+                const active = getActiveRoadmap();
+                if (active) {
+                    populateEditorModuleFilterOptions(active.items || []);
+                    renderEditorTable(active.items || []);
+                }
+            } else if (viewName === 'feedback') {
+                if (feedbackView) {
+                    feedbackView.classList.remove('hidden');
+                    feedbackView.classList.add('flex');
+                }
+                const active = getActiveRoadmap();
+                if (active) {
+                    populateFeedbackCategoryOptions(active.feedback || []);
+                    renderFeedbackTable();
+                }
+            }
+        };
+
+        window.setPerspective = function(perspective) {
+            activePerspective = perspective;
+            activeSubfilter = 'ALL';
+
+            // Update perspective buttons styling
+            const btnYear = document.getElementById('view-btn-year');
+            const btnQuarter = document.getElementById('view-btn-quarter');
+            const btnMonth = document.getElementById('view-btn-month');
+            const btnModule = document.getElementById('view-btn-module');
+
+            const pBtns = [
+                { el: btnYear, id: 'year' },
+                { el: btnQuarter, id: 'quarter' },
+                { el: btnMonth, id: 'month' },
+                { el: btnModule, id: 'module' }
+            ];
+
+            pBtns.forEach(btn => {
+                if (!btn.el) return;
+                if (btn.id === perspective) {
+                    btn.el.className = "px-3 py-1 rounded-lg text-xs font-semibold bg-white text-brand-700 shadow-sm transition-all";
+                } else {
+                    btn.el.className = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all";
+                }
+            });
+
+            updateSubfilterOptions();
+            const active = getActiveRoadmap();
+            if (active) renderTimeline(active.items || []);
+        };
+
+        window.applySubfilter = function(val) {
+            activeSubfilter = val;
+            const active = getActiveRoadmap();
+            if (active) renderTimeline(active.items || []);
+        };
+
+        function updateSubfilterOptions() {
+            if (!perspectiveSubfilter) return;
+            perspectiveSubfilter.innerHTML = '<option value="ALL">Show All</option>';
+            const active = getActiveRoadmap();
+            if (!active) return;
+
+            const items = active.items || [];
+
+            if (activePerspective === 'year') {
+                const years = Array.from(new Set(items.map(i => i.date ? i.date.slice(0, 4) : null).filter(Boolean))).sort();
+                years.forEach(y => {
+                    const opt = document.createElement('option');
+                    opt.value = y;
+                    opt.textContent = `Year ${y}`;
+                    perspectiveSubfilter.appendChild(opt);
+                });
+            } else if (activePerspective === 'quarter') {
+                const quarters = Array.from(new Set(items.map(i => {
+                    if (!i.date) return null;
+                    const [y, mStr] = i.date.split('-');
+                    return `Q${Math.ceil(parseInt(mStr, 10) / 3)} ${y}`;
+                }).filter(Boolean))).sort();
+                quarters.forEach(q => {
+                    const opt = document.createElement('option');
+                    opt.value = q;
+                    opt.textContent = q;
+                    perspectiveSubfilter.appendChild(opt);
+                });
+            } else if (activePerspective === 'month') {
+                const months = Array.from(new Set(items.map(i => i.date).filter(Boolean))).sort();
+                months.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    opt.textContent = formatMonthYear(m);
+                    perspectiveSubfilter.appendChild(opt);
+                });
+            } else if (activePerspective === 'module') {
+                const modules = Array.from(new Set(items.map(i => i.module).filter(Boolean))).sort();
+                modules.forEach(mod => {
+                    const opt = document.createElement('option');
+                    opt.value = mod;
+                    opt.textContent = mod;
+                    perspectiveSubfilter.appendChild(opt);
+                });
+            }
+
+            // Check if there are unscheduled backlog items
+            const hasUnscheduled = items.some(i => !i.date);
+            if (hasUnscheduled && activePerspective !== 'module') {
+                const opt = document.createElement('option');
+                opt.value = 'Unscheduled';
+                opt.textContent = 'Backlog / TBD';
+                perspectiveSubfilter.appendChild(opt);
+            }
+
+            perspectiveSubfilter.value = activeSubfilter;
+        }
+
+        // Format helpers
+        function formatMonthYear(ym) {
+            if (!ym) return 'Unscheduled';
+            const parts = ym.split('-');
+            if (parts.length < 2) return ym;
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const mIndex = parseInt(parts[1], 10) - 1;
+            return `${months[mIndex] || parts[1]} ${parts[0]}`;
+        }
+
+        function formatMonthFull(m) {
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            return months[m - 1] || `Month ${m}`;
+        }
+
+        // Calculate feedback status derived from related milestones
+        function getFeedbackDerivedStatus(feedbackId, roadmap) {
+            if (!roadmap || !roadmap.items) {
+                return { status: 'backlog', label: 'Backlog / Unlinked', milestones: [] };
+            }
+
+            const linkedMilestones = roadmap.items.filter(item => (item.feedbackIds || []).includes(feedbackId));
+
+            if (linkedMilestones.length === 0) {
+                return { status: 'backlog', label: 'Backlog / Unlinked', milestones: [] };
+            }
+
+            // If any linked milestone is In Progress
+            if (linkedMilestones.some(m => m.status === 'in-progress')) {
+                return { status: 'in-progress', label: 'In Progress', milestones: linkedMilestones };
+            }
+
+            // If all linked milestones are Completed
+            if (linkedMilestones.every(m => m.status === 'done')) {
+                return { status: 'done', label: 'Completed / Done', milestones: linkedMilestones };
+            }
+
+            // Otherwise, it is Planned
+            return { status: 'planned', label: 'Planned', milestones: linkedMilestones };
+        }
+
+        // Master UI update routine
+        window.updateUI = function() {
+            const activeRoadmap = getActiveRoadmap();
+            if (!activeRoadmap) return;
+
+            // 1. Populate Header Roadmap dropdown
+            if (headerRoadmapSelect) {
+                headerRoadmapSelect.innerHTML = roadmaps.map(r => `
+                    <option value="${r.id}" ${r.id === currentRoadmapId ? 'selected' : ''}>${r.title}</option>
+                `).join('');
+            }
+
+            // 2. Populate Roadmap Switcher tabs
+            if (roadmapsTabList) {
+                roadmapsTabList.innerHTML = roadmaps.map(r => {
+                    const isSelected = r.id === currentRoadmapId;
+                    const items = r.items || [];
+                    const doneCount = items.filter(i => i.status === 'done').length;
+                    const pct = items.length ? Math.round((doneCount / items.length) * 100) : 0;
+
+                    return `
+                        <div class="group relative flex items-center">
+                            <button onclick="selectRoadmap('${r.id}')" class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${isSelected ? 'bg-brand-600 text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
+                                <span>${r.title}</span>
+                                <span class="text-[10px] px-1.5 py-0.2 rounded-md ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'}">
+                                    ${pct}%
+                                </span>
+                            </button>
+                            <button onclick="event.stopPropagation(); promptDeleteRoadmap('${r.id}')" title="Delete roadmap" class="opacity-0 group-hover:opacity-100 ml-0.5 p-1 text-slate-400 hover:text-rose-600 rounded-lg transition-all">
+                                <i class="ph-bold ph-x text-[10px]"></i>
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // 3. Update feedback badges
+            const feedbackCount = (activeRoadmap.feedback || []).length;
+            if (navFeedbackCount) navFeedbackCount.textContent = feedbackCount;
+            if (feedbackTotalBadge) feedbackTotalBadge.textContent = `${feedbackCount} items`;
+
+            // 4. Update subfilters and active view
+            updateSubfilterOptions();
+
+            if (!roadmapView.classList.contains('hidden')) {
+                renderTimeline(activeRoadmap.items || []);
+            } else if (!editorView.classList.contains('hidden')) {
+                populateEditorModuleFilterOptions(activeRoadmap.items || []);
+                renderEditorTable(activeRoadmap.items || []);
+            } else if (!feedbackView.classList.contains('hidden')) {
+                populateFeedbackCategoryOptions(activeRoadmap.feedback || []);
+                renderFeedbackTable();
+            }
+        };
 
         // =======================================================
         // AUTHENTICATION & LOGIN GATE CONTROLS
@@ -1066,252 +1359,104 @@
             const userLabel = document.getElementById('workspace-user-label');
             const headerBadge = document.getElementById('header-user-badge');
             const headerName = document.getElementById('header-user-name');
+            const headerEmail = document.getElementById('header-user-email');
             const headerAvatar = document.getElementById('header-user-avatar');
+            const headerInitials = document.getElementById('header-user-initials');
 
-            if (userLabel) userLabel.textContent = `Synced • ${name.split(' ')[0] || name.split('@')[0]}`;
-            if (headerName) headerName.textContent = name.split(' ')[0] || name.split('@')[0];
-            
+            const displayName = name || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Workspace Member';
+            const email = currentUser?.email || 'Logged in';
+
+            if (userLabel) userLabel.textContent = `Online • ${displayName.split(' ')[0]}`;
+            if (headerName) headerName.textContent = displayName;
+            if (headerEmail) headerEmail.textContent = email;
+
+            // Generate initial
+            const initialLetter = displayName.charAt(0).toUpperCase() || 'U';
+            if (headerInitials) headerInitials.textContent = initialLetter;
+
             if (photoURL && headerAvatar) {
                 headerAvatar.src = photoURL;
                 headerAvatar.classList.remove('hidden');
-            } else if (headerAvatar) {
-                headerAvatar.classList.add('hidden');
+                if (headerInitials) headerInitials.classList.add('hidden');
+            } else {
+                if (headerAvatar) headerAvatar.classList.add('hidden');
+                if (headerInitials) headerInitials.classList.remove('hidden');
             }
 
-            if (headerBadge) headerBadge.classList.remove('hidden');
-        }
-
-        // View Navigation Switcher
-        window.switchView = function(view) {
-            if (!isAuthenticated && view !== 'signed-out') {
-                showLoginGate();
-                return;
-            }
-
-            roadmapView.classList.add('hidden');
-            roadmapView.classList.remove('flex');
-            editorView.classList.add('hidden');
-            editorView.classList.remove('flex');
-            feedbackView.classList.add('hidden');
-            feedbackView.classList.remove('flex');
-            signedOutView.classList.add('hidden');
-            signedOutView.classList.remove('flex');
-
-            const inactiveNav = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all";
-            const activeNav = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-brand-700 shadow-sm transition-all";
-
-            navRoadmap.className = inactiveNav;
-            navEditor.className = inactiveNav;
-            navFeedback.className = inactiveNav;
-
-            if (view === 'roadmap') {
-                roadmapView.classList.remove('hidden');
-                roadmapView.classList.add('flex');
-                navRoadmap.className = activeNav;
-                updateUI();
-            } else if (view === 'editor') {
-                editorView.classList.remove('hidden');
-                editorView.classList.add('flex');
-                navEditor.className = activeNav;
-                updateUI();
-            } else if (view === 'feedback') {
-                feedbackView.classList.remove('hidden');
-                feedbackView.classList.add('flex');
-                navFeedback.className = activeNav;
-                updateUI();
-            } else if (view === 'signed-out') {
-                if (mainAppHeader) {
-                    mainAppHeader.classList.add('hidden');
-                    mainAppHeader.classList.remove('flex');
-                }
-                signedOutView.classList.remove('hidden');
-                signedOutView.classList.add('flex');
-            }
-        };
-
-        // Perspectives Switcher
-        window.setPerspective = function(perspective) {
-            activePerspective = perspective;
-            activeSubfilter = 'ALL';
-
-            const buttons = ['year', 'quarter', 'month', 'module'];
-            buttons.forEach(p => {
-                const btn = document.getElementById(`view-btn-${p}`);
-                if (!btn) return;
-                if (p === perspective) {
-                    btn.className = "px-3 py-1 rounded-lg text-xs font-semibold bg-white text-brand-700 shadow-sm transition-all";
-                } else {
-                    btn.className = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all";
-                }
-            });
-
-            const activeRoadmap = getActiveRoadmap();
-            if (activeRoadmap) {
-                populateSubfilterOptions(activeRoadmap.items);
-                renderTimeline(activeRoadmap.items);
-            }
-        };
-
-        window.applySubfilter = function(val) {
-            activeSubfilter = val;
-            const activeRoadmap = getActiveRoadmap();
-            if (activeRoadmap) {
-                renderTimeline(activeRoadmap.items);
-            }
-        };
-
-        // Populate Perspective Subfilter
-        function populateSubfilterOptions(items) {
-            if (!perspectiveSubfilter) return;
-            perspectiveSubfilter.innerHTML = '<option value="ALL">Show All</option>';
-
-            const labelEl = document.getElementById('subfilter-label');
-
-            if (activePerspective === 'year') {
-                if (labelEl) labelEl.textContent = 'Year:';
-                const years = Array.from(new Set(items.map(i => i.date ? i.date.slice(0, 4) : 'Unscheduled'))).sort();
-                years.forEach(y => {
-                    const opt = document.createElement('option');
-                    opt.value = y;
-                    opt.textContent = y;
-                    perspectiveSubfilter.appendChild(opt);
-                });
-            } else if (activePerspective === 'quarter') {
-                if (labelEl) labelEl.textContent = 'Quarter:';
-                const quarters = Array.from(new Set(items.map(i => {
-                    if (!i.date) return 'Unscheduled';
-                    const [y, m] = i.date.split('-');
-                    const q = Math.ceil(parseInt(m, 10) / 3);
-                    return `Q${q} ${y}`;
-                }))).sort();
-                quarters.forEach(q => {
-                    const opt = document.createElement('option');
-                    opt.value = q;
-                    opt.textContent = q;
-                    perspectiveSubfilter.appendChild(opt);
-                });
-            } else if (activePerspective === 'month') {
-                if (labelEl) labelEl.textContent = 'Month:';
-                const months = Array.from(new Set(items.map(i => i.date || 'Unscheduled'))).sort();
-                months.forEach(m => {
-                    const opt = document.createElement('option');
-                    opt.value = m;
-                    opt.textContent = m === 'Unscheduled' ? 'Unscheduled' : formatMonthYear(m);
-                    perspectiveSubfilter.appendChild(opt);
-                });
-            } else if (activePerspective === 'module') {
-                if (labelEl) labelEl.textContent = 'Module:';
-                const modules = Array.from(new Set(items.map(i => i.module).filter(Boolean))).sort();
-                modules.forEach(mod => {
-                    const opt = document.createElement('option');
-                    opt.value = mod;
-                    opt.textContent = mod;
-                    perspectiveSubfilter.appendChild(opt);
-                });
-            }
-
-            perspectiveSubfilter.value = activeSubfilter || 'ALL';
-        }
-
-        // Format Utilities
-        function formatMonthYear(ym) {
-            if (!ym) return 'Unscheduled';
-            const parts = ym.split('-');
-            if (parts.length < 2) return ym;
-            const year = parts[0];
-            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            const mIdx = parseInt(parts[1], 10) - 1;
-            return `${monthNames[mIdx] || parts[1]} ${year}`;
-        }
-
-        function formatMonthFull(mNum) {
-            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            return monthNames[mNum - 1] || `Month ${mNum}`;
-        }
-
-        // Status Derivation for Feedback
-        function getFeedbackDerivedStatus(feedbackId, activeRoadmap) {
-            if (!activeRoadmap || !activeRoadmap.items) return { status: 'backlog', label: 'Backlog / Unlinked', milestones: [] };
-            
-            const linkedMilestones = activeRoadmap.items.filter(m => (m.feedbackIds || []).includes(feedbackId));
-            
-            if (linkedMilestones.length === 0) {
-                return { status: 'backlog', label: 'Backlog / Unlinked', milestones: [] };
-            }
-
-            if (linkedMilestones.some(m => m.status === 'in-progress')) {
-                return { status: 'in-progress', label: 'In Progress', milestones: linkedMilestones };
-            }
-            if (linkedMilestones.every(m => m.status === 'done')) {
-                return { status: 'done', label: 'Completed', milestones: linkedMilestones };
-            }
-            return { status: 'planned', label: 'Planned', milestones: linkedMilestones };
-        }
-
-        // Update UI View
-        function updateUI() {
-            const activeRoadmap = getActiveRoadmap();
-            if (!activeRoadmap) return;
-
-            if (printRoadmapTitle) printRoadmapTitle.textContent = activeRoadmap.title;
-            if (printDate) printDate.textContent = new Date().toLocaleDateString();
-
-            const feedbackList = activeRoadmap.feedback || [];
-            if (navFeedbackCount) navFeedbackCount.textContent = feedbackList.length;
-            if (feedbackTotalBadge) feedbackTotalBadge.textContent = `${feedbackList.length} items`;
-
-            renderRoadmapSwitcher();
-            populateSubfilterOptions(activeRoadmap.items);
-            populateEditorModuleFilterOptions(activeRoadmap.items);
-            populateFeedbackCategoryOptions(feedbackList);
-            renderEditorTable(activeRoadmap.items);
-            renderFeedbackTable();
-            renderTimeline(activeRoadmap.items);
-        }
-
-        // Render Roadmaps Switcher Bars
-        function renderRoadmapSwitcher() {
-            if (headerRoadmapSelect) {
-                headerRoadmapSelect.innerHTML = '';
-                roadmaps.forEach(r => {
-                    const opt = document.createElement('option');
-                    opt.value = r.id;
-                    opt.textContent = r.title;
-                    if (r.id === currentRoadmapId) opt.selected = true;
-                    headerRoadmapSelect.appendChild(opt);
-                });
-            }
-
-            if (roadmapsTabList) {
-                roadmapsTabList.innerHTML = '';
-                roadmaps.forEach(r => {
-                    const isActive = r.id === currentRoadmapId;
-                    const items = r.items || [];
-                    const doneCount = items.filter(i => i.status === 'done').length;
-                    const pct = items.length ? Math.round((doneCount / items.length) * 100) : 0;
-
-                    const btn = document.createElement('div');
-                    btn.className = `flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
-                        isActive 
-                            ? 'bg-brand-50 text-brand-700 border border-brand-200 shadow-xs' 
-                            : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200'
-                    }`;
-                    btn.onclick = () => selectRoadmap(r.id);
-
-                    btn.innerHTML = `
-                        <i class="ph-bold ph-tree-structure text-sm ${isActive ? 'text-brand-600' : 'text-slate-400'}"></i>
-                        <span class="max-w-[140px] truncate">${r.title}</span>
-                        <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isActive ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-600'}">
-                            ${pct}%
-                        </span>
-                    `;
-                    roadmapsTabList.appendChild(btn);
-                });
+            if (headerBadge) {
+                headerBadge.classList.remove('hidden');
+                headerBadge.setAttribute('title', `Logged in as ${displayName} (${email})`);
             }
         }
 
         window.selectRoadmap = function(id) {
             currentRoadmapId = id;
+            updateUI();
+        };
+
+        // =======================================================
+        // ROADMAP DELETION WITH CONFIRMATION MODAL
+        // =======================================================
+        window.confirmDeleteCurrentRoadmap = function() {
+            promptDeleteRoadmap(currentRoadmapId);
+        };
+
+        window.promptDeleteRoadmap = function(id) {
+            const target = roadmaps.find(r => r.id === id);
+            if (!target) return;
+
+            roadmapToDeleteId = id;
+            const targetTitleEl = document.getElementById('delete-roadmap-target-title');
+            if (targetTitleEl) {
+                targetTitleEl.textContent = `"${target.title}" (${(target.items || []).length} deliverables)`;
+            }
+
+            if (deleteRoadmapModal) deleteRoadmapModal.classList.remove('hidden');
+        };
+
+        window.closeDeleteRoadmapModal = function() {
+            roadmapToDeleteId = null;
+            if (deleteRoadmapModal) deleteRoadmapModal.classList.add('hidden');
+        };
+
+        window.executeRoadmapDeletion = async function() {
+            if (!roadmapToDeleteId) return;
+
+            const deletedId = roadmapToDeleteId;
+            const targetIndex = roadmaps.findIndex(r => r.id === deletedId);
+            
+            // Delete from Firestore if connected
+            if (useCloudPersistence && db && currentUser) {
+                try {
+                    const docRef = doc(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps', deletedId);
+                    await deleteDoc(docRef);
+                } catch (err) {
+                    console.warn("Could not delete from Firestore:", err);
+                }
+            }
+
+            // Remove from local memory
+            roadmaps = roadmaps.filter(r => r.id !== deletedId);
+
+            // If no roadmaps remain, initialize a fresh empty default roadmap
+            if (roadmaps.length === 0) {
+                const newDefault = {
+                    id: 'roadmap-' + Date.now(),
+                    title: 'New Product Roadmap',
+                    updatedAt: new Date().toISOString(),
+                    feedback: [],
+                    items: []
+                };
+                roadmaps.push(newDefault);
+                currentRoadmapId = newDefault.id;
+                await saveRoadmapToCloud(newDefault);
+            } else if (currentRoadmapId === deletedId) {
+                // If the deleted roadmap was the active one, switch to adjacent roadmap
+                const nextIndex = Math.min(targetIndex, roadmaps.length - 1);
+                currentRoadmapId = roadmaps[Math.max(0, nextIndex)].id;
+            }
+
+            closeDeleteRoadmapModal();
             updateUI();
         };
 
@@ -2267,7 +2412,7 @@
             const newComment = {
                 id: 'comm-' + Date.now(),
                 text: text,
-                author: currentUser?.uid ? `User (${currentUser.uid.slice(0, 5)})` : 'Team Member',
+                author: currentUser?.displayName || (currentUser?.email ? currentUser.email.split('@')[0] : 'Workspace Member'),
                 timestamp: new Date().toISOString()
             };
 
@@ -2335,7 +2480,7 @@
                 const newFeedbackIds = getCheckedFeedbackIds('edit-milestone-feedback-list');
 
                 // Detect changes for history logs
-                const authorName = currentUser?.uid ? `User (${currentUser.uid.slice(0, 5)})` : 'Team Member';
+                const authorName = currentUser?.displayName || (currentUser?.email ? currentUser.email.split('@')[0] : 'Workspace Member');
                 const changes = [];
                 if (item.status !== newStatus) changes.push(`Status changed from ${item.status} to ${newStatus}`);
                 if (item.date !== newDate) changes.push(`Target date changed to ${formatMonthYear(newDate)}`);
@@ -2414,7 +2559,7 @@
                             id: 'hist-' + Date.now(),
                             action: 'Milestone created',
                             timestamp: new Date().toISOString(),
-                            user: currentUser?.uid ? `User (${currentUser.uid.slice(0, 5)})` : 'Team Member'
+                            user: currentUser?.displayName || (currentUser?.email ? currentUser.email.split('@')[0] : 'Workspace Member')
                         }
                     ],
                     comments: []
@@ -2438,6 +2583,31 @@
         window.closeNewRoadmapModal = function() {
             if (newRoadmapModal) newRoadmapModal.classList.add('hidden');
         };
+
+        const newRoadmapForm = document.getElementById('new-roadmap-form');
+        if (newRoadmapForm) {
+            newRoadmapForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const titleInput = document.getElementById('new-roadmap-title-input');
+                const title = titleInput?.value.trim();
+                if (!title) return;
+
+                const newRoadmap = {
+                    id: 'roadmap-' + Date.now(),
+                    title: title,
+                    updatedAt: new Date().toISOString(),
+                    feedback: [],
+                    items: []
+                };
+
+                roadmaps.push(newRoadmap);
+                currentRoadmapId = newRoadmap.id;
+
+                await saveRoadmapToCloud(newRoadmap);
+                closeNewRoadmapModal();
+                updateUI();
+            });
+        }
 
         // =======================================================
         // EXPORT LOGIC
