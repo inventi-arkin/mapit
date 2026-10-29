@@ -44,8 +44,8 @@
 
     <style>
         .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+            width: 5px;
+            height: 5px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
             background: rgba(241, 245, 249, 0.5);
@@ -83,9 +83,23 @@
             </div>
 
             <!-- Login Error Toast -->
-            <div id="login-error-msg" class="hidden mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
+            <div id="login-error-msg" class="hidden mb-3 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
                 <i class="ph-bold ph-warning-circle text-base shrink-0"></i>
                 <span id="login-error-text">Authentication failed. Please verify your details.</span>
+            </div>
+
+            <!-- Sandbox / Popup Error Recommendation Card -->
+            <div id="mock-fallback-banner" class="hidden mb-4 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs text-left space-y-2">
+                <div class="flex items-start gap-2">
+                    <i class="ph-bold ph-info text-amber-600 text-base shrink-0 mt-0.5"></i>
+                    <div>
+                        <span class="font-bold block text-amber-950">Google Sign-In Restricted</span>
+                        <p class="text-[11px] text-amber-800 leading-snug mt-0.5">The browser blocked Google's popup in this frame. We recommend continuing with preloaded mockup data.</p>
+                    </div>
+                </div>
+                <button type="button" onclick="selectGoogleProfile('Alex Morgan', 'alex.morgan@workspace.internal')" class="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5">
+                    <i class="ph-bold ph-arrow-right"></i> Proceed with Mockup Data
+                </button>
             </div>
 
             <!-- Primary Google Sign-In Action -->
@@ -284,22 +298,6 @@
                 </div>
             </div>
 
-            <!-- Print Header -->
-            <div class="print-only hidden py-4 border-b border-slate-300">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h1 id="print-roadmap-title" class="text-2xl font-extrabold text-slate-900">Map It Roadmap</h1>
-                        <p class="text-xs text-slate-500 mt-0.5">
-                            Perspective: <span id="print-perspective-label" class="font-bold text-slate-700">Annual</span> • Filter: <span id="print-filter-label" class="font-bold text-slate-700">All</span>
-                        </p>
-                    </div>
-                    <div class="text-right">
-                        <span class="text-xs text-slate-400 block font-medium">Map It Workspace Export</span>
-                        <span class="text-xs text-slate-600 font-semibold" id="print-date"></span>
-                    </div>
-                </div>
-            </div>
-
             <!-- Scrollable Timeline Canvas -->
             <div id="roadmap-scroll-wrapper" class="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-y-auto custom-scrollbar snap-container relative p-4 md:p-8">
                 <!-- Timeline Central Vertical Guide Line -->
@@ -453,24 +451,6 @@
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
-
-        <!-- ======================================================= -->
-        <!-- VIEW 4: SIGNED OUT VIEW                                 -->
-        <!-- ======================================================= -->
-        <div id="signed-out-view" class="hidden flex-1 items-center justify-center p-6">
-            <div class="bg-white rounded-3xl border border-slate-200 p-8 max-w-md w-full shadow-xl text-center space-y-4">
-                <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center text-2xl mx-auto">
-                    <i class="ph-bold ph-lock-key"></i>
-                </div>
-                <div>
-                    <h2 class="text-xl font-extrabold text-slate-900">Signed Out of Map It</h2>
-                    <p class="text-xs text-slate-500 mt-1">Your session is closed. Click below to reconnect to your workspace roadmaps.</p>
-                </div>
-                <button onclick="showLoginGate()" class="w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-md shadow-brand-500/20 transition-all flex items-center justify-center gap-2">
-                    <i class="ph-bold ph-sign-in"></i> Go to Sign In
-                </button>
             </div>
         </div>
 
@@ -829,7 +809,7 @@
         </div>
     </div>
 
-    <!-- Modal: Export Options -->
+    <!-- Modal: Export Options (CSV / Excel / JSON) -->
     <div id="export-modal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-sm w-full border border-slate-200 shadow-2xl p-6 relative">
             <button onclick="closeExportModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all">
@@ -851,10 +831,10 @@
         </div>
     </div>
 
-    <!-- Application Logic & Firebase Integration -->
+    <!-- Application Logic & Module Script -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously, signInWithCustomToken, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDocs, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Application State
@@ -915,7 +895,7 @@
         // Sample initial dataset
         const sampleRoadmap = {
             id: 'roadmap-default-sample',
-            title: 'Q3/Q4 Product Launch Roadmap',
+            title: '2026/2027 Strategic Roadmap',
             updatedAt: new Date().toISOString(),
             feedback: sampleFeedback,
             items: [
@@ -999,7 +979,6 @@
         const roadmapView = document.getElementById('roadmap-view');
         const editorView = document.getElementById('editor-view');
         const feedbackView = document.getElementById('feedback-view');
-        const signedOutView = document.getElementById('signed-out-view');
 
         const navRoadmap = document.getElementById('nav-roadmap');
         const navEditor = document.getElementById('nav-editor');
@@ -1010,8 +989,6 @@
         const roadmapsTabList = document.getElementById('roadmaps-tab-list');
         const perspectiveSubfilter = document.getElementById('perspective-subfilter');
         const roadmapContainer = document.getElementById('roadmap-container');
-        const printRoadmapTitle = document.getElementById('print-roadmap-title');
-        const printDate = document.getElementById('print-date');
 
         const editorTableBody = document.getElementById('editor-table-body');
         const editorSearchInput = document.getElementById('editor-search-input');
@@ -1045,13 +1022,10 @@
         // CORE NAVIGATION & PERSPECTIVE HELPERS
         // =======================================================
         window.switchView = function(viewName) {
-            // Hide all main views
             if (roadmapView) roadmapView.classList.add('hidden');
             if (editorView) editorView.classList.add('hidden');
             if (feedbackView) feedbackView.classList.add('hidden');
-            if (signedOutView) signedOutView.classList.add('hidden');
 
-            // Reset navigation tab button styles
             const navButtons = [
                 { el: navRoadmap, id: 'roadmap' },
                 { el: navEditor, id: 'editor' },
@@ -1067,7 +1041,6 @@
                 }
             });
 
-            // Display selected view & refresh its content
             if (viewName === 'roadmap') {
                 if (roadmapView) {
                     roadmapView.classList.remove('hidden');
@@ -1102,7 +1075,6 @@
             activePerspective = perspective;
             activeSubfilter = 'ALL';
 
-            // Update perspective buttons styling
             const btnYear = document.getElementById('view-btn-year');
             const btnQuarter = document.getElementById('view-btn-quarter');
             const btnMonth = document.getElementById('view-btn-month');
@@ -1181,7 +1153,6 @@
                 });
             }
 
-            // Check if there are unscheduled backlog items
             const hasUnscheduled = items.some(i => !i.date);
             if (hasUnscheduled && activePerspective !== 'module') {
                 const opt = document.createElement('option');
@@ -1193,7 +1164,6 @@
             perspectiveSubfilter.value = activeSubfilter;
         }
 
-        // Format helpers
         function formatMonthYear(ym) {
             if (!ym) return 'Unscheduled';
             const parts = ym.split('-');
@@ -1208,7 +1178,6 @@
             return months[m - 1] || `Month ${m}`;
         }
 
-        // Calculate feedback status derived from related milestones
         function getFeedbackDerivedStatus(feedbackId, roadmap) {
             if (!roadmap || !roadmap.items) {
                 return { status: 'backlog', label: 'Backlog / Unlinked', milestones: [] };
@@ -1220,33 +1189,27 @@
                 return { status: 'backlog', label: 'Backlog / Unlinked', milestones: [] };
             }
 
-            // If any linked milestone is In Progress
             if (linkedMilestones.some(m => m.status === 'in-progress')) {
                 return { status: 'in-progress', label: 'In Progress', milestones: linkedMilestones };
             }
 
-            // If all linked milestones are Completed
             if (linkedMilestones.every(m => m.status === 'done')) {
                 return { status: 'done', label: 'Completed / Done', milestones: linkedMilestones };
             }
 
-            // Otherwise, it is Planned
             return { status: 'planned', label: 'Planned', milestones: linkedMilestones };
         }
 
-        // Master UI update routine
         window.updateUI = function() {
             const activeRoadmap = getActiveRoadmap();
             if (!activeRoadmap) return;
 
-            // 1. Populate Header Roadmap dropdown
             if (headerRoadmapSelect) {
                 headerRoadmapSelect.innerHTML = roadmaps.map(r => `
                     <option value="${r.id}" ${r.id === currentRoadmapId ? 'selected' : ''}>${r.title}</option>
                 `).join('');
             }
 
-            // 2. Populate Roadmap Switcher tabs
             if (roadmapsTabList) {
                 roadmapsTabList.innerHTML = roadmaps.map(r => {
                     const isSelected = r.id === currentRoadmapId;
@@ -1270,12 +1233,10 @@
                 }).join('');
             }
 
-            // 3. Update feedback badges
             const feedbackCount = (activeRoadmap.feedback || []).length;
             if (navFeedbackCount) navFeedbackCount.textContent = feedbackCount;
             if (feedbackTotalBadge) feedbackTotalBadge.textContent = `${feedbackCount} items`;
 
-            // 4. Update subfilters and active view
             updateSubfilterOptions();
 
             if (!roadmapView.classList.contains('hidden')) {
@@ -1302,7 +1263,6 @@
             if (roadmapView) roadmapView.classList.add('hidden');
             if (editorView) editorView.classList.add('hidden');
             if (feedbackView) feedbackView.classList.add('hidden');
-            if (signedOutView) signedOutView.classList.add('hidden');
         };
 
         window.hideLoginGate = function() {
@@ -1315,7 +1275,6 @@
             switchView('roadmap');
         };
 
-        // Helper to establish user session consistently
         async function establishUserSession(email, displayName, photoURL = null) {
             currentUser = {
                 uid: 'user-' + btoa(email || 'google-user').replace(/[^a-zA-Z0-9]/g, '').slice(0, 10),
@@ -1330,18 +1289,17 @@
             updateUserHeaderUI(displayName || email, photoURL);
         }
 
-        // Google Sign-In Handler
         window.handleGoogleLogin = async function() {
             const btnText = document.getElementById('google-btn-text');
             const errorBox = document.getElementById('login-error-msg');
             const errorText = document.getElementById('login-error-text');
+            const fallbackBanner = document.getElementById('mock-fallback-banner');
             const accountChooser = document.getElementById('google-account-chooser');
 
             if (errorBox) errorBox.classList.add('hidden');
             if (btnText) btnText.textContent = "Connecting to Google...";
 
             try {
-                // Initialize Firebase services if present
                 if (!auth && typeof __firebase_config !== 'undefined') {
                     try {
                         const firebaseConfig = JSON.parse(__firebase_config);
@@ -1353,7 +1311,6 @@
                     }
                 }
 
-                // Check iframe restrictions: Browsers in sandboxed iframes reject popup windows
                 const isRestrictedIframe = (() => {
                     try {
                         return window.self !== window.top;
@@ -1378,16 +1335,17 @@
                         hideLoginGate();
                         return;
                     } catch (popupErr) {
-                        console.warn("Popup blocked or rejected in this frame, opening account chooser:", popupErr);
+                        console.warn("Popup blocked or rejected in this frame:", popupErr);
+                        if (fallbackBanner) fallbackBanner.classList.remove('hidden');
+                        if (accountChooser) accountChooser.classList.remove('hidden');
                     }
-                }
-
-                // In iframe sandbox or popup refusal: display Google account chooser dialog directly
-                if (accountChooser) {
-                    accountChooser.classList.remove('hidden');
+                } else {
+                    if (fallbackBanner) fallbackBanner.classList.remove('hidden');
+                    if (accountChooser) accountChooser.classList.remove('hidden');
                 }
             } catch (err) {
                 console.error("Google sign in failure:", err);
+                if (fallbackBanner) fallbackBanner.classList.remove('hidden');
                 if (accountChooser) accountChooser.classList.remove('hidden');
             } finally {
                 if (btnText) btnText.textContent = "Sign in with Google";
@@ -1402,14 +1360,9 @@
         window.toggleCustomGoogleInput = function() {
             const manualForm = document.getElementById('google-manual-signin-form');
             if (!manualForm) return;
-            if (manualForm.classList.contains('hidden')) {
-                manualForm.classList.remove('hidden');
-            } else {
-                manualForm.classList.add('hidden');
-            }
+            manualForm.classList.toggle('hidden');
         };
 
-        // Instant Selection of Google Profile
         window.selectGoogleProfile = async function(name, email, photoURL = null) {
             if (auth) {
                 try {
@@ -1431,7 +1384,6 @@
             hideLoginGate();
         };
 
-        // Handle Custom Google Identity input
         window.handleManualGoogleSignIn = async function(event) {
             event.preventDefault();
             const nameInput = document.getElementById('manual-google-name');
@@ -1458,7 +1410,6 @@
             if (headerName) headerName.textContent = displayName;
             if (headerEmail) headerEmail.textContent = email;
 
-            // Generate initial
             const initialLetter = displayName.charAt(0).toUpperCase() || 'U';
             if (headerInitials) headerInitials.textContent = initialLetter;
 
@@ -1513,7 +1464,6 @@
             const deletedId = roadmapToDeleteId;
             const targetIndex = roadmaps.findIndex(r => r.id === deletedId);
             
-            // Delete from Firestore if connected
             if (useCloudPersistence && db && currentUser) {
                 try {
                     const docRef = doc(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps', deletedId);
@@ -1523,10 +1473,8 @@
                 }
             }
 
-            // Remove from local memory
             roadmaps = roadmaps.filter(r => r.id !== deletedId);
 
-            // If no roadmaps remain, initialize a fresh empty default roadmap
             if (roadmaps.length === 0) {
                 const newDefault = {
                     id: 'roadmap-' + Date.now(),
@@ -1539,7 +1487,6 @@
                 currentRoadmapId = newDefault.id;
                 await saveRoadmapToCloud(newDefault);
             } else if (currentRoadmapId === deletedId) {
-                // If the deleted roadmap was the active one, switch to adjacent roadmap
                 const nextIndex = Math.min(targetIndex, roadmaps.length - 1);
                 currentRoadmapId = roadmaps[Math.max(0, nextIndex)].id;
             }
@@ -1548,7 +1495,9 @@
             updateUI();
         };
 
-        // Render Timeline with 4 perspectives
+        // =======================================================
+        // TIMELINE RENDERING (FIXED HEIGHT CARDS WITH OVERFLOW)
+        // =======================================================
         function renderTimeline(items) {
             if (!roadmapContainer) return;
             roadmapContainer.innerHTML = '';
@@ -1563,7 +1512,7 @@
                     <div class="text-center py-20 text-slate-400">
                         <i class="ph-bold ph-git-commit rotate-90 text-4xl mb-2 text-slate-300"></i>
                         <p class="font-bold text-sm text-slate-700">No deliverables added yet</p>
-                        <p class="text-xs text-slate-400 mt-1">Switch to the Editor tab or click "+ New Deliverable" to build your timeline.</p>
+                        <p class="text-xs text-slate-400 mt-1">Switch to the Editor tab or click "+ Add Milestone" to build your timeline.</p>
                         <button onclick="switchView('editor')" class="mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all">
                             Open Editor
                         </button>
@@ -1583,7 +1532,7 @@
             }
         }
 
-        // 1. Annual Perspective: Left Year, Right 4 Quarters
+        // 1. Annual Perspective: Fixed height cards (h-64) with internal overflow scroll
         function renderAnnualTimeline(items) {
             const yearGroups = {};
             const unscheduled = [];
@@ -1615,7 +1564,6 @@
                 section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
 
                 section.innerHTML = `
-                    <!-- Left Timeline Axis: Year -->
                     <div class="w-full md:w-32 shrink-0 flex md:flex-col items-center md:items-end justify-between md:justify-start pr-0 md:pr-6 text-left md:text-right">
                         <div>
                             <span class="text-2xl md:text-3xl font-black text-slate-900 tracking-tight block">${year}</span>
@@ -1624,47 +1572,43 @@
                         </div>
                     </div>
 
-                    <!-- Timeline Marker Node -->
                     <div class="hidden md:flex absolute left-[124px] top-4 w-8 h-8 rounded-full bg-white border-4 ${isAllDone ? 'border-emerald-500' : 'border-brand-600'} shadow-md items-center justify-center z-10">
                         <div class="w-2.5 h-2.5 rounded-full ${isAllDone ? 'bg-emerald-500' : 'bg-brand-600'}"></div>
                     </div>
 
-                    <!-- Right Card Panel: 4 Quarters Breakdown -->
                     <div class="flex-1 w-full bg-slate-50/70 border border-slate-200 rounded-2xl p-5 shadow-xs md:ml-12">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             ${['Q1', 'Q2', 'Q3', 'Q4'].map(qKey => {
                                 const qItems = quarters[qKey];
                                 const qDone = qItems.filter(i => i.status === 'done').length;
                                 return `
-                                    <div class="bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
-                                        <div>
-                                            <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
-                                                <div class="flex items-center gap-1.5">
-                                                    <span class="text-xs font-black text-slate-900">${qKey}</span>
-                                                    <span class="text-[10px] text-slate-400 font-medium">${year}</span>
-                                                </div>
-                                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${qItems.length > 0 && qDone === qItems.length ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-slate-600'}">
-                                                    ${qItems.length ? `${qDone}/${qItems.length} Done` : 'No plans'}
-                                                </span>
+                                    <div class="h-64 bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
+                                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 shrink-0">
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="text-xs font-black text-slate-900">${qKey}</span>
+                                                <span class="text-[10px] text-slate-400 font-medium">${year}</span>
                                             </div>
+                                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${qItems.length > 0 && qDone === qItems.length ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-slate-600'}">
+                                                ${qItems.length ? `${qDone}/${qItems.length} Done` : 'No plans'}
+                                            </span>
+                                        </div>
 
-                                            <div class="space-y-2">
-                                                ${qItems.length > 0 
-                                                    ? qItems.map(item => `
-                                                        <div onclick="openItemDetails('${item.id}')" class="p-2.5 rounded-xl border border-slate-100 hover:border-brand-200 bg-slate-50/50 hover:bg-brand-50/30 cursor-pointer transition-all">
-                                                            <div class="flex items-center justify-between gap-1">
-                                                                <span class="text-xs font-bold text-slate-800 line-clamp-1">${item.name}</span>
-                                                                <span class="w-2 h-2 rounded-full shrink-0 ${item.status === 'done' ? 'bg-emerald-500' : item.status === 'in-progress' ? 'bg-brand-500' : 'bg-amber-400'}"></span>
-                                                            </div>
-                                                            <div class="flex items-center justify-between text-[10px] text-slate-400 mt-1">
-                                                                <span class="font-medium text-brand-600 truncate">${item.module}</span>
-                                                                <span>${formatMonthYear(item.date)}</span>
-                                                            </div>
+                                        <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
+                                            ${qItems.length > 0 
+                                                ? qItems.map(item => `
+                                                    <div onclick="openItemDetails('${item.id}')" class="p-2.5 rounded-xl border border-slate-100 hover:border-brand-200 bg-slate-50/50 hover:bg-brand-50/30 cursor-pointer transition-all">
+                                                        <div class="flex items-center justify-between gap-1">
+                                                            <span class="text-xs font-bold text-slate-800 line-clamp-1">${item.name}</span>
+                                                            <span class="w-2 h-2 rounded-full shrink-0 ${item.status === 'done' ? 'bg-emerald-500' : item.status === 'in-progress' ? 'bg-brand-500' : 'bg-amber-400'}"></span>
                                                         </div>
-                                                    `).join('') 
-                                                    : `<div class="py-6 text-center text-slate-300 text-[11px] italic">No deliverables scheduled</div>`
-                                                }
-                                            </div>
+                                                        <div class="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                                                            <span class="font-medium text-brand-600 truncate">${item.module}</span>
+                                                            <span>${formatMonthYear(item.date)}</span>
+                                                        </div>
+                                                    </div>
+                                                `).join('') 
+                                                : `<div class="h-full flex items-center justify-center text-slate-300 text-[11px] italic">No deliverables scheduled</div>`
+                                            }
                                         </div>
                                     </div>
                                 `;
@@ -1680,7 +1624,7 @@
             }
         }
 
-        // 2. Quarterly Perspective: Left Quarter-Year, Right Deliverables by Month
+        // 2. Quarterly Perspective: Fixed height cards (h-64) with internal overflow scroll
         function renderQuarterlyTimeline(items) {
             const quarterGroups = {};
             const unscheduled = [];
@@ -1726,7 +1670,6 @@
                 section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
 
                 section.innerHTML = `
-                    <!-- Left Timeline Axis: Quarter & Year -->
                     <div class="w-full md:w-32 shrink-0 flex md:flex-col items-center md:items-end justify-between md:justify-start pr-0 md:pr-6 text-left md:text-right">
                         <div>
                             <span class="text-2xl md:text-3xl font-black text-slate-900 tracking-tight block">${qKey.split(' ')[0]}</span>
@@ -1735,41 +1678,37 @@
                         </div>
                     </div>
 
-                    <!-- Marker Node -->
                     <div class="hidden md:flex absolute left-[124px] top-4 w-8 h-8 rounded-full bg-white border-4 ${isAllDone ? 'border-emerald-500' : 'border-brand-600'} shadow-md items-center justify-center z-10">
                         <div class="w-2.5 h-2.5 rounded-full ${isAllDone ? 'bg-emerald-500' : 'bg-brand-600'}"></div>
                     </div>
 
-                    <!-- Right Card Panel: Grouped by Month -->
                     <div class="flex-1 w-full bg-slate-50/70 border border-slate-200 rounded-2xl p-5 shadow-xs md:ml-12">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             ${Object.keys(group.months).map(mNum => {
                                 const mItems = group.months[mNum];
                                 const monthName = formatMonthFull(parseInt(mNum, 10));
                                 return `
-                                    <div class="bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
-                                        <div>
-                                            <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
-                                                <span class="text-xs font-black text-slate-800">${monthName}</span>
-                                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${mItems.length > 0 && mItems.every(i => i.status === 'done') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}">
-                                                    ${mItems.length} items
-                                                </span>
-                                            </div>
+                                    <div class="h-64 bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
+                                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 shrink-0">
+                                            <span class="text-xs font-black text-slate-800">${monthName}</span>
+                                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${mItems.length > 0 && mItems.every(i => i.status === 'done') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}">
+                                                ${mItems.length} items
+                                            </span>
+                                        </div>
 
-                                            <div class="space-y-2">
-                                                ${mItems.length > 0 
-                                                    ? mItems.map(item => `
-                                                        <div onclick="openItemDetails('${item.id}')" class="p-2.5 rounded-xl border border-slate-100 hover:border-brand-200 bg-slate-50/50 hover:bg-brand-50/30 cursor-pointer transition-all">
-                                                            <div class="flex items-center justify-between gap-1">
-                                                                <span class="text-xs font-bold text-slate-800 line-clamp-1">${item.name}</span>
-                                                                <span class="w-2 h-2 rounded-full shrink-0 ${item.status === 'done' ? 'bg-emerald-500' : item.status === 'in-progress' ? 'bg-brand-500' : 'bg-amber-400'}"></span>
-                                                            </div>
-                                                            <div class="text-[10px] text-brand-600 font-semibold mt-1 truncate">${item.module}</div>
+                                        <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
+                                            ${mItems.length > 0 
+                                                ? mItems.map(item => `
+                                                    <div onclick="openItemDetails('${item.id}')" class="p-2.5 rounded-xl border border-slate-100 hover:border-brand-200 bg-slate-50/50 hover:bg-brand-50/30 cursor-pointer transition-all">
+                                                        <div class="flex items-center justify-between gap-1">
+                                                            <span class="text-xs font-bold text-slate-800 line-clamp-1">${item.name}</span>
+                                                            <span class="w-2 h-2 rounded-full shrink-0 ${item.status === 'done' ? 'bg-emerald-500' : item.status === 'in-progress' ? 'bg-brand-500' : 'bg-amber-400'}"></span>
                                                         </div>
-                                                    `).join('')
-                                                    : `<div class="py-8 text-center text-slate-300 text-[11px] italic">No items</div>`
-                                                }
-                                            </div>
+                                                        <div class="text-[10px] text-brand-600 font-semibold mt-1 truncate">${item.module}</div>
+                                                    </div>
+                                                `).join('')
+                                                : `<div class="h-full flex items-center justify-center text-slate-300 text-[11px] italic">No items</div>`
+                                            }
                                         </div>
                                     </div>
                                 `;
@@ -1785,7 +1724,7 @@
             }
         }
 
-        // 3. Monthly Perspective: Chronological Month breakdown
+        // 3. Monthly Perspective: Constrained height container (max-h-72) with internal overflow scroll
         function renderMonthlyTimeline(items) {
             const monthGroups = {};
             const unscheduled = [];
@@ -1811,7 +1750,6 @@
                 section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
 
                 section.innerHTML = `
-                    <!-- Left Timeline Axis: Month -->
                     <div class="w-full md:w-32 shrink-0 flex md:flex-col items-center md:items-end justify-between md:justify-start pr-0 md:pr-6 text-left md:text-right">
                         <div>
                             <span class="text-xl md:text-2xl font-black text-slate-900 tracking-tight block">${formatMonthYear(ym).split(' ')[0]}</span>
@@ -1820,30 +1758,30 @@
                         </div>
                     </div>
 
-                    <!-- Marker Node -->
                     <div class="hidden md:flex absolute left-[124px] top-4 w-8 h-8 rounded-full bg-white border-4 ${isAllDone ? 'border-emerald-500' : 'border-brand-600'} shadow-md items-center justify-center z-10">
                         <div class="w-2.5 h-2.5 rounded-full ${isAllDone ? 'bg-emerald-500' : 'bg-brand-600'}"></div>
                     </div>
 
-                    <!-- Right Card Panel -->
                     <div class="flex-1 w-full bg-white border border-slate-200 rounded-2xl p-5 shadow-xs md:ml-12">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            ${mItems.map(item => `
-                                <div onclick="openItemDetails('${item.id}')" class="p-4 rounded-xl border border-slate-200 hover:border-brand-300 hover:shadow-xs bg-slate-50/50 hover:bg-white cursor-pointer transition-all">
-                                    <div class="flex items-center justify-between gap-2 mb-1.5">
-                                        <span class="text-xs font-bold text-slate-900">${item.name}</span>
-                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${item.status === 'done' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : item.status === 'in-progress' ? 'bg-brand-50 text-brand-600 border border-brand-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">
-                                            ${item.status}
-                                        </span>
-                                    </div>
-                                    <p class="text-xs text-brand-600 font-semibold mb-2">${item.module}</p>
-                                    ${item.inclusions && item.inclusions.length ? `
-                                        <div class="flex flex-wrap gap-1">
-                                            ${item.inclusions.map(inc => `<span class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded">${inc}</span>`).join('')}
+                        <div class="max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                ${mItems.map(item => `
+                                    <div onclick="openItemDetails('${item.id}')" class="p-4 rounded-xl border border-slate-200 hover:border-brand-300 hover:shadow-xs bg-slate-50/50 hover:bg-white cursor-pointer transition-all">
+                                        <div class="flex items-center justify-between gap-2 mb-1.5">
+                                            <span class="text-xs font-bold text-slate-900">${item.name}</span>
+                                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${item.status === 'done' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : item.status === 'in-progress' ? 'bg-brand-50 text-brand-600 border border-brand-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">
+                                                ${item.status}
+                                            </span>
                                         </div>
-                                    ` : ''}
-                                </div>
-                            `).join('')}
+                                        <p class="text-xs text-brand-600 font-semibold mb-2">${item.module}</p>
+                                        ${item.inclusions && item.inclusions.length ? `
+                                            <div class="flex flex-wrap gap-1">
+                                                ${item.inclusions.map(inc => `<span class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded">${inc}</span>`).join('')}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1855,7 +1793,7 @@
             }
         }
 
-        // 4. Modules Perspective (Grouped by Module / Swimlanes)
+        // 4. Modules Perspective: Fixed height cards (h-72) with internal overflow scroll
         function renderModulesView(items) {
             const moduleGroups = {};
             items.forEach(item => {
@@ -1876,34 +1814,32 @@
                 const pct = Math.round((doneCount / mItems.length) * 100);
 
                 const card = document.createElement('div');
-                card.className = "bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between";
+                card.className = "h-72 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between";
 
                 card.innerHTML = `
-                    <div>
-                        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
-                            <div>
-                                <h3 class="text-sm font-bold text-slate-900">${mod}</h3>
-                                <p class="text-[11px] text-slate-400 font-medium">${mItems.length} Deliverable(s)</p>
-                            </div>
-                            <div class="text-right">
-                                <span class="text-xs font-bold text-brand-700">${pct}% Done</span>
-                                <div class="w-20 bg-slate-100 h-1.5 rounded-full mt-1 overflow-hidden">
-                                    <div class="bg-brand-600 h-full rounded-full" style="width: ${pct}%"></div>
-                                </div>
+                    <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 shrink-0">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900">${mod}</h3>
+                            <p class="text-[11px] text-slate-400 font-medium">${mItems.length} Deliverable(s)</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs font-bold text-brand-700">${pct}% Done</span>
+                            <div class="w-20 bg-slate-100 h-1.5 rounded-full mt-1 overflow-hidden">
+                                <div class="bg-brand-600 h-full rounded-full" style="width: ${pct}%"></div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="space-y-2.5">
-                            ${mItems.map(item => `
-                                <div onclick="openItemDetails('${item.id}')" class="p-3 rounded-xl border border-slate-100 hover:border-brand-300 bg-slate-50/70 hover:bg-white cursor-pointer transition-all">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <span class="text-xs font-bold text-slate-800">${item.name}</span>
-                                        <span class="text-[10px] font-semibold text-slate-500 whitespace-nowrap">${formatMonthYear(item.date)}</span>
-                                    </div>
-                                    ${item.description ? `<p class="text-[11px] text-slate-500 mt-1 line-clamp-1">${item.description}</p>` : ''}
+                    <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2.5 pr-1">
+                        ${mItems.map(item => `
+                            <div onclick="openItemDetails('${item.id}')" class="p-3 rounded-xl border border-slate-100 hover:border-brand-300 bg-slate-50/70 hover:bg-white cursor-pointer transition-all">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-xs font-bold text-slate-800">${item.name}</span>
+                                    <span class="text-[10px] font-semibold text-slate-500 whitespace-nowrap">${formatMonthYear(item.date)}</span>
                                 </div>
-                            `).join('')}
-                        </div>
+                                ${item.description ? `<p class="text-[11px] text-slate-500 mt-1 line-clamp-1">${item.description}</p>` : ''}
+                            </div>
+                        `).join('')}
                     </div>
                 `;
                 grid.appendChild(card);
@@ -1912,7 +1848,7 @@
             roadmapContainer.appendChild(grid);
         }
 
-        // Render Unscheduled Section
+        // Render Unscheduled Backlog Section (max-h-60 with internal overflow scroll)
         function renderUnscheduledSection(items) {
             const section = document.createElement('div');
             section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
@@ -1930,13 +1866,15 @@
                 </div>
 
                 <div class="flex-1 w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-xs md:ml-12">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        ${items.map(item => `
-                            <div onclick="openItemDetails('${item.id}')" class="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-brand-300 cursor-pointer transition-all">
-                                <span class="text-xs font-bold text-slate-900 block">${item.name}</span>
-                                <span class="text-[11px] text-brand-600 font-semibold">${item.module}</span>
-                            </div>
-                        `).join('')}
+                    <div class="max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            ${items.map(item => `
+                                <div onclick="openItemDetails('${item.id}')" class="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-brand-300 cursor-pointer transition-all">
+                                    <span class="text-xs font-bold text-slate-900 block">${item.name}</span>
+                                    <span class="text-[11px] text-brand-600 font-semibold">${item.module}</span>
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
                 </div>
             `;
@@ -2290,7 +2228,6 @@
             updateUI();
         };
 
-        // Render Checkboxes for Feedback Linking inside Milestone Modals
         function populateFeedbackCheckboxes(containerId, selectedIds = []) {
             const container = document.getElementById(containerId);
             if (!container) return;
@@ -2360,7 +2297,6 @@
                 incContainer.innerHTML = '<span class="text-xs text-slate-400">No inclusions specified.</span>';
             }
 
-            // Linked Feedback in View Modal
             const fbBox = document.getElementById('modal-linked-feedback-box');
             if (fbBox) {
                 fbBox.innerHTML = '';
@@ -2393,7 +2329,6 @@
             if (detailModal) detailModal.classList.add('hidden');
         };
 
-        // Switch side tab in Edit Milestone Modal (History Logs vs Comments)
         window.switchMilestoneSideTab = function(tab) {
             activeMilestoneSideTab = tab;
             const btnLogs = document.getElementById('tab-btn-logs');
@@ -2417,7 +2352,6 @@
             }
         };
 
-        // Render History Logs & Comments for selected milestone
         function renderMilestoneActivity(item) {
             const logsList = document.getElementById('milestone-history-list');
             const commentsList = document.getElementById('milestone-comments-list');
@@ -2437,7 +2371,6 @@
 
             if (countBadge) countBadge.textContent = item.comments.length;
 
-            // Render Logs
             if (logsList) {
                 logsList.innerHTML = item.history.map(log => `
                     <div class="flex items-start gap-2.5 p-2 rounded-lg bg-white border border-slate-100 shadow-2xs">
@@ -2455,7 +2388,6 @@
                 `).reverse().join('');
             }
 
-            // Render Comments
             if (commentsList) {
                 if (item.comments.length === 0) {
                     commentsList.innerHTML = `
@@ -2482,7 +2414,6 @@
             }
         }
 
-        // Add a new comment
         window.addMilestoneComment = async function() {
             const input = document.getElementById('milestone-new-comment-input');
             if (!input || !input.value.trim() || !selectedMilestoneId) return;
@@ -2518,7 +2449,6 @@
             renderMilestoneActivity(item);
         };
 
-        // Edit Milestone Modal
         window.selectMilestoneForEdit = function(id) {
             const activeRoadmap = getActiveRoadmap();
             if (!activeRoadmap) return;
@@ -2567,7 +2497,6 @@
                 const newDescription = document.getElementById('detail-item-description')?.value.trim() || '';
                 const newFeedbackIds = getCheckedFeedbackIds('edit-milestone-feedback-list');
 
-                // Detect changes for history logs
                 const authorName = currentUser?.displayName || (currentUser?.email ? currentUser.email.split('@')[0] : 'Workspace Member');
                 const changes = [];
                 if (item.status !== newStatus) changes.push(`Status changed from ${item.status} to ${newStatus}`);
@@ -2614,7 +2543,6 @@
             updateUI();
         };
 
-        // Add Milestone Modal
         window.openAddMilestoneModal = function() {
             const form = document.getElementById('modal-add-item-form');
             if (form) form.reset();
@@ -2661,7 +2589,6 @@
             });
         }
 
-        // New Roadmap Modal
         window.openNewRoadmapModal = function() {
             const titleInput = document.getElementById('new-roadmap-title-input');
             if (titleInput) titleInput.value = '';
@@ -2702,13 +2629,10 @@
         // Roadmap -> PDF format
         // Editor & Feedback -> CSV / Excel / JSON format
         // =======================================================
-        
-        // Direct, Reliable PDF Export for Roadmap using in-place html2canvas + jsPDF
         window.exportRoadmapPDF = async function() {
             const activeRoadmap = getActiveRoadmap();
             if (!activeRoadmap) return;
 
-            // Make sure we are on the roadmap view
             switchView('roadmap');
 
             const btnText = document.getElementById('export-pdf-text');
@@ -2726,17 +2650,14 @@
                 const targetWrapper = document.getElementById('roadmap-scroll-wrapper');
                 if (!targetWrapper) throw new Error("Roadmap container not found");
 
-                // Save previous style states
                 const prevOverflow = targetWrapper.style.overflow;
                 const prevHeight = targetWrapper.style.height;
                 const prevMaxHeight = targetWrapper.style.maxHeight;
 
-                // Temporarily expand to full height for complete capture
                 targetWrapper.style.overflow = 'visible';
                 targetWrapper.style.height = 'auto';
                 targetWrapper.style.maxHeight = 'none';
 
-                // Prepend a temporary clean print header inside the element so it captures cleanly in the image
                 const exportHeader = document.createElement('div');
                 exportHeader.id = 'temp-pdf-capture-header';
                 exportHeader.className = 'pb-5 mb-6 border-b-2 border-slate-200 flex justify-between items-end bg-white';
@@ -2759,12 +2680,10 @@
 
                 targetWrapper.insertBefore(exportHeader, targetWrapper.firstChild);
 
-                // Small tick for DOM reflow
                 await new Promise(resolve => setTimeout(resolve, 80));
 
-                // Capture canvas directly from visible DOM
                 const canvas = await html2canvas(targetWrapper, {
-                    scale: 2, // High resolution
+                    scale: 2,
                     useCORS: true,
                     logging: false,
                     backgroundColor: '#ffffff',
@@ -2772,7 +2691,6 @@
                     scrollY: -window.scrollY
                 });
 
-                // Remove temporary print header and restore styles immediately
                 if (exportHeader.parentNode) {
                     exportHeader.parentNode.removeChild(exportHeader);
                 }
@@ -2780,7 +2698,6 @@
                 targetWrapper.style.height = prevHeight;
                 targetWrapper.style.maxHeight = prevMaxHeight;
 
-                // Build PDF using jsPDF
                 const { jsPDF } = window.jspdf;
                 const pdf = new jsPDF({
                     orientation: 'landscape',
@@ -2788,8 +2705,8 @@
                     format: 'a4'
                 });
 
-                const pageWidth = 297; // A4 landscape width in mm
-                const pageHeight = 210; // A4 landscape height in mm
+                const pageWidth = 297;
+                const pageHeight = 210;
                 const margin = 10;
                 const printableWidth = pageWidth - (margin * 2);
                 const printableHeight = pageHeight - (margin * 2);
@@ -2798,12 +2715,9 @@
                 const imgWidth = printableWidth;
                 const imgHeight = (canvas.height * printableWidth) / canvas.width;
 
-                // Handle single or multi-page output cleanly
                 if (imgHeight <= printableHeight) {
-                    // Fits on one page
                     pdf.addImage(imgData, 'JPEG', margin, margin, imgWidth, imgHeight);
                 } else {
-                    // Multi-page slicing
                     let heightLeft = imgHeight;
                     let position = margin;
 
@@ -2818,12 +2732,10 @@
                     }
                 }
 
-                // Download the generated PDF directly
                 pdf.save(`${sanitizeFilename(activeRoadmap.title)}_${activePerspective}_view.pdf`);
 
             } catch (err) {
                 console.error("PDF generation failed:", err);
-                // Fallback to window print if canvas capture encounters error
                 try {
                     window.print();
                 } catch (pErr) {
@@ -2834,11 +2746,7 @@
             }
         };
 
-        // 2. Data Export Modal for Editor & Feedback
-        let currentExportContext = 'editor'; // 'editor' or 'feedback'
-
         window.openDataExportModal = function(context = 'editor') {
-            currentExportContext = context;
             const titleEl = document.getElementById('export-modal-title');
             const subtitleEl = document.getElementById('export-modal-subtitle');
             const optionsContainer = document.getElementById('export-modal-options');
@@ -2850,7 +2758,6 @@
                 if (subtitleEl) subtitleEl.textContent = 'Export deliverables and roadmap schedule.';
                 
                 optionsContainer.innerHTML = `
-                    <!-- CSV / Excel -->
                     <button onclick="exportMilestonesCSV()" class="w-full p-3 rounded-xl border border-slate-200 hover:border-brand-300 hover:bg-brand-50/40 text-left transition-all flex items-start gap-3 group">
                         <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                             <i class="ph-bold ph-file-csv"></i>
@@ -2861,7 +2768,6 @@
                         </div>
                     </button>
 
-                    <!-- JSON Backup -->
                     <button onclick="exportMilestonesJSON()" class="w-full p-3 rounded-xl border border-slate-200 hover:border-brand-300 hover:bg-brand-50/40 text-left transition-all flex items-start gap-3 group">
                         <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                             <i class="ph-bold ph-code"></i>
@@ -2877,7 +2783,6 @@
                 if (subtitleEl) subtitleEl.textContent = 'Export user suggestions and status alignments.';
 
                 optionsContainer.innerHTML = `
-                    <!-- CSV / Excel -->
                     <button onclick="exportFeedbackCSV()" class="w-full p-3 rounded-xl border border-slate-200 hover:border-brand-300 hover:bg-brand-50/40 text-left transition-all flex items-start gap-3 group">
                         <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                             <i class="ph-bold ph-file-csv"></i>
@@ -2888,7 +2793,6 @@
                         </div>
                     </button>
 
-                    <!-- JSON Backup -->
                     <button onclick="exportFeedbackJSON()" class="w-full p-3 rounded-xl border border-slate-200 hover:border-brand-300 hover:bg-brand-50/40 text-left transition-all flex items-start gap-3 group">
                         <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                             <i class="ph-bold ph-code"></i>
@@ -2908,7 +2812,6 @@
             if (exportModal) exportModal.classList.add('hidden');
         };
 
-        // Export Milestones -> CSV (Excel-ready with UTF-8 BOM)
         window.exportMilestonesCSV = function() {
             const activeRoadmap = getActiveRoadmap();
             if (!activeRoadmap) return;
@@ -2950,7 +2853,6 @@
             closeExportModal();
         };
 
-        // Export Milestones -> JSON
         window.exportMilestonesJSON = function() {
             const activeRoadmap = getActiveRoadmap();
             if (!activeRoadmap) return;
@@ -2966,7 +2868,6 @@
             closeExportModal();
         };
 
-        // Export Feedback -> CSV (Excel-ready with UTF-8 BOM)
         window.exportFeedbackCSV = function() {
             const activeRoadmap = getActiveRoadmap();
             if (!activeRoadmap) return;
@@ -2995,7 +2896,6 @@
             closeExportModal();
         };
 
-        // Export Feedback -> JSON
         window.exportFeedbackJSON = function() {
             const activeRoadmap = getActiveRoadmap();
             if (!activeRoadmap) return;
@@ -3019,7 +2919,6 @@
             closeExportModal();
         };
 
-        // File download helper (works in iframes using data URI/blob URL)
         function downloadFile(content, fileName, mimeType) {
             const blob = new Blob([content], { type: mimeType });
             const url = URL.createObjectURL(blob);
@@ -3067,7 +2966,6 @@
             }
         }
 
-        // Auth & Init
         window.handleSignOut = async function() {
             if (auth) {
                 try {
@@ -3085,11 +2983,6 @@
             showLoginGate();
         };
 
-        window.reconnectWorkspace = function() {
-            showLoginGate();
-        };
-
-        // Initialize Application: enforce login gate first
         window.addEventListener('DOMContentLoaded', () => {
             showLoginGate();
         });
