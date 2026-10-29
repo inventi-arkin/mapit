@@ -6,6 +6,8 @@
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Identity Services (GSI) official SDK -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- html2canvas and jsPDF for reliable in-place PDF export -->
@@ -88,20 +90,6 @@
                 <span id="login-error-text">Authentication failed. Please verify your details.</span>
             </div>
 
-            <!-- Sandbox / Popup Error Recommendation Card -->
-            <div id="mock-fallback-banner" class="hidden mb-4 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs text-left space-y-2">
-                <div class="flex items-start gap-2">
-                    <i class="ph-bold ph-info text-amber-600 text-base shrink-0 mt-0.5"></i>
-                    <div>
-                        <span class="font-bold block text-amber-950">Google Sign-In Restricted</span>
-                        <p class="text-[11px] text-amber-800 leading-snug mt-0.5">The browser blocked Google's popup in this frame. We recommend continuing with preloaded mockup data.</p>
-                    </div>
-                </div>
-                <button type="button" onclick="selectGoogleProfile('Alex Morgan', 'alex.morgan@workspace.internal')" class="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5">
-                    <i class="ph-bold ph-arrow-right"></i> Proceed with Mockup Data
-                </button>
-            </div>
-
             <!-- Primary Google Sign-In Action -->
             <div id="google-primary-login-block" class="space-y-3">
                 <button type="button" id="google-login-btn" onclick="handleGoogleLogin()" class="w-full py-3 px-4 bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-700 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2.5">
@@ -115,53 +103,20 @@
                 </button>
             </div>
 
-            <!-- Google Account Chooser Modal (Direct within iframe) -->
-            <div id="google-account-chooser" class="hidden mt-4 pt-4 border-t border-slate-100 text-left space-y-3">
-                <div class="flex items-center justify-between pb-1">
-                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Choose a Google Account</span>
-                    <button type="button" onclick="closeGoogleAccountChooser()" class="text-slate-400 hover:text-slate-600 text-xs">
-                        <i class="ph-bold ph-x"></i>
-                    </button>
+            <!-- Fallback recommendation card displayed upon Google OAuth error/popup blockage -->
+            <div id="mock-fallback-card" class="hidden mt-4 pt-4 border-t border-slate-100 text-center space-y-3">
+                <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-left">
+                    <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-1">
+                        <i class="ph-bold ph-info text-brand-600"></i>
+                        <span>Browser popup restricted</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 leading-relaxed">
+                        Google Sign-In popup could not open in this environment. You can continue with mockup data to explore all features.
+                    </p>
                 </div>
-                
-                <!-- Quick Google Profile Options -->
-                <div class="space-y-1.5" id="google-quick-accounts-list">
-                    <button type="button" onclick="selectGoogleProfile('Alex Morgan', 'alex.morgan@gmail.com', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80')" class="w-full p-2.5 rounded-xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50/40 text-left transition-all flex items-center gap-3 group">
-                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80" class="w-8 h-8 rounded-full object-cover border border-slate-200">
-                        <div class="flex-1 min-w-0">
-                            <span class="text-xs font-bold text-slate-800 block truncate group-hover:text-brand-700">Alex Morgan</span>
-                            <span class="text-[10px] text-slate-400 block truncate">alex.morgan@gmail.com</span>
-                        </div>
-                        <i class="ph-bold ph-caret-right text-slate-300 group-hover:text-brand-600 text-xs"></i>
-                    </button>
-
-                    <button type="button" onclick="selectGoogleProfile('Jordan Chen', 'jordan.chen@workmail.com', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80')" class="w-full p-2.5 rounded-xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50/40 text-left transition-all flex items-center gap-3 group">
-                        <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80" class="w-8 h-8 rounded-full object-cover border border-slate-200">
-                        <div class="flex-1 min-w-0">
-                            <span class="text-xs font-bold text-slate-800 block truncate group-hover:text-brand-700">Jordan Chen</span>
-                            <span class="text-[10px] text-slate-400 block truncate">jordan.chen@workmail.com</span>
-                        </div>
-                        <i class="ph-bold ph-caret-right text-slate-300 group-hover:text-brand-600 text-xs"></i>
-                    </button>
-                </div>
-
-                <!-- Custom Google Account entry -->
-                <div class="pt-2 border-t border-slate-100">
-                    <button type="button" onclick="toggleCustomGoogleInput()" id="toggle-custom-google-btn" class="w-full py-1.5 text-[11px] font-bold text-brand-600 hover:text-brand-700 flex items-center justify-center gap-1.5">
-                        <i class="ph-bold ph-user-plus"></i> Use another Google Account
-                    </button>
-                    <form id="google-manual-signin-form" onsubmit="handleManualGoogleSignIn(event)" class="hidden mt-2 space-y-2">
-                        <div class="space-y-1">
-                            <input type="text" id="manual-google-name" required placeholder="Your Name (e.g. Sarah Miller)" class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
-                        </div>
-                        <div class="space-y-1">
-                            <input type="email" id="manual-google-email" required placeholder="google.account@gmail.com" class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
-                        </div>
-                        <button type="submit" class="w-full py-2 px-3 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5">
-                            <i class="ph-bold ph-sign-in"></i> Sign in with this account
-                        </button>
-                    </form>
-                </div>
+                <button type="button" onclick="loginWithMockData()" class="w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2">
+                    <i class="ph-bold ph-play"></i> Proceed with Mockup Data
+                </button>
             </div>
         </div>
     </div>
@@ -1255,6 +1210,11 @@
         // =======================================================
         window.showLoginGate = function() {
             isAuthenticated = false;
+            const errorBox = document.getElementById('login-error-msg');
+            const fallbackCard = document.getElementById('mock-fallback-card');
+            if (errorBox) errorBox.classList.add('hidden');
+            if (fallbackCard) fallbackCard.classList.add('hidden');
+
             if (loginGate) loginGate.classList.remove('hidden');
             if (mainAppHeader) {
                 mainAppHeader.classList.add('hidden');
@@ -1289,16 +1249,86 @@
             updateUserHeaderUI(displayName || email, photoURL);
         }
 
+        // Direct Mock Data Sign-In (no inputs needed)
+        window.loginWithMockData = async function() {
+            if (auth) {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                    useCloudPersistence = true;
+                } catch (e) {
+                    console.warn("Background auth note:", e);
+                }
+            }
+
+            await establishUserSession('alex.morgan@workspace.com', 'Alex Morgan (Demo)', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80');
+            if (useCloudPersistence) {
+                await loadRoadmapsFromCloud();
+            }
+            hideLoginGate();
+        };
+
+        function showGoogleAuthError(message = "Google Sign-In failed or popup was blocked.") {
+            const errorBox = document.getElementById('login-error-msg');
+            const errorText = document.getElementById('login-error-text');
+            const fallbackCard = document.getElementById('mock-fallback-card');
+
+            if (errorText) errorText.textContent = message;
+            if (errorBox) errorBox.classList.remove('hidden');
+            if (fallbackCard) fallbackCard.classList.remove('hidden');
+        }
+
         window.handleGoogleLogin = async function() {
             const btnText = document.getElementById('google-btn-text');
             const errorBox = document.getElementById('login-error-msg');
-            const errorText = document.getElementById('login-error-text');
-            const fallbackBanner = document.getElementById('mock-fallback-banner');
-            const accountChooser = document.getElementById('google-account-chooser');
+            const fallbackCard = document.getElementById('mock-fallback-card');
 
             if (errorBox) errorBox.classList.add('hidden');
+            if (fallbackCard) fallbackCard.classList.add('hidden');
             if (btnText) btnText.textContent = "Connecting to Google...";
 
+            // 1. Try Official Google Identity Services OAuth 2.0 Client if available
+            if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+                try {
+                    const client = google.accounts.oauth2.initTokenClient({
+                        client_id: '1035987309536-dummyclientid.apps.googleusercontent.com',
+                        scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+                        callback: async (tokenResponse) => {
+                            if (tokenResponse && tokenResponse.access_token) {
+                                try {
+                                    const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                                        headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
+                                    });
+                                    if (resp.ok) {
+                                        const profile = await resp.json();
+                                        await establishUserSession(profile.email, profile.name || profile.email, profile.picture);
+                                        hideLoginGate();
+                                        return;
+                                    }
+                                } catch (fetchErr) {
+                                    console.warn("Could not fetch Google user info:", fetchErr);
+                                    showGoogleAuthError("Google user profile could not be loaded.");
+                                }
+                            }
+                        },
+                        error_callback: (err) => {
+                            console.warn("Google OAuth callback error:", err);
+                            showGoogleAuthError("Google Sign-In popup was blocked or dismissed.");
+                        }
+                    });
+
+                    client.requestAccessToken({ prompt: 'select_account' });
+                    if (btnText) btnText.textContent = "Sign in with Google";
+                    return;
+                } catch (gsiErr) {
+                    console.warn("GSI client error:", gsiErr);
+                }
+            }
+
+            // 2. Try Firebase Auth popup if initialized and not in restricted iframe
             try {
                 if (!auth && typeof __firebase_config !== 'undefined') {
                     try {
@@ -1322,77 +1352,25 @@
                 if (!isRestrictedIframe && auth) {
                     const provider = new GoogleAuthProvider();
                     provider.setCustomParameters({ prompt: 'select_account' });
-                    try {
-                        const result = await signInWithPopup(auth, provider);
-                        currentUser = result.user;
-                        useCloudPersistence = true;
-
-                        const actualName = currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'Workspace Member');
-                        const actualPhoto = currentUser.photoURL || null;
-
-                        updateUserHeaderUI(actualName, actualPhoto);
-                        await loadRoadmapsFromCloud();
-                        hideLoginGate();
-                        return;
-                    } catch (popupErr) {
-                        console.warn("Popup blocked or rejected in this frame:", popupErr);
-                        if (fallbackBanner) fallbackBanner.classList.remove('hidden');
-                        if (accountChooser) accountChooser.classList.remove('hidden');
-                    }
-                } else {
-                    if (fallbackBanner) fallbackBanner.classList.remove('hidden');
-                    if (accountChooser) accountChooser.classList.remove('hidden');
-                }
-            } catch (err) {
-                console.error("Google sign in failure:", err);
-                if (fallbackBanner) fallbackBanner.classList.remove('hidden');
-                if (accountChooser) accountChooser.classList.remove('hidden');
-            } finally {
-                if (btnText) btnText.textContent = "Sign in with Google";
-            }
-        };
-
-        window.closeGoogleAccountChooser = function() {
-            const accountChooser = document.getElementById('google-account-chooser');
-            if (accountChooser) accountChooser.classList.add('hidden');
-        };
-
-        window.toggleCustomGoogleInput = function() {
-            const manualForm = document.getElementById('google-manual-signin-form');
-            if (!manualForm) return;
-            manualForm.classList.toggle('hidden');
-        };
-
-        window.selectGoogleProfile = async function(name, email, photoURL = null) {
-            if (auth) {
-                try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
+                    const result = await signInWithPopup(auth, provider);
+                    currentUser = result.user;
                     useCloudPersistence = true;
-                } catch (e) {
-                    console.warn("Background auth note:", e);
+
+                    const actualName = currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'Workspace Member');
+                    const actualPhoto = currentUser.photoURL || null;
+
+                    updateUserHeaderUI(actualName, actualPhoto);
+                    await loadRoadmapsFromCloud();
+                    hideLoginGate();
+                    return;
                 }
+            } catch (authErr) {
+                console.warn("Popup blocked or domain not whitelisted:", authErr);
             }
 
-            await establishUserSession(email, name, photoURL);
-            if (useCloudPersistence) {
-                await loadRoadmapsFromCloud();
-            }
-            hideLoginGate();
-        };
-
-        window.handleManualGoogleSignIn = async function(event) {
-            event.preventDefault();
-            const nameInput = document.getElementById('manual-google-name');
-            const emailInput = document.getElementById('manual-google-email');
-
-            const name = (nameInput?.value || '').trim() || 'Workspace Member';
-            const email = (emailInput?.value || '').trim() || 'user@gmail.com';
-
-            await selectGoogleProfile(name, email, null);
+            // 3. If Google Auth encounters an issue/restriction, show error and mock fallback
+            showGoogleAuthError("Google Sign-In popup was blocked by the browser. Please use the mockup data to proceed.");
+            if (btnText) btnText.textContent = "Sign in with Google";
         };
 
         function updateUserHeaderUI(name, photoURL) {
