@@ -971,6 +971,21 @@
             switchView('roadmap');
         };
 
+        // Helper to establish user session consistently
+        async function establishUserSession(email, displayName, photoURL = null) {
+            currentUser = {
+                uid: 'user-' + btoa(email || 'google-user').replace(/[^a-zA-Z0-9]/g, '').slice(0, 10),
+                email: email,
+                displayName: displayName,
+                photoURL: photoURL
+            };
+            if (roadmaps.length === 0) {
+                roadmaps = [sampleRoadmap];
+                currentRoadmapId = sampleRoadmap.id;
+            }
+            updateUserHeaderUI(displayName || email, photoURL);
+        }
+
         // Google Sign-In Handler
         window.handleGoogleLogin = async function() {
             const btnText = document.getElementById('google-btn-text');
