@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="1.1.0" data-released="2026-10-30">
+    <meta name="mapit-version" content="1.1.1" data-released="2026-10-30">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -90,8 +90,14 @@
                 <span id="login-error-text">Authentication failed. Please verify your details.</span>
             </div>
 
+            <!-- Shown on page load until Firebase reports whether a session exists, so returning users never see the sign-in button flash -->
+            <div id="login-checking" role="status" aria-live="polite" class="py-3 flex items-center justify-center gap-2 text-xs font-semibold text-slate-600">
+                <i class="ph-bold ph-circle-notch animate-spin text-base text-brand-600" aria-hidden="true"></i>
+                <span id="login-checking-text">Restoring your session...</span>
+            </div>
+
             <!-- Primary Google Sign-In Action -->
-            <div id="google-primary-login-block" class="space-y-3">
+            <div id="google-primary-login-block" class="hidden space-y-3">
                 <button type="button" id="google-login-btn" onclick="handleGoogleLogin()" class="w-full py-3 px-4 bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-700 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2.5">
                     <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -1303,8 +1309,17 @@
         // =======================================================
         // AUTHENTICATION & LOGIN GATE CONTROLS
         // =======================================================
+        // checking: show the spinner with this text instead of the sign-in button
+        function setLoginChecking(checking, text = 'Restoring your session...') {
+            document.getElementById('login-checking')?.classList.toggle('hidden', !checking);
+            document.getElementById('google-primary-login-block')?.classList.toggle('hidden', checking);
+            const label = document.getElementById('login-checking-text');
+            if (label) label.textContent = text;
+        }
+
         window.showLoginGate = function() {
             isAuthenticated = false;
+            setLoginChecking(false);
             const errorBox = document.getElementById('login-error-msg');
             const fallbackCard = document.getElementById('mock-fallback-card');
             if (errorBox) errorBox.classList.add('hidden');
@@ -1405,6 +1420,7 @@
             const retryBtn = document.getElementById('login-retry-btn');
             const retryText = document.getElementById('login-retry-text');
 
+            setLoginChecking(false);
             if (errorText) errorText.textContent = message;
             if (errorBox) errorBox.classList.remove('hidden');
             if (fallbackCard) fallbackCard.classList.toggle('hidden', !showDemo);
@@ -3322,16 +3338,25 @@
             renderAppVersion();
             showLoginGate();
             if (!auth) return;
+            setLoginChecking(true);
             let restoreChecked = false;
+            // If Firebase never answers (e.g. browser storage blocked), offer the sign-in button anyway
+            const restoreTimeout = setTimeout(() => { if (!restoreChecked && !isAuthenticated) setLoginChecking(false); }, 8000);
             onAuthStateChanged(auth, (user) => {
                 if (restoreChecked) return;
                 restoreChecked = true;
-                if (user && !user.isAnonymous && !isAuthenticated) {
+                clearTimeout(restoreTimeout);
+                if (!user || user.isAnonymous) {
+                    if (!isAuthenticated) setLoginChecking(false);
+                    return;
+                }
+                if (!isAuthenticated) {
                     if (!isAllowedAccount(user)) {
                         signOut(auth).catch(e => console.warn(e));
                         showGoogleAuthError(DOMAIN_DENIED_MESSAGE, DOMAIN_DENIED_OPTIONS);
                         return;
                     }
+                    setLoginChecking(true, 'Loading your roadmaps...');
                     startFirebaseSession(user);
                 }
             });
