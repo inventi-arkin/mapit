@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
+    <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
+    <meta name="mapit-version" content="1.1.0" data-released="2026-10-30">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -120,6 +122,8 @@
                     <i class="ph-bold ph-play"></i> Proceed with Mockup Data
                 </button>
             </div>
+
+            <p class="mt-5 text-center text-[10px] text-slate-500 font-medium">MapIt <span data-app-version></span></p>
         </div>
     </div>
 
@@ -134,6 +138,7 @@
                 <h1 class="text-sm font-extrabold text-slate-900 tracking-tight flex items-center gap-1.5">
                     Map It
                     <span class="hidden sm:inline text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200">Roadmap</span>
+                    <span data-app-version class="text-[10px] font-semibold text-slate-500"></span>
                 </h1>
                 <p id="workspace-status" class="text-[11px] text-slate-500 font-medium flex items-center gap-1">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -821,6 +826,14 @@
         </div>
     </div>
 
+    <!-- Save status: a change that could not be saved, or is waiting for a connection -->
+    <div id="save-status" role="status" aria-live="polite" class="hidden">
+        <i id="save-status-icon" class="ph-bold text-base shrink-0 mt-px" aria-hidden="true"></i>
+        <span id="save-status-text" class="flex-1 leading-relaxed"></span>
+        <button type="button" id="save-status-retry" onclick="retryFailedSaves()" class="hidden shrink-0 px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white font-bold">Retry</button>
+        <button type="button" onclick="dismissSaveStatus()" aria-label="Dismiss" class="shrink-0 p-1 rounded-lg hover:bg-white/60"><i class="ph-bold ph-x"></i></button>
+    </div>
+
     <!-- Application Logic & Module Script -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -1352,7 +1365,21 @@
             updateUserHeaderUI(actualName, user.photoURL || null);
 
             roadmaps = [];
-            await loadRoadmapsFromCloud();
+            try {
+                await loadRoadmapsFromCloud();
+            } catch (err) {
+                console.warn("Could not load from Firestore:", err);
+                useCloudPersistence = false;
+                const message = firestoreErrorMessage(err, 'load your roadmaps');
+                if (err?.code === 'permission-denied') {
+                    // Retrying with the same account will not help; let the user pick another
+                    await signOut(auth).catch(e => console.warn(e));
+                    showGoogleAuthError(message, DOMAIN_DENIED_OPTIONS);
+                } else {
+                    showGoogleAuthError(message, { showDemo: false, retryLabel: 'Try again' });
+                }
+                return;
+            }
             if (roadmaps.length === 0) {
                 roadmaps = [structuredClone(sampleRoadmap)];
                 currentRoadmapId = sampleRoadmap.id;
@@ -1399,6 +1426,14 @@
 
             if (!auth) {
                 showGoogleAuthError("Firebase could not be initialized. Please use the demo data to proceed.", { showDemo: true });
+                if (btnText) btnText.textContent = "Sign in with Google";
+                return;
+            }
+
+            // Still signed in but the roadmaps failed to load: retry loading without another popup
+            if (auth.currentUser && isAllowedAccount(auth.currentUser) && !isAuthenticated) {
+                if (btnText) btnText.textContent = "Loading your roadmaps...";
+                await startFirebaseSession(auth.currentUser);
                 if (btnText) btnText.textContent = "Sign in with Google";
                 return;
             }
@@ -1503,14 +1538,26 @@
             const targetIndex = roadmaps.findIndex(r => r.id === deletedId);
             
             if (useCloudPersistence && db && currentUser) {
-                try {
-                    const docRef = doc(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps', deletedId);
-                    await deleteDoc(docRef);
-                } catch (err) {
+                const docRef = doc(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps', deletedId);
+                const write = deleteDoc(docRef);
+                const deleteFailed = (err) => {
                     console.warn("Could not delete from Firestore:", err);
+                    deleteErrorMessage = `Not deleted: ${firestoreErrorMessage(err, 'delete this roadmap')} It will come back when you reload.`;
+                    refreshSaveStatus();
+                };
+                try {
+                    if (await writeWithWait(write) === 'waiting') {
+                        trackQueuedWrite(write, () => {}, deleteFailed);
+                    }
+                } catch (err) {
+                    // Keep the roadmap: it still exists in Firestore
+                    deleteFailed(err);
+                    closeDeleteRoadmapModal();
+                    return;
                 }
             }
 
+            unsavedRoadmapIds.delete(deletedId);
             roadmaps = roadmaps.filter(r => r.id !== deletedId);
 
             if (roadmaps.length === 0) {
@@ -3007,33 +3054,166 @@
         // =======================================================
         // PERSISTENCE & CLOUD SYNC
         // =======================================================
-        async function saveRoadmapToCloud(roadmap) {
-            if (!useCloudPersistence || !db || !currentUser) return;
-            try {
-                const docRef = doc(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps', roadmap.id);
-                await setDoc(docRef, roadmap);
-            } catch (err) {
-                console.warn("Firestore sync error:", err);
+        // Roadmaps whose last save failed (retried as a whole, since every save writes the full document)
+        const unsavedRoadmapIds = new Set();
+        let pendingWriteCount = 0;
+        let lastSaveError = '';
+        let deleteErrorMessage = '';
+        let saveProblemShown = false;
+        let saveStatusTimer = null;
+        // Offline, Firestore keeps a write queued and its promise waits; after this long we tell the user
+        const SAVE_WAIT_MS = 5000;
+
+        function firestoreErrorMessage(err, action) {
+            const code = err?.code || '';
+            const details = String(err?.message || '');
+            if (code === 'permission-denied') return `You don't have permission to ${action}. Make sure you are signed in with your @${ALLOWED_EMAIL_DOMAIN} account; if it keeps happening, contact the MapIt admin.`;
+            if (code === 'unauthenticated') return `Your session has expired, so MapIt could not ${action}. Sign out and sign in again.`;
+            if (code === 'invalid-argument' && /size|bytes/i.test(details)) return `MapIt could not ${action}: this roadmap is larger than Firestore allows (1 MiB). Remove old comments or split it into two roadmaps.`;
+            if (code === 'resource-exhausted') return `MapIt could not ${action}: the database's usage limit was reached. Try again later or contact the MapIt admin.`;
+            if (code === 'unavailable' || code === 'deadline-exceeded' || !navigator.onLine) return `No connection to the server, so MapIt could not ${action}. Check your connection and try again.`;
+            return `MapIt could not ${action} (${code || 'unknown error'}). Try again.`;
+        }
+
+        const SAVE_STATUS_STYLES = {
+            error: ['bg-rose-50 border-rose-200 text-rose-700', 'ph-warning-circle'],
+            waiting: ['bg-amber-50 border-amber-200 text-amber-800', 'ph-cloud-slash'],
+            saved: ['bg-emerald-50 border-emerald-200 text-emerald-700', 'ph-check-circle']
+        };
+
+        function showSaveStatus(kind, message, { retry = false } = {}) {
+            const box = document.getElementById('save-status');
+            if (!box) return;
+            const [colors, icon] = SAVE_STATUS_STYLES[kind];
+            box.className = `fixed z-[60] bottom-20 sm:bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:w-96 p-3 rounded-xl border shadow-lg text-xs font-medium flex items-start gap-2 ${colors}`;
+            box.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
+            document.getElementById('save-status-icon').className = `ph-bold ${icon} text-base shrink-0 mt-px`;
+            document.getElementById('save-status-text').textContent = message;
+            const retryBtn = document.getElementById('save-status-retry');
+            retryBtn.classList.toggle('hidden', !retry);
+            retryBtn.disabled = false;
+            retryBtn.textContent = 'Retry';
+            saveProblemShown = kind !== 'saved';
+            clearTimeout(saveStatusTimer);
+            if (kind === 'saved') saveStatusTimer = setTimeout(dismissSaveStatus, 3000);
+        }
+
+        window.dismissSaveStatus = function() {
+            clearTimeout(saveStatusTimer);
+            deleteErrorMessage = '';
+            document.getElementById('save-status')?.classList.add('hidden');
+        };
+
+        // Show the most important open problem: failed saves, queued writes, then a failed delete; "saved" once both are cleared
+        function refreshSaveStatus() {
+            if (!useCloudPersistence) return; // signed out: writes still settling from the last session
+            if (unsavedRoadmapIds.size > 0) {
+                showSaveStatus('error', `Not saved: ${lastSaveError}`, { retry: true });
+            } else if (pendingWriteCount > 0) {
+                showSaveStatus('waiting', 'Not saved yet: waiting for a connection. Your changes will be saved when you are back online; keep this tab open.');
+            } else if (deleteErrorMessage) {
+                showSaveStatus('error', deleteErrorMessage);
+            } else if (saveProblemShown) {
+                showSaveStatus('saved', 'All changes saved.');
             }
         }
 
+        // 'done' when the server confirmed the write, 'waiting' when it is still queued (offline or slow); rejects on failure
+        async function writeWithWait(write) {
+            if (!navigator.onLine) return 'waiting';
+            let timer;
+            const waited = new Promise(resolve => { timer = setTimeout(() => resolve('waiting'), SAVE_WAIT_MS); });
+            try {
+                return await Promise.race([write.then(() => 'done'), waited]);
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        function trackQueuedWrite(write, onDone, onFail) {
+            pendingWriteCount++;
+            refreshSaveStatus();
+            write.then(onDone, onFail).finally(() => {
+                pendingWriteCount--;
+                refreshSaveStatus();
+            });
+        }
+
+        function markRoadmapSaved(roadmapId) {
+            unsavedRoadmapIds.delete(roadmapId);
+            refreshSaveStatus();
+        }
+
+        function markRoadmapUnsaved(roadmapId, err) {
+            console.warn("Firestore sync error:", err);
+            if (!useCloudPersistence) return;
+            lastSaveError = firestoreErrorMessage(err, 'save your changes');
+            unsavedRoadmapIds.add(roadmapId);
+            refreshSaveStatus();
+        }
+
+        // Returns false when the save failed; the change stays on screen and can be retried
+        async function saveRoadmapToCloud(roadmap) {
+            if (!useCloudPersistence || !db || !currentUser) return true;
+            const docRef = doc(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps', roadmap.id);
+            const write = setDoc(docRef, roadmap);
+            try {
+                if (await writeWithWait(write) === 'waiting') {
+                    trackQueuedWrite(write, () => markRoadmapSaved(roadmap.id), err => markRoadmapUnsaved(roadmap.id, err));
+                } else {
+                    markRoadmapSaved(roadmap.id);
+                }
+                return true;
+            } catch (err) {
+                markRoadmapUnsaved(roadmap.id, err);
+                return false;
+            }
+        }
+
+        window.retryFailedSaves = async function() {
+            const retryBtn = document.getElementById('save-status-retry');
+            if (retryBtn) {
+                retryBtn.disabled = true;
+                retryBtn.textContent = 'Retrying...';
+            }
+            for (const id of [...unsavedRoadmapIds]) {
+                const roadmap = roadmaps.find(r => r.id === id);
+                if (roadmap) {
+                    await saveRoadmapToCloud(roadmap);
+                } else {
+                    unsavedRoadmapIds.delete(id);
+                }
+            }
+            refreshSaveStatus();
+        };
+
+        // Warn before leaving while changes are not saved
+        window.addEventListener('beforeunload', (e) => {
+            if (unsavedRoadmapIds.size > 0 || pendingWriteCount > 0) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // Throws on failure, so a failed load is never mistaken for "no roadmaps yet" (which would seed the sample over real data)
         async function loadRoadmapsFromCloud() {
             if (!useCloudPersistence || !db || !currentUser) return;
-            try {
-                const colRef = collection(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps');
-                const snap = await getDocs(colRef);
-                const loaded = [];
-                snap.forEach(d => loaded.push(d.data()));
-                if (loaded.length > 0) {
-                    roadmaps = loaded;
-                    currentRoadmapId = roadmaps[0].id;
-                }
-            } catch (err) {
-                console.warn("Could not load from Firestore, using memory:", err);
+            const colRef = collection(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps');
+            const snap = await getDocs(colRef);
+            const loaded = [];
+            snap.forEach(d => loaded.push(d.data()));
+            if (loaded.length > 0) {
+                roadmaps = loaded;
+                currentRoadmapId = roadmaps[0].id;
             }
         }
 
         window.handleSignOut = async function() {
+            if ((unsavedRoadmapIds.size > 0 || pendingWriteCount > 0)
+                && !confirm('Some changes are not saved yet and will be lost if you sign out. Sign out anyway?')) return;
+            unsavedRoadmapIds.clear();
+            saveProblemShown = false;
+            dismissSaveStatus();
             if (auth) {
                 try {
                     await signOut(auth);
@@ -3124,8 +3304,22 @@
             }
         });
 
+        // App version from <meta name="mapit-version">, so the live site can be checked at a glance
+        function renderAppVersion() {
+            const meta = document.querySelector('meta[name="mapit-version"]');
+            if (!meta) return;
+            const version = meta.content;
+            const released = meta.dataset.released || '';
+            document.querySelectorAll('[data-app-version]').forEach(el => {
+                el.textContent = 'v' + version;
+                el.title = released ? `Version ${version}, released ${released}` : `Version ${version}`;
+            });
+            console.info(`MapIt v${version}${released ? ' (' + released + ')' : ''}`);
+        }
+
         // Restore a previous Google session on load; otherwise show the login gate
         window.addEventListener('DOMContentLoaded', () => {
+            renderAppVersion();
             showLoginGate();
             if (!auth) return;
             let restoreChecked = false;
