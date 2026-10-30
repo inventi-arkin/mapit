@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="1.2.0" data-released="2026-10-30">
+    <meta name="mapit-version" content="2.0.0" data-released="2026-10-30">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -66,6 +66,13 @@
         }
         .snap-item {
             scroll-snap-align: start;
+        }
+        /* Role / read-only gating (Firestore rules enforce the same limits) */
+        .read-only .editor-only,
+        .no-edit-role .role-editor-only,
+        .not-admin .admin-only,
+        body:not(.no-edit-role) .role-viewer-only {
+            display: none !important;
         }
     </style>
 </head>
@@ -190,10 +197,21 @@
                     <span id="header-user-name" class="text-xs font-bold text-slate-800 truncate">Workspace User</span>
                     <span id="header-user-email" class="text-[10px] text-slate-500 font-medium truncate mt-0.5">user@example.com</span>
                 </div>
+                <span id="header-role-badge" class="hidden"></span>
             </div>
 
+            <!-- Users & roles (admins) -->
+            <button id="users-btn" onclick="openUsersModal()" title="Users" aria-label="Users" class="admin-only p-1.5 text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-xl transition-all">
+                <i class="ph-bold ph-users-three text-lg"></i>
+            </button>
+
+            <!-- Private roadmaps from before the shared workspace -->
+            <button id="private-roadmaps-btn" onclick="openPrivateRoadmapsModal()" title="Your private roadmaps" aria-label="Your private roadmaps" class="hidden p-1.5 text-slate-500 hover:text-brand-700 hover:bg-brand-50 rounded-xl transition-all">
+                <i class="ph-bold ph-lock-simple text-lg"></i>
+            </button>
+
             <!-- New Roadmap Button -->
-            <button onclick="openNewRoadmapModal()" aria-label="New Roadmap" class="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold shadow-sm shadow-brand-500/20 transition-all">
+            <button onclick="openNewRoadmapModal()" aria-label="New Roadmap" class="role-editor-only flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold shadow-sm shadow-brand-500/20 transition-all">
                 <i class="ph-bold ph-plus"></i> <span class="hidden md:inline">New Roadmap</span>
             </button>
 
@@ -206,6 +224,8 @@
 
     <!-- Main Content Canvas -->
     <main class="flex-1 overflow-hidden relative p-3 pb-20 sm:pb-3 md:p-6 flex flex-col">
+        <!-- Read-only / preview notices and the private-roadmaps banner -->
+        <div id="workspace-notices" class="hidden max-w-6xl mx-auto w-full flex flex-col gap-2 mb-3 shrink-0"></div>
 
         <!-- ======================================================= -->
         <!-- VIEW 1: ROADMAP TIMELINE (Unified with Roadmap Tabs)   -->
@@ -227,10 +247,10 @@
                     <button id="export-pdf-btn" onclick="exportRoadmapPDF()" title="Export Roadmap as PDF" aria-label="Export Roadmap as PDF" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all shadow-xs">
                         <i class="ph-bold ph-file-pdf text-sm"></i> <span id="export-pdf-text" class="hidden sm:inline">Export PDF</span>
                     </button>
-                    <button onclick="switchView('editor')" title="Add Deliverables" aria-label="Add Deliverables" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
+                    <button onclick="switchView('editor')" title="Add Deliverables" aria-label="Add Deliverables" class="editor-only flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
                         <i class="ph-bold ph-plus"></i> <span class="hidden sm:inline">Add Deliverables</span>
                     </button>
-                    <button onclick="confirmDeleteCurrentRoadmap()" title="Delete Current Roadmap" aria-label="Delete Current Roadmap" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
+                    <button id="delete-roadmap-btn" onclick="confirmDeleteCurrentRoadmap()" title="Delete Current Roadmap" aria-label="Delete Current Roadmap" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
                         <i class="ph-bold ph-trash text-sm"></i>
                     </button>
                 </div>
@@ -307,7 +327,7 @@
                     <button onclick="openDataExportModal('editor')" title="Export Milestones (CSV/Excel/JSON)" class="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all border border-slate-200">
                         <i class="ph-bold ph-download-simple"></i> Export
                     </button>
-                    <button onclick="openAddMilestoneModal()" class="flex items-center gap-2 px-3.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-brand-500/20 transition-all">
+                    <button onclick="openAddMilestoneModal()" class="editor-only flex items-center gap-2 px-3.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-brand-500/20 transition-all">
                         <i class="ph-bold ph-plus"></i> Add Milestone
                     </button>
                 </div>
@@ -381,7 +401,7 @@
                     <button onclick="openDataExportModal('feedback')" title="Export Feedback (CSV/Excel/JSON)" class="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all border border-slate-200">
                         <i class="ph-bold ph-download-simple"></i> Export
                     </button>
-                    <button onclick="openAddFeedbackModal()" class="flex items-center gap-2 px-3.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-brand-500/20 transition-all">
+                    <button onclick="openAddFeedbackModal()" class="editor-only flex items-center gap-2 px-3.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-brand-500/20 transition-all">
                         <i class="ph-bold ph-plus"></i> New Suggestion
                     </button>
                 </div>
@@ -481,7 +501,7 @@
                     Close
                 </button>
                 <button type="button" onclick="editFromDetails()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
-                    <i class="ph-bold ph-pencil-simple"></i> Edit
+                    <i class="ph-bold ph-pencil-simple"></i> <span id="details-edit-label">Edit</span>
                 </button>
             </div>
         </div>
@@ -508,6 +528,10 @@
                 
                 <!-- Left Column: Milestone Configuration (7 cols) -->
                 <form id="edit-detail-form" class="min-w-0 md:col-span-7 space-y-3.5 flex flex-col justify-between">
+                    <div id="edit-remote-notice" role="status" class="hidden p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium flex items-start gap-2">
+                        <i class="ph-bold ph-users text-base shrink-0"></i>
+                        <span id="edit-remote-notice-text"></span>
+                    </div>
                     <div class="space-y-3.5">
                         <input type="hidden" id="detail-item-id">
                         
@@ -559,14 +583,14 @@
                     </div>
 
                     <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 mt-4">
-                        <button type="button" onclick="deleteFromDetailModal()" class="px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5">
+                        <button type="button" onclick="deleteFromDetailModal()" class="editor-only px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5">
                             <i class="ph-bold ph-trash"></i> Delete
                         </button>
                         <div class="flex items-center gap-2">
                             <button type="button" onclick="closeEditMilestoneModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
                                 Cancel
                             </button>
-                            <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
+                            <button type="submit" class="editor-only px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
                                 <i class="ph-bold ph-check"></i> Save Changes
                             </button>
                         </div>
@@ -605,7 +629,7 @@
                     </div>
 
                     <!-- Bottom Comment Input Box (active when in comments tab) -->
-                    <div id="milestone-comment-input-box" class="hidden pt-3 border-t border-slate-200 mt-2">
+                    <div id="milestone-comment-input-box" class="editor-only hidden pt-3 border-t border-slate-200 mt-2">
                         <div class="flex items-center gap-1.5">
                             <input type="text" id="milestone-new-comment-input" aria-label="New comment" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); addMilestoneComment(); }" placeholder="Write a comment or note..." class="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-200 focus:border-brand-500 rounded-xl outline-none">
                             <button type="button" onclick="addMilestoneComment()" aria-label="Send comment" class="p-1.5 px-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold transition-all">
@@ -791,12 +815,12 @@
                 </div>
                 <div>
                     <h3 id="delete-roadmap-title" class="text-base font-bold text-slate-900">Delete Roadmap</h3>
-                    <p class="text-xs text-slate-500">This action cannot be undone.</p>
+                    <p class="text-xs text-slate-500">Only its creator or an admin can do this.</p>
                 </div>
             </div>
 
             <p class="text-xs text-slate-600 mb-4 leading-relaxed">
-                Are you sure you want to delete <strong id="delete-roadmap-target-title" class="text-slate-900 font-bold">this roadmap</strong>? All deliverables, feedback links, comments, and audit history associated with it will be permanently removed.
+                Are you sure you want to delete <strong id="delete-roadmap-target-title" class="text-slate-900 font-bold">this roadmap</strong>? It disappears for everyone in the workspace. Its milestones, feedback and activity are kept, and admins can still view it.
             </p>
 
             <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -844,7 +868,7 @@
                 </div>
                 <div>
                     <h3 id="confirm-delete-title" class="text-base font-bold text-slate-900">Delete</h3>
-                    <p class="text-xs text-slate-500">This action cannot be undone.</p>
+                    <p id="confirm-delete-subtitle" class="text-xs text-slate-500">Please confirm.</p>
                 </div>
             </div>
 
@@ -863,11 +887,87 @@
         </div>
     </div>
 
+    <!-- Modal: Users & roles (admins only) -->
+    <div id="users-modal" role="dialog" aria-modal="true" aria-labelledby="users-modal-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4">
+        <div class="bg-white sm:rounded-2xl max-w-3xl w-full h-full sm:h-auto sm:max-h-[90vh] border border-slate-200 shadow-2xl p-4 sm:p-6 relative flex flex-col overflow-hidden">
+            <button type="button" onclick="closeUsersModal()" data-dialog-close aria-label="Close" class="absolute top-4 right-4 text-slate-500 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all">
+                <i class="ph-bold ph-x text-lg"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-4 shrink-0">
+                <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl shrink-0">
+                    <i class="ph-bold ph-users-three"></i>
+                </div>
+                <div>
+                    <h3 id="users-modal-title" class="text-base font-bold text-slate-900">Users</h3>
+                    <p class="text-xs text-slate-500">Roles control what each person can do. Changes apply right away.</p>
+                </div>
+            </div>
+
+            <div class="shrink-0 flex flex-wrap items-center gap-2 p-3 mb-3 rounded-xl bg-slate-50 border border-slate-200">
+                <label for="default-role-select" class="text-xs font-semibold text-slate-700">Role for new users</label>
+                <select id="default-role-select" onchange="setDefaultRole(this.value)" class="text-xs font-semibold border border-slate-200 rounded-lg px-2 py-1 bg-white">
+                    <option value="viewer">Viewer</option>
+                    <option value="editor">Editor</option>
+                </select>
+                <span class="text-[11px] text-slate-500">Anyone with an @inventi.ph account who signs in joins with this role.</span>
+            </div>
+
+            <div class="shrink-0 flex flex-wrap items-center gap-2 mb-2">
+                <div class="relative flex-1 min-w-[180px]">
+                    <i class="ph ph-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                    <input type="text" id="users-search" oninput="renderUsers()" aria-label="Search users" placeholder="Search name or email..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl outline-none focus:border-brand-500">
+                </div>
+                <select id="users-role-filter" onchange="renderUsers()" aria-label="Filter by role" class="text-xs font-semibold border border-slate-200 rounded-xl px-2 py-1.5 bg-white">
+                    <option value="ALL">All roles</option>
+                    <option value="admin">Admin</option>
+                    <option value="editor">Editor</option>
+                    <option value="viewer">Viewer</option>
+                    <option value="blocked">Blocked</option>
+                </select>
+                <span id="users-count" class="text-[11px] font-semibold text-slate-500"></span>
+            </div>
+
+            <div class="flex-1 overflow-y-auto custom-scrollbar border border-slate-200 rounded-xl">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 sticky top-0">
+                        <tr>
+                            <th class="py-2 px-3 font-bold">User</th>
+                            <th class="py-2 px-3 font-bold">Role</th>
+                            <th class="hidden sm:table-cell py-2 px-3 font-bold">Joined</th>
+                            <th class="py-2 px-3 font-bold">Last active</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-table-body" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Private roadmaps from before the shared workspace -->
+    <div id="private-roadmaps-modal" role="dialog" aria-modal="true" aria-labelledby="private-roadmaps-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative max-h-[90vh] flex flex-col overflow-hidden">
+            <button type="button" onclick="closePrivateRoadmapsModal()" data-dialog-close aria-label="Close" class="absolute top-4 right-4 text-slate-500 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all">
+                <i class="ph-bold ph-x text-lg"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-3 shrink-0">
+                <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center text-xl shrink-0">
+                    <i class="ph-bold ph-lock-simple"></i>
+                </div>
+                <div>
+                    <h3 id="private-roadmaps-title" class="text-base font-bold text-slate-900">Your private roadmaps</h3>
+                    <p class="text-xs text-slate-500">Saved before the shared workspace. Only you can see them.</p>
+                </div>
+            </div>
+            <p class="text-xs text-slate-600 mb-3 leading-relaxed shrink-0">Moving a roadmap copies it into the shared workspace, where your team can see and edit it. Your private copy is kept as a read-only backup.</p>
+            <p id="private-roadmaps-viewer-note" class="hidden text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2.5 mb-3 shrink-0">Ask a MapIt admin for Editor access to move these.</p>
+            <div id="private-roadmaps-list" class="flex flex-col gap-2 overflow-y-auto custom-scrollbar"></div>
+        </div>
+    </div>
+
     <!-- Save status: a change that could not be saved, or is waiting for a connection -->
     <div id="save-status" role="status" aria-live="polite" class="hidden">
         <i id="save-status-icon" class="ph-bold text-base shrink-0 mt-px" aria-hidden="true"></i>
         <span id="save-status-text" class="flex-1 leading-relaxed"></span>
-        <button type="button" id="save-status-retry" onclick="retryFailedSaves()" class="hidden shrink-0 px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white font-bold">Retry</button>
         <button type="button" onclick="dismissSaveStatus()" aria-label="Dismiss" class="shrink-0 p-1 rounded-lg hover:bg-white/60"><i class="ph-bold ph-x"></i></button>
     </div>
 
@@ -875,7 +975,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDocs, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, getDocs, updateDoc, collection, query, where, onSnapshot, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Application State
         let currentUser = null;
@@ -1023,9 +1123,9 @@
         };
 
         // Format relative timestamp
-        function formatRelativeTime(isoString) {
-            if (!isoString) return 'Just now';
-            const date = new Date(isoString);
+        function formatRelativeTime(value) {
+            const date = toDate(value);
+            if (!date) return 'Just now';
             const now = new Date();
             const diffInSeconds = Math.floor((now - date) / 1000);
 
@@ -1076,7 +1176,8 @@
 
         // Helper: Active Roadmap accessor
         function getActiveRoadmap() {
-            return roadmaps.find(r => r.id === currentRoadmapId) || roadmaps[0];
+            if (previewRoadmap) return previewRoadmap;
+            return roadmaps.find(r => r.id === currentRoadmapId) || roadmaps.find(r => !r.deletedAt) || null;
         }
 
         // =======================================================
@@ -1141,6 +1242,7 @@
                     renderFeedbackTable();
                 }
             }
+            if (!getActiveRoadmap()) renderWorkspaceEmpty();
         };
 
         window.setPerspective = function(perspective) {
@@ -1291,43 +1393,54 @@
         }
 
         window.updateUI = function() {
+            applyRoleUI();
+            renderNotices();
             const activeRoadmap = getActiveRoadmap();
-            if (!activeRoadmap) return;
+            const liveRoadmaps = roadmaps.filter(r => !r.deletedAt);
+            const deletedRoadmaps = roadmaps.filter(r => r.deletedAt);
 
             if (headerRoadmapSelect) {
-                headerRoadmapSelect.innerHTML = roadmaps.map(r => `
-                    <option value="${r.id}" ${r.id === currentRoadmapId ? 'selected' : ''}>${escapeHtml(r.title)}</option>
-                `).join('');
+                const option = r => `<option value="${escapeHtml(r.id)}" ${activeRoadmap && r.id === activeRoadmap.id ? 'selected' : ''}>${escapeHtml(r.title)}</option>`;
+                headerRoadmapSelect.innerHTML =
+                    (previewRoadmap ? `<option value="" selected>Preview: ${escapeHtml(previewRoadmap.title)}</option>` : '') +
+                    (liveRoadmaps.length ? liveRoadmaps.map(option).join('') : '<option value="">No roadmaps yet</option>') +
+                    (isAdmin() && deletedRoadmaps.length ? `<optgroup label="Deleted roadmaps (admin)">${deletedRoadmaps.map(option).join('')}</optgroup>` : '');
             }
 
             if (roadmapsTabList) {
-                roadmapsTabList.innerHTML = roadmaps.map(r => {
-                    const isSelected = r.id === currentRoadmapId;
+                roadmapsTabList.innerHTML = liveRoadmaps.map(r => {
+                    const isSelected = activeRoadmap && r.id === activeRoadmap.id;
                     const items = r.items || [];
                     const doneCount = items.filter(i => i.status === 'done').length;
                     const pct = items.length ? Math.round((doneCount / items.length) * 100) : 0;
 
                     return `
                         <div class="group relative flex items-center">
-                            <button onclick="selectRoadmap('${r.id}')" class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${isSelected ? 'bg-brand-600 text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
+                            <button onclick="selectRoadmap('${escapeHtml(r.id)}')" class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${isSelected ? 'bg-brand-600 text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
                                 <span>${escapeHtml(r.title)}</span>
                                 <span class="text-[10px] px-1.5 py-0.2 rounded-md ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'}">
                                     ${pct}%
                                 </span>
                             </button>
-                            <button onclick="event.stopPropagation(); promptDeleteRoadmap('${r.id}')" title="Delete roadmap" aria-label="Delete roadmap" class="sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 ml-0.5 p-1 text-slate-500 hover:text-rose-600 rounded-lg transition-all">
+                            ${canDeleteRoadmap(r) ? `
+                            <button onclick="event.stopPropagation(); promptDeleteRoadmap('${escapeHtml(r.id)}')" title="Delete roadmap" aria-label="Delete roadmap" class="sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 ml-0.5 p-1 text-slate-500 hover:text-rose-600 rounded-lg transition-all">
                                 <i class="ph-bold ph-x text-[10px]"></i>
-                            </button>
+                            </button>` : ''}
                         </div>
                     `;
-                }).join('');
+                }).join('') || '<span class="text-xs text-slate-500 italic px-1">No roadmaps yet</span>';
             }
 
-            const feedbackCount = (activeRoadmap.feedback || []).length;
+            const feedbackCount = activeRoadmap ? (activeRoadmap.feedback || []).length : 0;
             if (navFeedbackCount) navFeedbackCount.textContent = feedbackCount;
             const mobFeedbackCount = document.getElementById('mob-nav-feedback-count');
             if (mobFeedbackCount) mobFeedbackCount.textContent = feedbackCount;
             if (feedbackTotalBadge) feedbackTotalBadge.textContent = pluralize(feedbackCount, 'item');
+
+            if (!activeRoadmap) {
+                renderWorkspaceEmpty();
+                return;
+            }
 
             updateSubfilterOptions();
 
@@ -1341,6 +1454,89 @@
                 renderFeedbackTable();
             }
         };
+
+        // Show/hide controls for the user's role and the open roadmap (Firestore rules enforce the same limits)
+        function applyRoleUI() {
+            document.body.classList.toggle('read-only', !canEditActive());
+            document.body.classList.toggle('no-edit-role', !canEdit());
+            document.body.classList.toggle('not-admin', !isAdmin());
+
+            const badge = document.getElementById('header-role-badge');
+            if (badge) {
+                const styles = {
+                    admin: ['Admin', 'bg-indigo-50 text-indigo-700 border-indigo-200', 'You can manage users and delete any roadmap'],
+                    editor: ['Editor', 'bg-brand-50 text-brand-700 border-brand-200', 'You can create and edit roadmaps'],
+                    viewer: ['View only', 'bg-slate-100 text-slate-600 border-slate-200', 'Ask a MapIt admin for Editor access']
+                };
+                const style = useCloudPersistence ? styles[myRole] : null;
+                badge.classList.toggle('hidden', !style);
+                if (style) {
+                    badge.textContent = style[0];
+                    badge.className = `text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${style[1]}`;
+                    badge.title = style[2];
+                }
+            }
+
+            const active = getActiveRoadmap();
+            document.getElementById('delete-roadmap-btn')?.classList.toggle('hidden', !canDeleteRoadmap(active));
+            const privateBtn = document.getElementById('private-roadmaps-btn');
+            if (privateBtn) privateBtn.classList.toggle('hidden', !privateRoadmaps.length);
+        }
+
+        // Read-only bar (preview / deleted roadmap) and the "private roadmaps" banner above the views
+        function renderNotices() {
+            const box = document.getElementById('workspace-notices');
+            if (!box) return;
+            const active = getActiveRoadmap();
+            const notices = [];
+            if (active?.isPreview) {
+                notices.push(`
+                    <div class="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium">
+                        <i class="ph-bold ph-lock-simple text-base"></i>
+                        <span class="flex-1 min-w-0">Previewing your private roadmap <strong>"${escapeHtml(active.title)}"</strong>. Read only, not in the shared workspace.</span>
+                        <button type="button" onclick="closePreview()" class="px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white font-bold">Back to workspace</button>
+                        ${canEdit() && !active.movedToWorkspace ? `<button type="button" onclick="moveRoadmapById('${escapeHtml(active.sourceId)}')" class="px-2.5 py-1 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-bold">Move to workspace</button>` : ''}
+                    </div>`);
+            } else if (active?.deletedAt) {
+                notices.push(`
+                    <div class="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
+                        <i class="ph-bold ph-trash text-base"></i>
+                        <span class="flex-1 min-w-0">Deleted roadmap${active.deletedBy?.name ? ` (deleted by <span title="${escapeHtml(active.deletedBy.email || '')}">${escapeHtml(active.deletedBy.name)}</span>, ${escapeHtml(formatPHT(active.deletedAt))})` : ''}. Read only, visible to admins.</span>
+                    </div>`);
+            }
+            const unmoved = privateRoadmaps.filter(r => !r.movedToWorkspace);
+            if (useCloudPersistence && unmoved.length && localStorage.getItem(HIDE_PRIVATE_KEY) !== '1' && !active?.isPreview) {
+                notices.push(`
+                    <div class="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-brand-50 border border-brand-200 text-brand-900 text-xs font-medium">
+                        <i class="ph-bold ph-lock-simple text-base"></i>
+                        <span class="flex-1 min-w-0">You have ${pluralize(unmoved.length, 'private roadmap')} from before the shared workspace.</span>
+                        <button type="button" onclick="openPrivateRoadmapsModal()" class="px-2.5 py-1 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-bold">Review</button>
+                        <button type="button" onclick="hidePrivateBanner()" class="px-2.5 py-1 rounded-lg hover:bg-white/70 font-bold">Hide</button>
+                    </div>`);
+            }
+            box.innerHTML = notices.join('');
+            box.classList.toggle('hidden', !notices.length);
+        }
+
+        // No roadmap at all (new workspace, or every roadmap deleted)
+        function renderWorkspaceEmpty() {
+            if (roadmapContainer) {
+                roadmapContainer.innerHTML = `
+                    <div class="text-center py-20 text-slate-500">
+                        <i class="ph-bold ph-map-trifold text-4xl mb-2 text-slate-300"></i>
+                        <p class="font-bold text-sm text-slate-700">No roadmaps in the workspace yet</p>
+                        <p class="text-xs text-slate-500 mt-1 role-viewer-only">An editor hasn't created a roadmap yet.</p>
+                        <div class="mt-4 flex flex-wrap items-center justify-center gap-2 role-editor-only">
+                            <button onclick="openNewRoadmapModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all">Create roadmap</button>
+                            <button onclick="createSampleRoadmap()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all">Add sample roadmap</button>
+                        </div>
+                    </div>`;
+            }
+            const emptyRow = cols => `<tr><td colspan="${cols}" class="text-center py-12 text-slate-500 text-xs">No roadmap yet. Create one first.</td></tr>`;
+            if (editorTableBody) editorTableBody.innerHTML = emptyRow(6);
+            if (feedbackTableBody) feedbackTableBody.innerHTML = emptyRow(6);
+            if (perspectiveSubfilter) perspectiveSubfilter.innerHTML = '<option value="ALL">Show All</option>';
+        }
 
         // =======================================================
         // AUTHENTICATION & LOGIN GATE CONTROLS
@@ -1398,6 +1594,8 @@
                 roadmaps = [structuredClone(sampleRoadmap)];
                 currentRoadmapId = sampleRoadmap.id;
             }
+            myRole = 'editor';      // demo mode: one person, full editing, in memory only
+            demoAuditLog = [];
             updateUserHeaderUI(displayName || email, photoURL);
         }
 
@@ -1408,7 +1606,7 @@
             hideLoginGate();
         };
 
-        // Signed-in Firebase user: load their roadmaps, seeding the sample on first login
+        // Signed-in Firebase user: join the shared workspace (or read their role), then listen for live changes
         async function startFirebaseSession(user) {
             currentUser = user;
             useCloudPersistence = true;
@@ -1417,12 +1615,27 @@
             updateUserHeaderUI(actualName, user.photoURL || null);
 
             roadmaps = [];
+            previewRoadmap = null;
+            privateRoadmaps = [];
+            myRole = null;
             try {
-                await loadRoadmapsFromCloud();
+                const member = await ensureMembership(user);
+                if (member.role === 'blocked') {
+                    useCloudPersistence = false;
+                    await signOut(auth).catch(e => console.warn(e));
+                    showGoogleAuthError(BLOCKED_MESSAGE, DOMAIN_DENIED_OPTIONS);
+                    return;
+                }
+                myRole = member.role;
+                await startWorkspaceListeners();
             } catch (err) {
-                console.warn("Could not load from Firestore:", err);
+                console.warn("Could not open the workspace:", err);
+                stopAllListeners();
                 useCloudPersistence = false;
-                const message = firestoreErrorMessage(err, 'load your roadmaps');
+                myRole = null;
+                const message = err?.code === 'mapit/no-workspace'
+                    ? `MapIt's shared workspace hasn't been set up yet. Ask the MapIt admin (${BOOTSTRAP_ADMIN}) to sign in first.`
+                    : firestoreErrorMessage(err, 'load your roadmaps');
                 if (err?.code === 'permission-denied') {
                     // Retrying with the same account will not help; let the user pick another
                     await signOut(auth).catch(e => console.warn(e));
@@ -1432,12 +1645,8 @@
                 }
                 return;
             }
-            if (roadmaps.length === 0) {
-                roadmaps = [structuredClone(sampleRoadmap)];
-                currentRoadmapId = sampleRoadmap.id;
-                await saveRoadmapToCloud(roadmaps[0]);
-            }
             hideLoginGate();
+            loadPrivateRoadmaps();
         }
 
         // Only verified company accounts may use MapIt (also enforced by firestore.rules)
@@ -1555,7 +1764,10 @@
         }
 
         window.selectRoadmap = function(id) {
+            if (!id) return;
+            previewRoadmap = null;
             currentRoadmapId = id;
+            rememberRoadmap(id);
             updateUI();
         };
 
@@ -1563,12 +1775,13 @@
         // ROADMAP DELETION WITH CONFIRMATION MODAL
         // =======================================================
         window.confirmDeleteCurrentRoadmap = function() {
-            promptDeleteRoadmap(currentRoadmapId);
+            const active = getActiveRoadmap();
+            if (active) promptDeleteRoadmap(active.id);
         };
 
         window.promptDeleteRoadmap = function(id) {
             const target = roadmaps.find(r => r.id === id);
-            if (!target) return;
+            if (!target || !canDeleteRoadmap(target)) return;
 
             roadmapToDeleteId = id;
             const targetTitleEl = document.getElementById('delete-roadmap-target-title');
@@ -1585,52 +1798,9 @@
         };
 
         window.executeRoadmapDeletion = async function() {
-            if (!roadmapToDeleteId) return;
-
-            const deletedId = roadmapToDeleteId;
-            const targetIndex = roadmaps.findIndex(r => r.id === deletedId);
-            
-            if (useCloudPersistence && db && currentUser) {
-                const docRef = doc(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps', deletedId);
-                const write = deleteDoc(docRef);
-                const deleteFailed = (err) => {
-                    console.warn("Could not delete from Firestore:", err);
-                    deleteErrorMessage = `Not deleted: ${firestoreErrorMessage(err, 'delete this roadmap')} It will come back when you reload.`;
-                    refreshSaveStatus();
-                };
-                try {
-                    if (await writeWithWait(write) === 'waiting') {
-                        trackQueuedWrite(write, () => {}, deleteFailed);
-                    }
-                } catch (err) {
-                    // Keep the roadmap: it still exists in Firestore
-                    deleteFailed(err);
-                    closeDeleteRoadmapModal();
-                    return;
-                }
-            }
-
-            unsavedRoadmapIds.delete(deletedId);
-            roadmaps = roadmaps.filter(r => r.id !== deletedId);
-
-            if (roadmaps.length === 0) {
-                const newDefault = {
-                    id: 'roadmap-' + Date.now(),
-                    title: 'New Product Roadmap',
-                    updatedAt: new Date().toISOString(),
-                    feedback: [],
-                    items: []
-                };
-                roadmaps.push(newDefault);
-                currentRoadmapId = newDefault.id;
-                await saveRoadmapToCloud(newDefault);
-            } else if (currentRoadmapId === deletedId) {
-                const nextIndex = Math.min(targetIndex, roadmaps.length - 1);
-                currentRoadmapId = roadmaps[Math.max(0, nextIndex)].id;
-            }
-
+            const target = roadmaps.find(r => r.id === roadmapToDeleteId);
             closeDeleteRoadmapModal();
-            updateUI();
+            if (target) await deleteRoadmap(target);
         };
 
         // =======================================================
@@ -1651,7 +1821,7 @@
                         <i class="ph-bold ph-git-commit rotate-90 text-4xl mb-2 text-slate-300"></i>
                         <p class="font-bold text-sm text-slate-700">No deliverables added yet</p>
                         <p class="text-xs text-slate-500 mt-1">Switch to the Editor tab or click "+ Add Milestone" to build your timeline.</p>
-                        <button onclick="switchView('editor')" class="mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all">
+                        <button onclick="switchView('editor')" class="editor-only mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all">
                             Open Editor
                         </button>
                     </div>
@@ -2112,7 +2282,7 @@
                         <td colspan="6" class="text-center py-12 text-slate-500">
                             <i class="ph ph-sliders text-3xl mb-1 text-slate-300"></i>
                             <p class="font-medium text-xs">No deliverables match your search or filter.</p>
-                            <button onclick="openAddMilestoneModal()" class="mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
+                            <button onclick="openAddMilestoneModal()" class="editor-only mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
                                 <i class="ph-bold ph-plus"></i> Add new deliverable
                             </button>
                         </td>
@@ -2157,7 +2327,7 @@
                         </div>
                     </td>
                     <td class="py-3 px-4 text-right whitespace-nowrap">
-                        <button onclick="event.stopPropagation(); selectMilestoneForEdit('${item.id}')" class="p-1.5 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all" title="Edit Milestone" aria-label="Edit Milestone">
+                        <button onclick="event.stopPropagation(); selectMilestoneForEdit('${escapeHtml(item.id)}')" class="editor-only p-1.5 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all" title="Edit Milestone" aria-label="Edit Milestone">
                             <i class="ph ph-pencil-simple text-base"></i>
                         </button>
                     </td>
@@ -2234,7 +2404,7 @@
                         <td colspan="6" class="text-center py-12 text-slate-500">
                             <i class="ph ph-chat-centered-text text-3xl mb-1 text-slate-300"></i>
                             <p class="font-medium text-xs">No feedback or suggestions found.</p>
-                            <button onclick="openAddFeedbackModal()" class="mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
+                            <button onclick="openAddFeedbackModal()" class="editor-only mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
                                 <i class="ph-bold ph-plus"></i> Add new suggestion
                             </button>
                         </td>
@@ -2283,10 +2453,10 @@
                     </td>
                     <td class="py-3 px-4 text-right whitespace-nowrap">
                         <div class="flex items-center justify-end gap-1">
-                            <button onclick="editFeedbackItem('${item.id}')" title="Edit Feedback" aria-label="Edit Feedback" class="p-1.5 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all">
+                            <button onclick="editFeedbackItem('${escapeHtml(item.id)}')" title="Edit Feedback" aria-label="Edit Feedback" class="editor-only p-1.5 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all">
                                 <i class="ph ph-pencil-simple text-base"></i>
                             </button>
-                            <button onclick="deleteFeedbackItem('${item.id}')" title="Delete Feedback" aria-label="Delete Feedback" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
+                            <button onclick="deleteFeedbackItem('${escapeHtml(item.id)}')" title="Delete Feedback" aria-label="Delete Feedback" class="editor-only p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
                                 <i class="ph ph-trash text-base"></i>
                             </button>
                         </div>
@@ -2336,50 +2506,36 @@
             feedbackForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const activeRoadmap = getActiveRoadmap();
-                if (!activeRoadmap) return;
-
-                if (!activeRoadmap.feedback) activeRoadmap.feedback = [];
+                if (!activeRoadmap || !canEditActive()) return;
 
                 const id = document.getElementById('feedback-item-id')?.value;
-                const title = document.getElementById('feedback-form-title')?.value.trim() || '';
-                const category = document.getElementById('feedback-form-category')?.value.trim() || '';
-                const source = document.getElementById('feedback-form-source')?.value.trim() || '';
-                const description = document.getElementById('feedback-form-description')?.value.trim() || '';
-
-                if (id) {
-                    const existing = activeRoadmap.feedback.find(f => f.id === id);
-                    if (existing) {
-                        existing.title = title;
-                        existing.category = category;
-                        existing.source = source;
-                        existing.description = description;
-                    }
-                } else {
-                    activeRoadmap.feedback.push({
-                        id: 'fb-' + Date.now(),
-                        title,
-                        category,
-                        source,
-                        description
-                    });
-                }
-
-                activeRoadmap.updatedAt = new Date().toISOString();
-                await saveRoadmapToCloud(activeRoadmap);
+                const fields = {
+                    title: document.getElementById('feedback-form-title')?.value.trim() || '',
+                    category: document.getElementById('feedback-form-category')?.value.trim() || '',
+                    source: document.getElementById('feedback-form-source')?.value.trim() || '',
+                    description: document.getElementById('feedback-form-description')?.value.trim() || ''
+                };
                 closeFeedbackModal();
-                updateUI();
+                await saveFeedback(activeRoadmap, id, fields);
             });
         }
 
         // Resolves true when the user confirms; Cancel, Esc and the backdrop resolve false
         let confirmDeleteResolve = null;
-        function confirmDelete({ kind, target, detail = '' }) {
-            document.getElementById('confirm-delete-title').textContent = `Delete ${kind}`;
-            document.getElementById('confirm-delete-target').textContent = `"${target}"`;
-            document.getElementById('confirm-delete-detail').textContent = detail;
-            document.getElementById('confirm-delete-label').textContent = `Delete ${kind}`;
+        function confirmAction({ title, messageHtml, confirmLabel }) {
+            document.getElementById('confirm-delete-title').textContent = title;
+            document.getElementById('confirm-delete-message').innerHTML = messageHtml;
+            document.getElementById('confirm-delete-label').textContent = confirmLabel;
             document.getElementById('confirm-delete-modal').classList.remove('hidden');
             return new Promise(resolve => { confirmDeleteResolve = resolve; });
+        }
+
+        function confirmDelete({ kind, target, detail = '' }) {
+            return confirmAction({
+                title: `Delete ${kind}`,
+                messageHtml: `Are you sure you want to delete <strong id="confirm-delete-target" class="text-slate-900 font-bold">"${escapeHtml(target)}"</strong>? <span id="confirm-delete-detail">${escapeHtml(detail)}</span>`,
+                confirmLabel: `Delete ${kind}`
+            });
         }
 
         window.resolveConfirmDelete = function(confirmed) {
@@ -2391,7 +2547,7 @@
 
         window.deleteFeedbackItem = async function(id) {
             const activeRoadmap = getActiveRoadmap();
-            if (!activeRoadmap) return;
+            if (!activeRoadmap || !canEditActive()) return;
 
             const feedbackItem = (activeRoadmap.feedback || []).find(f => f.id === id);
             if (!feedbackItem) return;
@@ -2402,17 +2558,7 @@
                 detail: linkedCount ? `It will be unlinked from ${pluralize(linkedCount, 'milestone')}.` : ''
             });
             if (!confirmed) return;
-
-            activeRoadmap.feedback = (activeRoadmap.feedback || []).filter(f => f.id !== id);
-            (activeRoadmap.items || []).forEach(m => {
-                if (m.feedbackIds) {
-                    m.feedbackIds = m.feedbackIds.filter(fId => fId !== id);
-                }
-            });
-
-            activeRoadmap.updatedAt = new Date().toISOString();
-            await saveRoadmapToCloud(activeRoadmap);
-            updateUI();
+            await deleteFeedback(activeRoadmap, feedbackItem);
         };
 
         function populateFeedbackCheckboxes(containerId, selectedIds = []) {
@@ -2510,6 +2656,9 @@
                 }
             }
 
+            const editLabel = document.getElementById('details-edit-label');
+            if (editLabel) editLabel.textContent = canEditActive() ? 'Edit' : 'History & comments';
+
             if (detailModal) detailModal.classList.remove('hidden');
         };
 
@@ -2547,102 +2696,198 @@
             }
         };
 
+        // Audit entry -> lines of text for the activity list (first line is the headline)
+        const FIELD_LABELS = { name: 'Name', module: 'Module', date: 'Target date', status: 'Status', inclusions: 'Scope', description: 'Description', feedbackIds: 'Linked feedback', title: 'Title', category: 'Category', source: 'Source' };
+        function describeAudit(entry) {
+            const changes = entry.changes || [];
+            const line = c => {
+                if (c.f === 'status') return `Status changed from ${c.from || '—'} to ${c.to}`;
+                if (c.f === 'date') return `Target date changed to ${formatMonthYear(c.to)}`;
+                if (c.f === 'name') return `Renamed to "${c.to}"`;
+                if (c.f === 'module') return `Module changed to "${c.to}"`;
+                if (c.f === 'description') return 'Description updated';
+                if (c.f === 'inclusions') return 'Scope inclusions updated';
+                if (c.f === 'feedback') return String(c.to).startsWith('+') ? `Linked feedback "${String(c.to).slice(1)}"` : `Unlinked feedback "${String(c.to).slice(1)}"`;
+                return `${FIELD_LABELS[c.f] || c.f} changed`;
+            };
+            switch (entry.action) {
+                case 'milestone.created': return ['Milestone created'];
+                case 'milestone.updated': return changes.length ? changes.map(line) : ['Milestone updated'];
+                case 'milestone.deleted': return ['Milestone deleted'];
+                case 'comment.added': return ['Added comment'];
+                case 'roadmap.moved': return ['Moved into the shared workspace'];
+                default: return [entry.action];
+            }
+        }
+
         function renderMilestoneActivity(item) {
             const logsList = document.getElementById('milestone-history-list');
             const commentsList = document.getElementById('milestone-comments-list');
             const countBadge = document.getElementById('milestone-comments-count');
 
-            if (!item.history) {
-                item.history = [
-                    {
-                        id: 'hist-init-' + item.id,
-                        action: 'Milestone created',
-                        timestamp: item.createdAt || new Date().toISOString(),
-                        user: 'System'
-                    }
-                ];
-            }
-            if (!item.comments) item.comments = [];
+            const entries = (useCloudPersistence && !item.isPreviewItem ? openMilestoneActivity : demoAuditLog.filter(e => e.target?.id === item.id))
+                .slice().sort((a, b) => toMillis(b.at) - toMillis(a.at));
+            const legacy = (item.legacyHistory || item.history || []).slice().reverse();
+            const comments = useCloudPersistence && !item.isPreviewItem ? openMilestoneComments : (item.comments || []);
 
-            if (countBadge) countBadge.textContent = item.comments.length;
+            if (countBadge) countBadge.textContent = comments.length;
+
+            const row = ({ lines, who, whoTitle, when, whenTitle, legacyRow }) => `
+                <div class="flex items-start gap-2.5 p-2 rounded-lg ${legacyRow ? 'bg-slate-50' : 'bg-white'} border border-slate-100 shadow-2xs">
+                    <div class="w-6 h-6 rounded-full ${legacyRow ? 'bg-slate-100 text-slate-500' : 'bg-brand-50 text-brand-600'} flex items-center justify-center shrink-0 mt-0.5 text-xs">
+                        <i class="ph-bold ph-git-commit"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-1">
+                            <span class="font-semibold text-slate-800 text-[11px] truncate">${escapeHtml(lines[0])}</span>
+                            <span class="text-[10px] text-slate-500 shrink-0" title="${escapeHtml(whenTitle)}">${escapeHtml(when)}</span>
+                        </div>
+                        ${lines.slice(1).map(l => `<span class="text-[11px] text-slate-700 block">${escapeHtml(l)}</span>`).join('')}
+                        <span class="text-[10px] text-slate-500 block" title="${escapeHtml(whoTitle)}">${escapeHtml(who)}</span>
+                    </div>
+                </div>`;
 
             if (logsList) {
-                logsList.innerHTML = item.history.map(log => `
-                    <div class="flex items-start gap-2.5 p-2 rounded-lg bg-white border border-slate-100 shadow-2xs">
-                        <div class="w-6 h-6 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 mt-0.5 text-xs">
-                            <i class="ph-bold ph-git-commit"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center justify-between gap-1">
-                                <span class="font-semibold text-slate-800 text-[11px] truncate">${escapeHtml(log.action)}</span>
-                                <span class="text-[10px] text-slate-500 shrink-0">${formatRelativeTime(log.timestamp)}</span>
-                            </div>
-                            <span class="text-[10px] text-slate-500 block">${escapeHtml(log.user || 'Member')}</span>
-                        </div>
-                    </div>
-                `).reverse().join('');
+                const html = entries.map(e => row({
+                    lines: describeAudit(e),
+                    who: e.by?.name || 'Member',
+                    whoTitle: e.by?.email ? `${e.by.name} (${e.by.email})` : '',
+                    when: formatRelativeTime(e.at),
+                    whenTitle: formatPHT(e.at)
+                })).join('') + (legacy.length ? `
+                    <p class="pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Earlier history (before audit log, not protected)</p>
+                    ${legacy.map(h => row({ lines: [h.action || 'Change'], who: h.user || 'Member', whoTitle: '', when: formatRelativeTime(h.timestamp), whenTitle: formatPHT(h.timestamp), legacyRow: true })).join('')}` : '');
+                logsList.innerHTML = html || '<div class="py-8 text-center text-slate-500 text-xs italic">No activity recorded yet.</div>';
             }
 
             if (commentsList) {
-                if (item.comments.length === 0) {
+                if (comments.length === 0) {
                     commentsList.innerHTML = `
                         <div class="py-8 text-center text-slate-500 text-xs italic">
-                            No comments yet. Start a discussion below!
+                            No comments yet.${canEditActive() ? ' Start a discussion below!' : ''}
                         </div>
                     `;
                 } else {
-                    commentsList.innerHTML = item.comments.map(c => `
+                    commentsList.innerHTML = comments.map(c => {
+                        const name = c.originalAuthor || c.by?.name || c.author || 'User';
+                        const time = c.originalTimestamp || c.at || c.timestamp;
+                        const movedBy = c.originalAuthor && c.by?.name ? ` · moved by ${c.by.name}` : '';
+                        return `
                         <div class="p-2.5 rounded-xl bg-white border border-slate-100 shadow-2xs space-y-1">
                             <div class="flex items-center justify-between text-[11px]">
-                                <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                                <span class="font-bold text-slate-800 flex items-center gap-1.5" title="${escapeHtml(c.by?.email && !c.originalAuthor ? `${c.by.name} (${c.by.email})` : '')}">
                                     <span class="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[9px] font-bold">
-                                        ${escapeHtml((c.author || 'U').charAt(0).toUpperCase())}
+                                        ${escapeHtml(name.charAt(0).toUpperCase())}
                                     </span>
-                                    ${escapeHtml(c.author || 'User')}
+                                    ${escapeHtml(name)}<span class="font-normal text-slate-500">${escapeHtml(movedBy)}</span>
                                 </span>
-                                <span class="text-[10px] text-slate-500">${formatRelativeTime(c.timestamp)}</span>
+                                <span class="text-[10px] text-slate-500" title="${escapeHtml(formatPHT(time))}">${escapeHtml(formatRelativeTime(time))}</span>
                             </div>
                             <p class="text-xs text-slate-600 leading-relaxed">${escapeHtml(c.text)}</p>
-                        </div>
-                    `).join('');
+                        </div>`;
+                    }).join('');
                 }
             }
         }
 
         window.addMilestoneComment = async function() {
             const input = document.getElementById('milestone-new-comment-input');
-            if (!input || !input.value.trim() || !selectedMilestoneId) return;
+            if (!input || !input.value.trim() || !selectedMilestoneId || !canEditActive()) return;
 
             const text = input.value.trim();
             const activeRoadmap = getActiveRoadmap();
-            if (!activeRoadmap) return;
-
-            const item = activeRoadmap.items.find(i => i.id === selectedMilestoneId);
+            const item = activeRoadmap?.items.find(i => i.id === selectedMilestoneId);
             if (!item) return;
 
-            if (!item.comments) item.comments = [];
-            if (!item.history) item.history = [];
-
-            const newComment = {
-                id: 'comm-' + Date.now(),
-                text: text,
-                author: currentUser?.displayName || (currentUser?.email ? currentUser.email.split('@')[0] : 'Workspace Member'),
-                timestamp: new Date().toISOString()
-            };
-
-            item.comments.push(newComment);
-            item.history.push({
-                id: 'hist-' + Date.now(),
-                action: 'Added comment',
-                timestamp: new Date().toISOString(),
-                user: newComment.author
-            });
-
-            activeRoadmap.updatedAt = new Date().toISOString();
-            await saveRoadmapToCloud(activeRoadmap);
             input.value = '';
+            await addComment(activeRoadmap, item, text);
             renderMilestoneActivity(item);
         };
+
+        // ---- Edit window: what the user changed vs. what others changed meanwhile ----
+        const EDIT_FIELDS = {
+            name: 'detail-item-name', module: 'detail-item-module', date: 'detail-item-date', status: 'detail-item-status',
+            inclusions: 'detail-item-inclusions', description: 'detail-item-description', feedbackIds: null
+        };
+        let editBaseline = {};   // field -> value the form started from (updated when someone else saves)
+
+        function itemFieldValue(item, field) {
+            if (field === 'inclusions') return (item.inclusions || []).map(s => String(s).trim()).filter(Boolean).join(', ');
+            if (field === 'feedbackIds') return [...(item.feedbackIds || [])].sort().join('|');
+            if (field === 'status') return item.status || 'planned';
+            if (field === 'date') return String(item.date || '');
+            return String(item[field] ?? '').trim();
+        }
+
+        function formFieldValue(field) {
+            if (field === 'feedbackIds') return getCheckedFeedbackIds('edit-milestone-feedback-list').sort().join('|');
+            const value = document.getElementById(EDIT_FIELDS[field])?.value || '';
+            if (field === 'inclusions') return value.split(',').map(s => s.trim()).filter(Boolean).join(', ');
+            if (field === 'date' || field === 'status') return value;
+            return value.trim();
+        }
+
+        function setFormFieldValue(field, item) {
+            if (field === 'feedbackIds') {
+                populateFeedbackCheckboxes('edit-milestone-feedback-list', item.feedbackIds || []);
+                return;
+            }
+            const el = document.getElementById(EDIT_FIELDS[field]);
+            if (el) el.value = field === 'status' ? (item.status || 'planned') : itemFieldValue(item, field);
+        }
+
+        function setEditReadOnly(readOnly) {
+            document.querySelectorAll('#edit-detail-form input, #edit-detail-form select, #edit-detail-form textarea')
+                .forEach(el => { el.disabled = readOnly; });
+            const title = document.getElementById('edit-milestone-title');
+            if (title) title.textContent = readOnly ? 'Milestone Details' : 'Edit Milestone Details';
+        }
+
+        // Called by the live milestone listener while the Edit window is open
+        function onOpenMilestoneChanged(roadmap, change) {
+            if (!selectedMilestoneId || editMilestoneModal?.classList.contains('hidden') || getActiveRoadmap()?.id !== roadmap.id) return;
+            if (change.type === 'removed') {
+                if (ownDeletes.has(selectedMilestoneId)) return;
+                const id = selectedMilestoneId;
+                closeEditMilestoneModal();
+                getDoc(auditRef('del-milestone-' + id))
+                    .then(s => showSaveStatus('info', `This milestone was deleted${s.exists() ? ' by ' + s.data().by?.name : ''}.`))
+                    .catch(() => showSaveStatus('info', 'This milestone was deleted by someone else.'));
+                return;
+            }
+            if (change.type !== 'modified' || change.doc.metadata.hasPendingWrites) return;
+            const data = change.doc.data();
+            if (data.updatedBy?.email === myEmail()) return;
+            const changedLabels = [], keptLabels = [];
+            Object.keys(EDIT_FIELDS).forEach(field => {
+                const remote = itemFieldValue(data, field);
+                if (remote === editBaseline[field]) return;
+                changedLabels.push(FIELD_LABELS[field]);
+                if (formFieldValue(field) === editBaseline[field]) {
+                    setFormFieldValue(field, data);
+                } else {
+                    keptLabels.push(FIELD_LABELS[field]);
+                    const el = EDIT_FIELDS[field] && document.getElementById(EDIT_FIELDS[field]);
+                    if (el) { el.classList.add('ring-2', 'ring-amber-300'); el.title = `Also changed by ${data.updatedBy?.name || 'someone else'}`; }
+                }
+                editBaseline[field] = remote;
+            });
+            if (!changedLabels.length) return;
+            const notice = document.getElementById('edit-remote-notice');
+            const text = document.getElementById('edit-remote-notice-text');
+            if (notice && text) {
+                text.textContent = `${data.updatedBy?.name || 'Someone'} changed this milestone just now: ${changedLabels.join(', ')}.` +
+                    (keptLabels.length ? ` Your unsaved ${keptLabels.join(', ')} ${keptLabels.length === 1 ? 'edit was' : 'edits were'} kept; saving will replace theirs.` : '');
+                notice.classList.remove('hidden');
+            }
+        }
+
+        function stopEditListeners() {
+            editUnsubs.forEach(u => u());
+            editUnsubs = [];
+            openMilestoneComments = [];
+            openMilestoneActivity = [];
+        }
 
         window.selectMilestoneForEdit = function(id) {
             const activeRoadmap = getActiveRoadmap();
@@ -2652,14 +2897,31 @@
 
             selectedMilestoneId = id;
             document.getElementById('detail-item-id').value = item.id;
-            document.getElementById('detail-item-name').value = item.name;
-            document.getElementById('detail-item-module').value = item.module;
-            document.getElementById('detail-item-date').value = item.date || '';
-            document.getElementById('detail-item-status').value = item.status;
-            document.getElementById('detail-item-inclusions').value = (item.inclusions || []).join(', ');
-            document.getElementById('detail-item-description').value = item.description || '';
+            Object.keys(EDIT_FIELDS).forEach(field => setFormFieldValue(field, item));
+            editBaseline = Object.fromEntries(Object.keys(EDIT_FIELDS).map(field => [field, formFieldValue(field)]));
+            document.querySelectorAll('#edit-detail-form .ring-amber-300').forEach(el => { el.classList.remove('ring-2', 'ring-amber-300'); el.title = ''; });
+            document.getElementById('edit-remote-notice')?.classList.add('hidden');
+            setEditReadOnly(!canEditActive());
 
-            populateFeedbackCheckboxes('edit-milestone-feedback-list', item.feedbackIds || []);
+            stopEditListeners();
+            if (useCloudPersistence && !activeRoadmap.isPreview) {
+                const refresh = () => {
+                    const current = getActiveRoadmap()?.items.find(i => i.id === id);
+                    if (current && selectedMilestoneId === id) renderMilestoneActivity(current);
+                };
+                const panelError = err => console.warn('Activity listener error:', err);
+                editUnsubs.push(onSnapshot(wsCollection('roadmaps', activeRoadmap.id, 'milestones', id, 'comments'), snap => {
+                    openMilestoneComments = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id }))
+                        .sort((a, b) => toMillis(a.at) - toMillis(b.at));
+                    refresh();
+                }, panelError));
+                editUnsubs.push(onSnapshot(query(wsCollection('auditLog'), where('target.id', '==', id)), snap => {
+                    openMilestoneActivity = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id }))
+                        .filter(e => e.roadmapId === activeRoadmap.id);
+                    refresh();
+                }, panelError));
+            }
+            if (activeRoadmap.isPreview) item.isPreviewItem = true;
             renderMilestoneActivity(item);
             switchMilestoneSideTab('logs');
 
@@ -2668,6 +2930,7 @@
 
         window.closeEditMilestoneModal = function() {
             selectedMilestoneId = null;
+            stopEditListeners();
             if (editMilestoneModal) editMilestoneModal.classList.add('hidden');
         };
 
@@ -2676,58 +2939,45 @@
             editDetailForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const activeRoadmap = getActiveRoadmap();
-                if (!activeRoadmap) return;
+                if (!activeRoadmap || !canEditActive()) return;
 
                 const id = document.getElementById('detail-item-id')?.value;
                 const item = activeRoadmap.items.find(i => i.id === id);
                 if (!item) return;
 
-                if (!item.history) item.history = [];
-
-                const newName = document.getElementById('detail-item-name')?.value.trim() || '';
-                const newModule = document.getElementById('detail-item-module')?.value.trim() || '';
-                const newDate = document.getElementById('detail-item-date')?.value || '';
-                const newStatus = document.getElementById('detail-item-status')?.value || 'planned';
-                const newInclusions = (document.getElementById('detail-item-inclusions')?.value || '').split(',').map(s => s.trim()).filter(Boolean);
-                const newDescription = document.getElementById('detail-item-description')?.value.trim() || '';
-                const newFeedbackIds = getCheckedFeedbackIds('edit-milestone-feedback-list');
-
-                const authorName = currentUser?.displayName || (currentUser?.email ? currentUser.email.split('@')[0] : 'Workspace Member');
+                // Only the fields this user changed are written, so a colleague's edits to other fields are kept
+                const updates = {};
                 const changes = [];
-                if (item.status !== newStatus) changes.push(`Status changed from ${item.status} to ${newStatus}`);
-                if (item.date !== newDate) changes.push(`Target date changed to ${formatMonthYear(newDate)}`);
-                if (item.name !== newName) changes.push(`Renamed to "${newName}"`);
-                if (item.module !== newModule) changes.push(`Module changed to "${newModule}"`);
-                if ((item.feedbackIds || []).length !== newFeedbackIds.length) changes.push(`Updated linked feedback items`);
+                const feedbackTitle = fid => (activeRoadmap.feedback || []).find(f => f.id === fid)?.title || fid;
+                Object.keys(EDIT_FIELDS).forEach(field => {
+                    const now = formFieldValue(field);
+                    const before = editBaseline[field];
+                    if (now === before) return;
+                    if (field === 'feedbackIds') {
+                        const nowIds = now ? now.split('|') : [];
+                        const oldIds = before ? before.split('|') : [];
+                        updates.feedbackIds = getCheckedFeedbackIds('edit-milestone-feedback-list');
+                        nowIds.filter(x => !oldIds.includes(x)).forEach(x => changes.push({ f: 'feedback', to: '+' + clip(feedbackTitle(x), 200) }));
+                        oldIds.filter(x => !nowIds.includes(x)).forEach(x => changes.push({ f: 'feedback', to: '-' + clip(feedbackTitle(x), 200) }));
+                    } else if (field === 'inclusions') {
+                        updates.inclusions = now ? now.split(', ') : [];
+                        changes.push({ f: field, from: clip(before), to: clip(now) });
+                    } else if (field === 'description') {
+                        updates.description = now;
+                        changes.push({ f: field, to: clip(now) });
+                    } else {
+                        updates[field] = now;
+                        changes.push({ f: field, from: clip(before), to: clip(now) });
+                    }
+                });
 
-                if (changes.length > 0) {
-                    changes.forEach(ch => {
-                        item.history.push({
-                            id: 'hist-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-                            action: ch,
-                            timestamp: new Date().toISOString(),
-                            user: authorName
-                        });
-                    });
-                }
-
-                item.name = newName;
-                item.module = newModule;
-                item.date = newDate;
-                item.status = newStatus;
-                item.inclusions = newInclusions;
-                item.description = newDescription;
-                item.feedbackIds = newFeedbackIds;
-
-                activeRoadmap.updatedAt = new Date().toISOString();
-                await saveRoadmapToCloud(activeRoadmap);
                 closeEditMilestoneModal();
-                updateUI();
+                await updateMilestone(activeRoadmap, item, updates, changes);
             });
         }
 
         window.deleteFromDetailModal = async function() {
-            if (!selectedMilestoneId) return;
+            if (!selectedMilestoneId || !canEditActive()) return;
             const activeRoadmap = getActiveRoadmap();
             if (!activeRoadmap) return;
 
@@ -2736,18 +2986,16 @@
             const confirmed = await confirmDelete({
                 kind: 'milestone',
                 target: item.name,
-                detail: 'Its comments and history will be deleted too.'
+                detail: 'Its history and comments stay in the activity log.'
             });
             if (!confirmed) return;
 
-            activeRoadmap.items = activeRoadmap.items.filter(i => i.id !== selectedMilestoneId);
-            activeRoadmap.updatedAt = new Date().toISOString();
-            await saveRoadmapToCloud(activeRoadmap);
             closeEditMilestoneModal();
-            updateUI();
+            await deleteMilestone(activeRoadmap, item);
         };
 
         window.openAddMilestoneModal = function() {
+            if (!canEditActive()) return;
             const form = document.getElementById('modal-add-item-form');
             if (form) form.reset();
             populateFeedbackCheckboxes('add-milestone-feedback-list', []);
@@ -2763,37 +3011,25 @@
             modalAddItemForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const activeRoadmap = getActiveRoadmap();
-                if (!activeRoadmap) return;
+                if (!activeRoadmap || !canEditActive()) return;
 
-                const newItem = {
-                    id: 'm-' + Date.now(),
+                const fields = {
                     name: document.getElementById('modal-item-name')?.value.trim() || '',
                     module: document.getElementById('modal-item-module')?.value.trim() || '',
                     date: document.getElementById('modal-item-date')?.value || '',
                     status: document.getElementById('modal-item-status')?.value || 'planned',
                     inclusions: (document.getElementById('modal-item-inclusions')?.value || '').split(',').map(s => s.trim()).filter(Boolean),
                     description: document.getElementById('modal-item-description')?.value.trim() || '',
-                    feedbackIds: getCheckedFeedbackIds('add-milestone-feedback-list'),
-                    history: [
-                        {
-                            id: 'hist-' + Date.now(),
-                            action: 'Milestone created',
-                            timestamp: new Date().toISOString(),
-                            user: currentUser?.displayName || (currentUser?.email ? currentUser.email.split('@')[0] : 'Workspace Member')
-                        }
-                    ],
-                    comments: []
+                    feedbackIds: getCheckedFeedbackIds('add-milestone-feedback-list')
                 };
 
-                activeRoadmap.items.push(newItem);
-                activeRoadmap.updatedAt = new Date().toISOString();
-                await saveRoadmapToCloud(activeRoadmap);
                 closeAddMilestoneModal();
-                updateUI();
+                await addMilestone(activeRoadmap, fields);
             });
         }
 
         window.openNewRoadmapModal = function() {
+            if (!canEdit()) return;
             const titleInput = document.getElementById('new-roadmap-title-input');
             if (titleInput) titleInput.value = '';
             if (newRoadmapModal) newRoadmapModal.classList.remove('hidden');
@@ -2809,24 +3045,16 @@
                 e.preventDefault();
                 const titleInput = document.getElementById('new-roadmap-title-input');
                 const title = titleInput?.value.trim();
-                if (!title) return;
-
-                const newRoadmap = {
-                    id: 'roadmap-' + Date.now(),
-                    title: title,
-                    updatedAt: new Date().toISOString(),
-                    feedback: [],
-                    items: []
-                };
-
-                roadmaps.push(newRoadmap);
-                currentRoadmapId = newRoadmap.id;
-
-                await saveRoadmapToCloud(newRoadmap);
+                if (!title || !canEdit()) return;
                 closeNewRoadmapModal();
-                updateUI();
+                await createRoadmap(title);
             });
         }
+
+        window.createSampleRoadmap = function() {
+            if (!canEdit()) return;
+            return createRoadmap(sampleRoadmap.title, { fromSample: true });
+        };
 
         // =======================================================
         // EXPORT LOGIC
@@ -3043,7 +3271,7 @@
                 }
 
                 const inclusions = (item.inclusions || []).join('; ');
-                const linkedFb = (item.feedbackIds || []).map(fId => feedbackMap[fId] || fId).join('; ');
+                const linkedFb = (item.feedbackIds || []).filter(fId => feedbackMap[fId]).map(fId => feedbackMap[fId]).join('; ');
 
                 const escape = csvCell;
 
@@ -3064,14 +3292,25 @@
             closeExportModal();
         };
 
-        window.exportMilestonesJSON = function() {
+        window.exportMilestonesJSON = async function() {
             const activeRoadmap = getActiveRoadmap();
             if (!activeRoadmap) return;
 
+            const milestones = (activeRoadmap.items || []).map(m => ({ ...m }));
+            if (useCloudPersistence && !activeRoadmap.isPreview) {
+                for (const m of milestones) {
+                    try {
+                        const snap = await getDocs(wsCollection('roadmaps', activeRoadmap.id, 'milestones', m.id, 'comments'));
+                        m.comments = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => toMillis(a.at) - toMillis(b.at));
+                    } catch (err) {
+                        console.warn('Could not load comments for export:', err);
+                    }
+                }
+            }
             const payload = {
                 roadmapTitle: activeRoadmap.title,
                 exportedAt: new Date().toISOString(),
-                milestones: activeRoadmap.items || []
+                milestones: plainData(milestones)
             };
 
             const jsonStr = JSON.stringify(payload, null, 2);
@@ -3125,7 +3364,7 @@
                 })
             };
 
-            const jsonStr = JSON.stringify(payload, null, 2);
+            const jsonStr = JSON.stringify(plainData(payload), null, 2);
             downloadFile(jsonStr, `${sanitizeFilename(activeRoadmap.title)}-feedback-suggestions.json`, 'application/json;charset=utf-8;');
             closeExportModal();
         };
@@ -3149,13 +3388,9 @@
         }
 
         // =======================================================
-        // PERSISTENCE & CLOUD SYNC
+        // SAVE STATUS (G-1)
         // =======================================================
-        // Roadmaps whose last save failed (retried as a whole, since every save writes the full document)
-        const unsavedRoadmapIds = new Set();
         let pendingWriteCount = 0;
-        let lastSaveError = '';
-        let deleteErrorMessage = '';
         let saveProblemShown = false;
         let saveStatusTimer = null;
         // Offline, Firestore keeps a write queued and its promise waits; after this long we tell the user
@@ -3166,19 +3401,20 @@
             const details = String(err?.message || '');
             if (code === 'permission-denied') return `You don't have permission to ${action}. Make sure you are signed in with your @${ALLOWED_EMAIL_DOMAIN} account; if it keeps happening, contact the MapIt admin.`;
             if (code === 'unauthenticated') return `Your session has expired, so MapIt could not ${action}. Sign out and sign in again.`;
-            if (code === 'invalid-argument' && /size|bytes/i.test(details)) return `MapIt could not ${action}: this roadmap is larger than Firestore allows (1 MiB). Remove old comments or split it into two roadmaps.`;
+            if (code === 'invalid-argument' && /size|bytes/i.test(details)) return `MapIt could not ${action}: the item is larger than Firestore allows (1 MiB).`;
             if (code === 'resource-exhausted') return `MapIt could not ${action}: the database's usage limit was reached. Try again later or contact the MapIt admin.`;
-            if (code === 'unavailable' || code === 'deadline-exceeded' || !navigator.onLine) return `No connection to the server, so MapIt could not ${action}. Check your connection and try again.`;
+            if (code === 'unavailable' || code === 'deadline-exceeded' || code === 'mapit/timeout' || !navigator.onLine) return `No connection to the server, so MapIt could not ${action}. Check your connection and try again.`;
             return `MapIt could not ${action} (${code || 'unknown error'}). Try again.`;
         }
 
         const SAVE_STATUS_STYLES = {
             error: ['bg-rose-50 border-rose-200 text-rose-700', 'ph-warning-circle'],
             waiting: ['bg-amber-50 border-amber-200 text-amber-800', 'ph-cloud-slash'],
-            saved: ['bg-emerald-50 border-emerald-200 text-emerald-700', 'ph-check-circle']
+            saved: ['bg-emerald-50 border-emerald-200 text-emerald-700', 'ph-check-circle'],
+            info: ['bg-brand-50 border-brand-200 text-brand-800', 'ph-info']
         };
 
-        function showSaveStatus(kind, message, { retry = false } = {}) {
+        function showSaveStatus(kind, message) {
             const box = document.getElementById('save-status');
             if (!box) return;
             const [colors, icon] = SAVE_STATUS_STYLES[kind];
@@ -3186,31 +3422,24 @@
             box.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
             document.getElementById('save-status-icon').className = `ph-bold ${icon} text-base shrink-0 mt-px`;
             document.getElementById('save-status-text').textContent = message;
-            const retryBtn = document.getElementById('save-status-retry');
-            retryBtn.classList.toggle('hidden', !retry);
-            retryBtn.disabled = false;
-            retryBtn.textContent = 'Retry';
-            saveProblemShown = kind !== 'saved';
+            saveProblemShown = kind === 'waiting' || kind === 'error';
             clearTimeout(saveStatusTimer);
             if (kind === 'saved') saveStatusTimer = setTimeout(dismissSaveStatus, 3000);
+            if (kind === 'info') saveStatusTimer = setTimeout(dismissSaveStatus, 6000);
         }
 
         window.dismissSaveStatus = function() {
             clearTimeout(saveStatusTimer);
-            deleteErrorMessage = '';
+            saveProblemShown = false;
             document.getElementById('save-status')?.classList.add('hidden');
         };
 
-        // Show the most important open problem: failed saves, queued writes, then a failed delete; "saved" once both are cleared
+        // Queued writes show "waiting"; once they are all confirmed, "All changes saved"
         function refreshSaveStatus() {
             if (!useCloudPersistence) return; // signed out: writes still settling from the last session
-            if (unsavedRoadmapIds.size > 0) {
-                showSaveStatus('error', `Not saved: ${lastSaveError}`, { retry: true });
-            } else if (pendingWriteCount > 0) {
+            if (pendingWriteCount > 0) {
                 showSaveStatus('waiting', 'Not saved yet: waiting for a connection. Your changes will be saved when you are back online; keep this tab open.');
-            } else if (deleteErrorMessage) {
-                showSaveStatus('error', deleteErrorMessage);
-            } else if (saveProblemShown) {
+            } else if (saveProblemShown && document.getElementById('save-status-icon')?.classList.contains('ph-cloud-slash')) {
                 showSaveStatus('saved', 'All changes saved.');
             }
         }
@@ -3236,81 +3465,760 @@
             });
         }
 
-        function markRoadmapSaved(roadmapId) {
-            unsavedRoadmapIds.delete(roadmapId);
-            refreshSaveStatus();
-        }
-
-        function markRoadmapUnsaved(roadmapId, err) {
-            console.warn("Firestore sync error:", err);
-            if (!useCloudPersistence) return;
-            lastSaveError = firestoreErrorMessage(err, 'save your changes');
-            unsavedRoadmapIds.add(roadmapId);
-            refreshSaveStatus();
-        }
-
-        // Returns false when the save failed; the change stays on screen and can be retried
-        async function saveRoadmapToCloud(roadmap) {
-            if (!useCloudPersistence || !db || !currentUser) return true;
-            const docRef = doc(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps', roadmap.id);
-            const write = setDoc(docRef, roadmap);
-            try {
-                if (await writeWithWait(write) === 'waiting') {
-                    trackQueuedWrite(write, () => markRoadmapSaved(roadmap.id), err => markRoadmapUnsaved(roadmap.id, err));
-                } else {
-                    markRoadmapSaved(roadmap.id);
-                }
-                return true;
-            } catch (err) {
-                markRoadmapUnsaved(roadmap.id, err);
-                return false;
-            }
-        }
-
-        window.retryFailedSaves = async function() {
-            const retryBtn = document.getElementById('save-status-retry');
-            if (retryBtn) {
-                retryBtn.disabled = true;
-                retryBtn.textContent = 'Retrying...';
-            }
-            for (const id of [...unsavedRoadmapIds]) {
-                const roadmap = roadmaps.find(r => r.id === id);
-                if (roadmap) {
-                    await saveRoadmapToCloud(roadmap);
-                } else {
-                    unsavedRoadmapIds.delete(id);
-                }
-            }
-            refreshSaveStatus();
-        };
-
         // Warn before leaving while changes are not saved
         window.addEventListener('beforeunload', (e) => {
-            if (unsavedRoadmapIds.size > 0 || pendingWriteCount > 0) {
+            if (pendingWriteCount > 0) {
                 e.preventDefault();
                 e.returnValue = '';
             }
         });
 
-        // Throws on failure, so a failed load is never mistaken for "no roadmaps yet" (which would seed the sample over real data)
-        async function loadRoadmapsFromCloud() {
-            if (!useCloudPersistence || !db || !currentUser) return;
-            const colRef = collection(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps');
-            const snap = await getDocs(colRef);
-            const loaded = [];
-            snap.forEach(d => loaded.push(d.data()));
-            if (loaded.length > 0) {
-                roadmaps = loaded;
-                currentRoadmapId = roadmaps[0].id;
+        // =======================================================
+        // SHARED WORKSPACE, ROLES & AUDIT LOG (2.0.0)
+        // specs/shared-workspace.md, user-management.md, audit-log.md v3
+        // Firestore: artifacts/{app}/workspace/main/{members, roadmaps/{id}/{milestones/{id}/comments, feedback}, auditLog}
+        // =======================================================
+        const WORKSPACE_PATH = ['artifacts', defaultAppId, 'workspace', 'main'];
+        const BOOTSTRAP_ADMIN = 'arkin.paroan@inventi.ph'; // first admin; also hard-coded in firestore.rules
+        const BLOCKED_MESSAGE = 'Your access to MapIt has been removed. Contact a MapIt admin.';
+        const ROLE_LABELS = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer', blocked: 'Blocked' };
+        const LAST_ROADMAP_KEY = 'mapit.lastRoadmap';
+        const HIDE_PRIVATE_KEY = 'mapit.hidePrivateBanner';
+
+        let myRole = null;               // 'admin' | 'editor' | 'viewer' | 'blocked'; demo mode: 'editor'
+        let previewRoadmap = null;       // a private roadmap shown read-only, outside the workspace
+        let privateRoadmaps = [];        // the user's pre-2.0 roadmaps under users/{uid}/roadmaps
+        let demoAuditLog = [];           // demo mode: audit entries kept in memory
+        let sessionUnsubs = [];          // listeners that live for the whole session
+        let roadmapsUnsub = null;
+        const roadmapUnsubs = new Map(); // roadmapId -> [unsubscribe milestones, unsubscribe feedback]
+        let editUnsubs = [];             // listeners for the open Edit window (comments, activity)
+        let openMilestoneComments = [];
+        let openMilestoneActivity = [];
+        const ownDeletes = new Set();    // ids this user deleted, so the live listener doesn't announce them
+        let renderQueued = false;
+
+        const wsRef = (...path) => doc(db, ...WORKSPACE_PATH, ...path);
+        const wsCollection = (...path) => collection(db, ...WORKSPACE_PATH, ...path);
+        const roadmapRef = id => wsRef('roadmaps', id);
+        const itemRef = (roadmapId, kind, id) => wsRef('roadmaps', roadmapId, kind, id); // kind: 'milestones' | 'feedback'
+        const auditRef = id => wsRef('auditLog', id);
+
+        function myEmail() { return (currentUser?.email || '').toLowerCase(); }
+        function actor() {
+            const email = myEmail();
+            return { name: currentUser?.displayName || email.split('@')[0] || 'Workspace Member', email };
+        }
+        function canEdit() { return myRole === 'admin' || myRole === 'editor'; }
+        function isAdmin() { return myRole === 'admin'; }
+        function canEditActive() {
+            const active = getActiveRoadmap();
+            return canEdit() && !!active && !active.deletedAt && !active.isPreview;
+        }
+        function canDeleteRoadmap(roadmap) {
+            if (!roadmap || roadmap.deletedAt || roadmap.isPreview) return false;
+            if (!useCloudPersistence) return canEdit();
+            return isAdmin() || (myRole === 'editor' && roadmap.createdBy?.email === myEmail());
+        }
+        function rememberRoadmap(id) {
+            try { localStorage.setItem(LAST_ROADMAP_KEY, id); } catch (e) { /* private mode */ }
+        }
+        function newId(prefix) { return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`; }
+        function toDate(value) {
+            if (!value) return null;
+            if (typeof value.toDate === 'function') return value.toDate();
+            const d = new Date(value);
+            return isNaN(d) ? null : d;
+        }
+        function toMillis(value) { return toDate(value)?.getTime() || 0; }
+        const PHT_FORMAT = new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+        function formatPHT(value) { const d = toDate(value); return d ? `${PHT_FORMAT.format(d)} PHT` : 'Pending'; }
+        // Compact text for audit "changes"
+        function clip(value, max = 300) { return String(value ?? '').slice(0, max); }
+        const byCreated = (a, b) => toMillis(a.createdAt) - toMillis(b.createdAt) || String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+        // Firestore Timestamps -> ISO strings (for JSON exports)
+        function plainData(value) {
+            if (value && typeof value.toDate === 'function') return value.toDate().toISOString();
+            if (Array.isArray(value)) return value.map(plainData);
+            if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, plainData(v)]));
+            return value;
+        }
+
+        function scheduleRender() {
+            if (renderQueued) return;
+            renderQueued = true;
+            requestAnimationFrame(() => {
+                renderQueued = false;
+                if (isAuthenticated) updateUI();
+            });
+        }
+
+        // ---- Audit entries (tamper-proof in Firestore: create-only, own email, server time) ----
+        function auditEntry(roadmap, action, target, changes = []) {
+            return {
+                v: 1,
+                roadmapId: roadmap?.id || '',
+                roadmapTitle: clip(roadmap?.title || '', 200),
+                at: useCloudPersistence ? serverTimestamp() : new Date().toISOString(),
+                action,
+                target: { type: target.type, id: target.id, label: clip(target.label, 200) },
+                changes,
+                by: actor()
+            };
+        }
+        function logDemo(entry) { demoAuditLog.push({ ...entry, id: newId('a') }); }
+        function stamp(auditId) { return { updatedBy: actor(), updatedAt: serverTimestamp(), lastAuditId: auditId }; }
+        function milestoneFields(m) {
+            return { name: m.name || '', module: m.module || '', date: m.date || '', status: m.status || 'planned', inclusions: m.inclusions || [], description: m.description || '', feedbackIds: m.feedbackIds || [] };
+        }
+        function feedbackFields(f) {
+            return { title: f.title || '', category: f.category || '', source: f.source || '', description: f.description || '' };
+        }
+
+        // One atomic batch per user action: the change and its audit entry are saved together or not at all
+        async function commitBatch(build, action) {
+            const batch = writeBatch(db);
+            build(batch);
+            const write = batch.commit();
+            try {
+                if (await writeWithWait(write) === 'waiting') {
+                    trackQueuedWrite(write, () => {}, err => reportWriteError(err, action));
+                }
+                return true;
+            } catch (err) {
+                reportWriteError(err, action);
+                return false;
             }
         }
 
-        window.handleSignOut = async function() {
-            if ((unsavedRoadmapIds.size > 0 || pendingWriteCount > 0)
-                && !confirm('Some changes are not saved yet and will be lost if you sign out. Sign out anyway?')) return;
-            unsavedRoadmapIds.clear();
+        function reportWriteError(err, action) {
+            console.warn('Firestore write failed:', err);
+            if (!useCloudPersistence) return;
+            let message = firestoreErrorMessage(err, action);
+            if (err?.code === 'permission-denied' && myRole) message += ` (Your role is ${ROLE_LABELS[myRole] || myRole}.)`;
+            showSaveStatus('error', `Not saved: ${message}`);
+        }
+
+        // ---- Roadmaps ----
+        // Firestore rules may look up at most 20 documents per batch and each item write needs 3,
+        // so bulk writes (sample roadmap, moving a private roadmap) go in chunks, each with its own audit entry.
+        const ITEMS_PER_BATCH = 6;
+        async function writeInChunks(roadmap, writes, reason, action) {
+            for (let i = 0; i < writes.length; i += ITEMS_PER_BATCH) {
+                const part = writes.slice(i, i + ITEMS_PER_BATCH);
+                const aid = newId('a');
+                const ok = await commitBatch(batch => {
+                    part.forEach(write => write(batch, aid));
+                    batch.set(auditRef(aid), auditEntry(roadmap, 'roadmap.items_added', { type: 'roadmap', id: roadmap.id, label: roadmap.title },
+                        [{ f: 'records', to: part.length }, { f: 'reason', to: reason }]));
+                }, action);
+                if (!ok) return false;
+            }
+            return true;
+        }
+
+        async function createRoadmap(title, { fromSample = false } = {}) {
+            const id = newId('roadmap');
+            const roadmap = { id, title, createdBy: actor(), items: [], feedback: [] };
+            const items = fromSample ? structuredClone(sampleRoadmap.items).map(m => ({ id: m.id, ...milestoneFields(m) })) : [];
+            const feedback = fromSample ? structuredClone(sampleRoadmap.feedback).map(f => ({ id: f.id, ...feedbackFields(f) })) : [];
+            const entry = auditEntry(roadmap, 'roadmap.created', { type: 'roadmap', id, label: title }, [{ f: 'title', to: clip(title) }].concat(fromSample ? [{ f: 'sample', to: 'yes' }] : []));
+            currentRoadmapId = id;
+            previewRoadmap = null;
+            if (!useCloudPersistence) {
+                roadmaps.push({ ...roadmap, items, feedback });
+                logDemo(entry);
+                updateUI();
+                return true;
+            }
+            rememberRoadmap(id);
+            const aid = newId('a');
+            const ok = await commitBatch(batch => {
+                batch.set(roadmapRef(id), { title, createdBy: actor(), createdAt: serverTimestamp(), deletedAt: null, ...stamp(aid) });
+                batch.set(auditRef(aid), entry);
+            }, 'create the roadmap');
+            if (!ok || !fromSample) return ok;
+            return writeInChunks(roadmap, [
+                ...items.map(({ id: mid, ...fields }) => (batch, chunkAid) => batch.set(itemRef(id, 'milestones', mid), { ...fields, createdBy: actor(), createdAt: serverTimestamp(), ...stamp(chunkAid) })),
+                ...feedback.map(({ id: fid, ...fields }) => (batch, chunkAid) => batch.set(itemRef(id, 'feedback', fid), { ...fields, createdBy: actor(), createdAt: serverTimestamp(), ...stamp(chunkAid) }))
+            ], 'sample', 'add the sample milestones');
+        }
+
+        // Soft delete: hidden for members, kept (read-only) for admins
+        async function deleteRoadmap(roadmap) {
+            if (!canDeleteRoadmap(roadmap)) return false;
+            const counts = [{ f: 'milestones', to: (roadmap.items || []).length }, { f: 'feedback', to: (roadmap.feedback || []).length }];
+            const entry = auditEntry(roadmap, 'roadmap.deleted', { type: 'roadmap', id: roadmap.id, label: roadmap.title }, counts);
+            if (!useCloudPersistence) {
+                roadmaps = roadmaps.filter(r => r.id !== roadmap.id);
+                logDemo(entry);
+                if (currentRoadmapId === roadmap.id) currentRoadmapId = roadmaps[0]?.id || null;
+                updateUI();
+                return true;
+            }
+            ownDeletes.add(roadmap.id);
+            const aid = 'del-roadmap-' + roadmap.id;
+            return commitBatch(batch => {
+                batch.update(roadmapRef(roadmap.id), { deletedAt: serverTimestamp(), deletedBy: actor(), ...stamp(aid) });
+                batch.set(auditRef(aid), entry);
+            }, 'delete this roadmap');
+        }
+
+        // ---- Milestones ----
+        async function addMilestone(roadmap, fields) {
+            const id = newId('m');
+            const entry = auditEntry(roadmap, 'milestone.created', { type: 'milestone', id, label: fields.name },
+                ['name', 'module', 'date', 'status'].map(f => ({ f, to: clip(fields[f]) })));
+            if (!useCloudPersistence) {
+                roadmap.items.push({ id, ...fields, createdBy: actor(), comments: [] });
+                logDemo(entry);
+                updateUI();
+                return true;
+            }
+            const aid = newId('a');
+            return commitBatch(batch => {
+                batch.set(itemRef(roadmap.id, 'milestones', id), { ...milestoneFields(fields), createdBy: actor(), createdAt: serverTimestamp(), ...stamp(aid) });
+                batch.set(auditRef(aid), entry);
+            }, 'add the milestone');
+        }
+
+        // updates: only the fields this user changed; changes: [{ f, from, to }] for the audit log
+        async function updateMilestone(roadmap, item, updates, changes) {
+            if (!Object.keys(updates).length) return true;
+            const entry = auditEntry(roadmap, 'milestone.updated', { type: 'milestone', id: item.id, label: updates.name ?? item.name }, changes);
+            if (!useCloudPersistence) {
+                Object.assign(item, updates);
+                logDemo(entry);
+                updateUI();
+                return true;
+            }
+            const aid = newId('a');
+            return commitBatch(batch => {
+                batch.update(itemRef(roadmap.id, 'milestones', item.id), { ...updates, ...stamp(aid) });
+                batch.set(auditRef(aid), entry);
+            }, 'save the milestone');
+        }
+
+        async function deleteMilestone(roadmap, item) {
+            const entry = auditEntry(roadmap, 'milestone.deleted', { type: 'milestone', id: item.id, label: item.name },
+                ['name', 'module', 'date', 'status'].map(f => ({ f, to: clip(item[f]) })));
+            if (!useCloudPersistence) {
+                roadmap.items = roadmap.items.filter(i => i.id !== item.id);
+                logDemo(entry);
+                updateUI();
+                return true;
+            }
+            // Its comments are left in place (no longer shown); their text is already in the audit log
+            ownDeletes.add(item.id);
+            const aid = 'del-milestone-' + item.id;
+            return commitBatch(batch => {
+                batch.delete(itemRef(roadmap.id, 'milestones', item.id));
+                batch.set(auditRef(aid), entry);
+            }, 'delete the milestone');
+        }
+
+        async function addComment(roadmap, item, text) {
+            const id = newId('c');
+            const entry = auditEntry(roadmap, 'comment.added', { type: 'milestone', id: item.id, label: item.name }, [{ f: 'text', to: clip(text, 500) }]);
+            if (!useCloudPersistence) {
+                (item.comments ||= []).push({ id, text, by: actor(), at: new Date().toISOString() });
+                logDemo(entry);
+                return true;
+            }
+            const aid = 'c-' + id;
+            return commitBatch(batch => {
+                batch.set(wsRef('roadmaps', roadmap.id, 'milestones', item.id, 'comments', id), { text: clip(text, 2000), at: serverTimestamp(), by: actor(), auditId: aid });
+                batch.set(auditRef(aid), entry);
+            }, 'add the comment');
+        }
+
+        // ---- Feedback ----
+        async function saveFeedback(roadmap, id, fields) {
+            if (id) {
+                const existing = (roadmap.feedback || []).find(f => f.id === id);
+                if (!existing) return false;
+                const changes = Object.keys(fields).filter(f => (existing[f] || '') !== fields[f]).map(f => ({ f, from: clip(existing[f]), to: clip(fields[f]) }));
+                if (!changes.length) return true;
+                const updates = Object.fromEntries(changes.map(c => [c.f, fields[c.f]]));
+                const entry = auditEntry(roadmap, 'feedback.updated', { type: 'feedback', id, label: fields.title }, changes);
+                if (!useCloudPersistence) {
+                    Object.assign(existing, updates);
+                    logDemo(entry);
+                    updateUI();
+                    return true;
+                }
+                const aid = newId('a');
+                return commitBatch(batch => {
+                    batch.update(itemRef(roadmap.id, 'feedback', id), { ...updates, ...stamp(aid) });
+                    batch.set(auditRef(aid), entry);
+                }, 'save the feedback');
+            }
+            const fid = newId('fb');
+            const entry = auditEntry(roadmap, 'feedback.created', { type: 'feedback', id: fid, label: fields.title }, ['title', 'category'].map(f => ({ f, to: clip(fields[f]) })));
+            if (!useCloudPersistence) {
+                (roadmap.feedback ||= []).push({ id: fid, ...fields });
+                logDemo(entry);
+                updateUI();
+                return true;
+            }
+            const aid = newId('a');
+            return commitBatch(batch => {
+                batch.set(itemRef(roadmap.id, 'feedback', fid), { ...feedbackFields(fields), createdBy: actor(), createdAt: serverTimestamp(), ...stamp(aid) });
+                batch.set(auditRef(aid), entry);
+            }, 'add the feedback');
+        }
+
+        async function deleteFeedback(roadmap, feedbackItem) {
+            const linked = (roadmap.items || []).filter(m => (m.feedbackIds || []).includes(feedbackItem.id));
+            const entry = auditEntry(roadmap, 'feedback.deleted', { type: 'feedback', id: feedbackItem.id, label: feedbackItem.title },
+                [{ f: 'title', to: clip(feedbackItem.title) }, { f: 'unlinkedFrom', to: linked.length }]);
+            if (!useCloudPersistence) {
+                roadmap.feedback = roadmap.feedback.filter(f => f.id !== feedbackItem.id);
+                linked.forEach(m => { m.feedbackIds = m.feedbackIds.filter(x => x !== feedbackItem.id); });
+                logDemo(entry);
+                updateUI();
+                return true;
+            }
+            // Milestones keep the old id in feedbackIds; the app ignores ids of feedback that no longer exists
+            const aid = 'del-feedback-' + feedbackItem.id;
+            return commitBatch(batch => {
+                batch.delete(itemRef(roadmap.id, 'feedback', feedbackItem.id));
+                batch.set(auditRef(aid), entry);
+            }, 'delete the feedback');
+        }
+
+        // ---- Membership & roles ----
+        function withTimeout(promise, ms = 15000) {
+            let timer;
+            return Promise.race([
+                promise,
+                new Promise((_, reject) => { timer = setTimeout(() => reject(Object.assign(new Error('Timed out'), { code: 'mapit/timeout' })), ms); })
+            ]).finally(() => clearTimeout(timer));
+        }
+
+        // Reads the user's member record; on first sign-in creates it with the workspace's default role.
+        // The very first sign-in of BOOTSTRAP_ADMIN creates the workspace itself.
+        async function ensureMembership(user) {
+            const email = (user.email || '').toLowerCase();
+            const ref = wsRef('members', email);
+            const profile = { name: user.displayName || email.split('@')[0], photoURL: user.photoURL || '' };
+            let snap = await withTimeout(getDoc(ref));
+            if (!snap.exists()) {
+                const wsSnap = await withTimeout(getDoc(doc(db, ...WORKSPACE_PATH)));
+                const bootstrap = !wsSnap.exists() && email === BOOTSTRAP_ADMIN;
+                if (!wsSnap.exists() && !bootstrap) throw Object.assign(new Error('Workspace not set up'), { code: 'mapit/no-workspace' });
+                const role = bootstrap || email === BOOTSTRAP_ADMIN ? 'admin' : (wsSnap.data().defaultRole === 'editor' ? 'editor' : 'viewer');
+                const aid = `join-${email}-${Date.now()}`;
+                const batch = writeBatch(db);
+                if (bootstrap) batch.set(doc(db, ...WORKSPACE_PATH), { defaultRole: 'viewer', createdAt: serverTimestamp(), createdBy: { name: profile.name, email }, lastAuditId: aid });
+                batch.set(ref, { email, ...profile, role, joinedAt: serverTimestamp(), lastSeenAt: serverTimestamp(), lastAuditId: aid });
+                batch.set(auditRef(aid), {
+                    v: 1, roadmapId: '', roadmapTitle: '', at: serverTimestamp(), action: bootstrap ? 'workspace.created' : 'member.joined',
+                    target: { type: 'member', id: email, label: clip(profile.name, 200) }, changes: [{ f: 'role', to: role }], by: { name: profile.name, email }
+                });
+                await withTimeout(batch.commit());
+                snap = await withTimeout(getDoc(ref));
+            } else {
+                const data = snap.data();
+                if (data.role !== 'blocked' && (Date.now() - toMillis(data.lastSeenAt) > 3600e3 || data.name !== profile.name || (data.photoURL || '') !== profile.photoURL)) {
+                    updateDoc(ref, { ...profile, lastSeenAt: serverTimestamp() }).catch(e => console.warn('Could not update last seen:', e));
+                }
+            }
+            return snap.data();
+        }
+
+        function onMyMemberChanged(snap) {
+            const data = snap.data();
+            const newRole = data?.role || 'blocked';
+            const oldRole = myRole;
+            if (newRole === oldRole) return;
+            myRole = newRole;
+            if (newRole === 'blocked') {
+                endSessionWithMessage(BLOCKED_MESSAGE);
+                return;
+            }
+            if (oldRole) {
+                showSaveStatus('info', `Your role was changed to ${ROLE_LABELS[newRole]}${data.roleChangedBy?.name ? ' by ' + data.roleChangedBy.name : ''}.`);
+                if (!canEdit()) {
+                    closeEditMilestoneModal();
+                    closeAddMilestoneModal();
+                    closeFeedbackModal();
+                    closeNewRoadmapModal();
+                }
+                if (!isAdmin()) closeUsersModal();
+                if ((oldRole === 'admin') !== (newRole === 'admin')) subscribeRoadmaps().catch(onListenerError);
+            }
+            scheduleRender();
+        }
+
+        // Signed out by the app (blocked, or the workspace became unreadable)
+        async function endSessionWithMessage(message) {
+            cleanUpSession();
+            showLoginGate();
+            await signOut(auth).catch(e => console.warn(e));
+            showGoogleAuthError(message, DOMAIN_DENIED_OPTIONS);
+        }
+
+        async function onListenerError(err) {
+            console.warn('Workspace listener error:', err);
+            if (!useCloudPersistence) return;
+            if (err?.code === 'permission-denied') {
+                // Most likely the user's role just changed to blocked; the member record says for sure
+                try {
+                    const snap = await getDoc(wsRef('members', myEmail()));
+                    if (!snap.exists() || snap.data().role === 'blocked') return endSessionWithMessage(BLOCKED_MESSAGE);
+                } catch (e) { /* fall through */ }
+            }
+            showSaveStatus('error', `Lost the live connection to the workspace (${err?.code || 'error'}). Reload the page to see the latest changes.`);
+        }
+
+        // ---- Live listeners ----
+        function startWorkspaceListeners() {
+            stopAllListeners();
+            sessionUnsubs.push(onSnapshot(wsRef('members', myEmail()), onMyMemberChanged, onListenerError));
+            return subscribeRoadmaps();
+        }
+
+        // Members see live roadmaps; admins also see deleted ones (the rules allow nothing else)
+        function subscribeRoadmaps() {
+            roadmapsUnsub?.();
+            const q = isAdmin() ? wsCollection('roadmaps') : query(wsCollection('roadmaps'), where('deletedAt', '==', null));
+            return new Promise((resolve, reject) => {
+                let first = true;
+                roadmapsUnsub = onSnapshot(q, snap => {
+                    onRoadmapsSnapshot(snap);
+                    if (first) { first = false; resolve(); }
+                }, err => {
+                    if (first) { first = false; reject(err); } else onListenerError(err);
+                });
+            });
+        }
+
+        function onRoadmapsSnapshot(snap) {
+            const previous = new Map(roadmaps.map(r => [r.id, r]));
+            const wasViewing = previewRoadmap ? null : roadmaps.find(r => r.id === currentRoadmapId);
+            roadmaps = snap.docs.map(d => {
+                const old = previous.get(d.id);
+                return { ...d.data({ serverTimestamps: 'estimate' }), id: d.id, items: old?.items || [], feedback: old?.feedback || [] };
+            }).sort(byCreated);
+
+            const ids = new Set(roadmaps.map(r => r.id));
+            for (const [id, unsubs] of roadmapUnsubs) {
+                if (!ids.has(id)) { unsubs.forEach(u => u()); roadmapUnsubs.delete(id); }
+            }
+            roadmaps.forEach(r => { if (!roadmapUnsubs.has(r.id)) subscribeRoadmapContent(r.id); });
+
+            const current = roadmaps.find(r => r.id === currentRoadmapId);
+            // The roadmap on screen was deleted (by someone else, or by this user)
+            if (wasViewing && !wasViewing.deletedAt && (!current || current.deletedAt)) {
+                if (!ownDeletes.has(wasViewing.id)) {
+                    const by = current?.deletedBy?.name;
+                    showSaveStatus('info', `"${wasViewing.title}" was deleted${by ? ' by ' + by : ' by someone else'}.`);
+                    closeEditMilestoneModal();
+                    closeModal();
+                }
+                currentRoadmapId = null;
+            } else if (current?.deletedAt && !wasViewing?.deletedAt) {
+                currentRoadmapId = null;
+            }
+            if (!roadmaps.some(r => r.id === currentRoadmapId)) {
+                const live = roadmaps.filter(r => !r.deletedAt);
+                let remembered = null;
+                try { remembered = localStorage.getItem(LAST_ROADMAP_KEY); } catch (e) { /* private mode */ }
+                currentRoadmapId = (live.find(r => r.id === remembered) || live[0])?.id || null;
+            }
+            scheduleRender();
+        }
+
+        function subscribeRoadmapContent(roadmapId) {
+            // A roadmap deleted under a member's listener ends with permission-denied; the roadmaps listener drops it
+            const onError = err => { if (err?.code !== 'permission-denied') onListenerError(err); };
+            const unsubs = [
+                onSnapshot(wsCollection('roadmaps', roadmapId, 'milestones'), snap => {
+                    const roadmap = roadmaps.find(r => r.id === roadmapId);
+                    if (!roadmap) return;
+                    roadmap.items = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id })).sort(byCreated);
+                    snap.docChanges().forEach(change => { if (change.doc.id === selectedMilestoneId) onOpenMilestoneChanged(roadmap, change); });
+                    scheduleRender();
+                }, onError),
+                onSnapshot(wsCollection('roadmaps', roadmapId, 'feedback'), snap => {
+                    const roadmap = roadmaps.find(r => r.id === roadmapId);
+                    if (!roadmap) return;
+                    roadmap.feedback = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id })).sort(byCreated);
+                    scheduleRender();
+                }, onError)
+            ];
+            roadmapUnsubs.set(roadmapId, unsubs);
+        }
+
+        function stopAllListeners() {
+            sessionUnsubs.forEach(u => u());
+            sessionUnsubs = [];
+            roadmapsUnsub?.();
+            roadmapsUnsub = null;
+            roadmapUnsubs.forEach(list => list.forEach(u => u()));
+            roadmapUnsubs.clear();
+            stopEditListeners();
+            stopUsersListeners();
+        }
+
+        // ---- Users screen (admins) ----
+        let membersList = [];
+        let workspaceSettings = null;
+        let usersUnsubs = [];
+
+        function stopUsersListeners() {
+            usersUnsubs.forEach(u => u());
+            usersUnsubs = [];
+        }
+
+        window.openUsersModal = function() {
+            if (!isAdmin() || !useCloudPersistence) return;
+            stopUsersListeners();
+            membersList = [];
+            renderUsers();
+            usersUnsubs.push(onSnapshot(wsCollection('members'), snap => {
+                membersList = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id }));
+                renderUsers();
+            }, err => { console.warn('Members listener error:', err); showSaveStatus('error', firestoreErrorMessage(err, 'load the users')); }));
+            usersUnsubs.push(onSnapshot(doc(db, ...WORKSPACE_PATH), snap => {
+                workspaceSettings = snap.data() || {};
+                const select = document.getElementById('default-role-select');
+                if (select) select.value = workspaceSettings.defaultRole === 'editor' ? 'editor' : 'viewer';
+            }, err => console.warn('Workspace settings listener error:', err)));
+            document.getElementById('users-modal')?.classList.remove('hidden');
+        };
+
+        window.closeUsersModal = function() {
+            stopUsersListeners();
+            document.getElementById('users-modal')?.classList.add('hidden');
+        };
+
+        const RECENT_MS = 7 * 24 * 3600e3;
+        window.renderUsers = function() {
+            const body = document.getElementById('users-table-body');
+            if (!body) return;
+            const search = (document.getElementById('users-search')?.value || '').trim().toLowerCase();
+            const roleFilter = document.getElementById('users-role-filter')?.value || 'ALL';
+            const isRecent = m => Date.now() - toMillis(m.joinedAt) < RECENT_MS;
+            const list = membersList
+                .filter(m => roleFilter === 'ALL' || m.role === roleFilter)
+                .filter(m => !search || (m.name || '').toLowerCase().includes(search) || (m.email || m.id).toLowerCase().includes(search))
+                .sort((a, b) => (isRecent(b) - isRecent(a)) || toMillis(b.joinedAt) * isRecent(b) - toMillis(a.joinedAt) * isRecent(a) || (a.name || '').localeCompare(b.name || ''));
+            const count = document.getElementById('users-count');
+            if (count) count.textContent = `${pluralize(list.length, 'user')}${list.length !== membersList.length ? ` of ${membersList.length}` : ''}`;
+            if (!list.length) {
+                body.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-500 text-xs">${membersList.length ? 'No users match.' : 'Loading users...'}</td></tr>`;
+                return;
+            }
+            body.innerHTML = list.map(m => {
+                const email = m.email || m.id;
+                const isMe = email === myEmail();
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-2.5 px-3">
+                            <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">${escapeHtml(m.name || email)}
+                                ${isRecent(m) ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">New</span>' : ''}
+                                ${isMe ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">You</span>' : ''}
+                            </div>
+                            <div class="text-[11px] text-slate-500">${escapeHtml(email)}</div>
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <select aria-label="Role for ${escapeHtml(m.name || email)}" data-email="${escapeHtml(email)}" onchange="changeMemberRole(this)" ${isMe ? 'disabled title="Another admin must change your role"' : ''}
+                                class="text-xs font-semibold border border-slate-200 rounded-lg px-2 py-1 bg-white disabled:bg-slate-100 disabled:text-slate-500">
+                                ${['admin', 'editor', 'viewer', 'blocked'].map(r => `<option value="${r}" ${m.role === r ? 'selected' : ''}>${ROLE_LABELS[r]}</option>`).join('')}
+                            </select>
+                        </td>
+                        <td class="hidden sm:table-cell py-2.5 px-3 text-[11px] text-slate-600 whitespace-nowrap" title="${escapeHtml(formatPHT(m.joinedAt))}">${escapeHtml(formatRelativeTime(m.joinedAt))}</td>
+                        <td class="py-2.5 px-3 text-[11px] text-slate-600 whitespace-nowrap" title="${escapeHtml(formatPHT(m.lastSeenAt))}">${escapeHtml(formatRelativeTime(m.lastSeenAt))}</td>
+                    </tr>`;
+            }).join('');
+        };
+
+        window.changeMemberRole = async function(select) {
+            const email = select.dataset.email;
+            const member = membersList.find(m => (m.email || m.id) === email);
+            const newRole = select.value;
+            if (!member || !isAdmin() || email === myEmail() || newRole === member.role) return;
+            const name = member.name || email;
+            if (newRole === 'admin' || member.role === 'admin' || newRole === 'blocked') {
+                const messages = {
+                    admin: `Make <strong>${escapeHtml(name)}</strong> an Admin? Admins can manage all users and delete any roadmap.`,
+                    blocked: `Block <strong>${escapeHtml(name)}</strong>? They lose access to MapIt right away. Their past changes keep their name.`,
+                    other: `Remove Admin from <strong>${escapeHtml(name)}</strong>? Their role becomes ${ROLE_LABELS[newRole]}.`
+                };
+                const confirmed = await confirmAction({
+                    title: newRole === 'blocked' ? 'Block user' : 'Change admin access',
+                    messageHtml: messages[newRole === 'admin' || newRole === 'blocked' ? newRole : 'other'],
+                    confirmLabel: newRole === 'blocked' ? 'Block' : 'Change role'
+                });
+                if (!confirmed) {
+                    select.value = member.role;
+                    return;
+                }
+            }
+            const aid = newId('a');
+            const entry = auditEntry(null, 'member.role_changed', { type: 'member', id: email, label: name }, [{ f: 'role', from: member.role, to: newRole }]);
+            const ok = await commitBatch(batch => {
+                batch.update(wsRef('members', email), { role: newRole, roleChangedAt: serverTimestamp(), roleChangedBy: actor(), lastAuditId: aid });
+                batch.set(auditRef(aid), entry);
+            }, `change ${name}'s role`);
+            if (!ok) select.value = member.role;
+        };
+
+        window.setDefaultRole = async function(role) {
+            if (!isAdmin() || !['viewer', 'editor'].includes(role)) return;
+            const before = workspaceSettings?.defaultRole || 'viewer';
+            if (role === before) return;
+            const aid = newId('a');
+            const entry = auditEntry(null, 'workspace.default_role_changed', { type: 'workspace', id: 'main', label: 'Workspace' }, [{ f: 'defaultRole', from: before, to: role }]);
+            const ok = await commitBatch(batch => {
+                batch.update(doc(db, ...WORKSPACE_PATH), { defaultRole: role, updatedAt: serverTimestamp(), updatedBy: actor(), lastAuditId: aid });
+                batch.set(auditRef(aid), entry);
+            }, 'change the default role');
+            if (!ok) document.getElementById('default-role-select').value = before;
+        };
+
+        // ---- Private roadmaps from before 2.0 ----
+        async function loadPrivateRoadmaps() {
+            if (!useCloudPersistence || !currentUser) return;
+            try {
+                const snap = await getDocs(collection(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps'));
+                privateRoadmaps = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+            } catch (err) {
+                console.warn('Could not read private roadmaps:', err);
+                privateRoadmaps = [];
+            }
+            renderPrivateRoadmaps();
+            updateUI();
+        }
+
+        function renderPrivateRoadmaps() {
+            const list = document.getElementById('private-roadmaps-list');
+            if (!list) return;
+            const note = document.getElementById('private-roadmaps-viewer-note');
+            if (note) note.classList.toggle('hidden', canEdit());
+            list.innerHTML = privateRoadmaps.map(r => `
+                <div class="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-slate-200 bg-white">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold text-slate-900 truncate">${escapeHtml(r.title || 'Untitled roadmap')}</div>
+                        <div class="text-[11px] text-slate-500">${pluralize((r.items || []).length, 'milestone')} · ${escapeHtml(String((r.feedback || []).length))} feedback</div>
+                    </div>
+                    ${r.movedToWorkspace
+                        ? '<span class="text-[11px] font-bold text-emerald-700 flex items-center gap-1"><i class="ph-bold ph-check-circle"></i> Moved</span>'
+                        : `<button type="button" onclick="previewPrivateRoadmap('${escapeHtml(r.id)}')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold">Preview</button>
+                           ${canEdit() ? `<button type="button" onclick="moveRoadmapById('${escapeHtml(r.id)}')" class="px-2.5 py-1 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-bold">Move to workspace</button>` : ''}`}
+                </div>`).join('') || '<p class="text-xs text-slate-500">No private roadmaps.</p>';
+        }
+
+        window.openPrivateRoadmapsModal = function() {
+            renderPrivateRoadmaps();
+            document.getElementById('private-roadmaps-modal')?.classList.remove('hidden');
+        };
+
+        window.closePrivateRoadmapsModal = function() {
+            document.getElementById('private-roadmaps-modal')?.classList.add('hidden');
+        };
+
+        window.hidePrivateBanner = function() {
+            try { localStorage.setItem(HIDE_PRIVATE_KEY, '1'); } catch (e) { /* private mode */ }
+            renderNotices();
+        };
+
+        window.previewPrivateRoadmap = function(id) {
+            const source = privateRoadmaps.find(r => r.id === id);
+            if (!source) return;
+            previewRoadmap = { ...structuredClone(source), id: 'preview-' + id, sourceId: id, isPreview: true, items: structuredClone(source.items || []), feedback: structuredClone(source.feedback || []) };
+            closePrivateRoadmapsModal();
+            updateUI();
+        };
+
+        window.closePreview = function() {
+            previewRoadmap = null;
+            updateUI();
+        };
+
+        window.moveRoadmapById = async function(id) {
+            const source = privateRoadmaps.find(r => r.id === id);
+            if (!source || source.movedToWorkspace || !canEdit()) return;
+            const targetId = `${currentUser.uid}_${source.id}`;
+            const items = source.items || [];
+            const feedback = source.feedback || [];
+            const roadmap = { id: targetId, title: source.title || 'Untitled roadmap' };
+            const action = `move "${roadmap.title}" to the workspace`;
+
+            // A retry after an interrupted move: the roadmap exists already, skip what was copied
+            const alreadyThere = roadmaps.some(r => r.id === targetId);
+            const existingComments = new Set();
+            if (alreadyThere) {
+                for (const m of items) {
+                    try {
+                        const snap = await getDocs(wsCollection('roadmaps', targetId, 'milestones', m.id, 'comments'));
+                        snap.docs.forEach(d => existingComments.add(m.id + '/' + d.id));
+                    } catch (err) { /* milestone not copied yet */ }
+                }
+            } else {
+                const aid = 'move-' + targetId;
+                const ok = await commitBatch(batch => {
+                    batch.set(roadmapRef(targetId), { title: roadmap.title, createdBy: actor(), createdAt: serverTimestamp(), deletedAt: null, movedFrom: { uid: currentUser.uid, roadmapId: source.id }, ...stamp(aid) });
+                    batch.set(auditRef(aid), auditEntry(roadmap, 'roadmap.moved', { type: 'roadmap', id: targetId, label: roadmap.title },
+                        [{ f: 'from', to: myEmail() }, { f: 'milestones', to: items.length }, { f: 'feedback', to: feedback.length }]));
+                }, action);
+                if (!ok) return;
+            }
+
+            const writes = [
+                ...items.map(m => (batch, aid) => batch.set(itemRef(targetId, 'milestones', m.id), {
+                    ...milestoneFields(m),
+                    legacyHistory: (m.history || []).map(h => ({ action: clip(h.action), user: clip(h.user || ''), timestamp: h.timestamp || '' })),
+                    createdBy: actor(), createdAt: serverTimestamp(), ...stamp(aid)
+                })),
+                ...feedback.map(f => (batch, aid) => batch.set(itemRef(targetId, 'feedback', f.id), { ...feedbackFields(f), createdBy: actor(), createdAt: serverTimestamp(), ...stamp(aid) })),
+                ...items.flatMap(m => (m.comments || []).map((c, i) => ({ m, c, cid: c.id || `comm-${i}` })))
+                    .filter(({ m, cid }) => !existingComments.has(m.id + '/' + cid))
+                    .map(({ m, c, cid }) => (batch, aid) => batch.set(wsRef('roadmaps', targetId, 'milestones', m.id, 'comments', cid), {
+                        text: clip(c.text, 2000), at: serverTimestamp(), by: actor(), auditId: aid,
+                        originalAuthor: clip(c.author || ''), originalTimestamp: c.timestamp || ''
+                    }))
+            ];
+            if (!await writeInChunks(roadmap, writes, 'moved from private roadmap', action)) return;
+
+            const marked = await commitBatch(batch => {
+                batch.update(doc(db, 'artifacts', defaultAppId, 'users', currentUser.uid, 'roadmaps', source.id), { movedToWorkspace: { roadmapId: targetId, at: serverTimestamp() } });
+            }, 'mark the private roadmap as moved');
+            if (!marked) return;
+            source.movedToWorkspace = { roadmapId: targetId };
+            previewRoadmap = null;
+            currentRoadmapId = targetId;
+            rememberRoadmap(targetId);
+            renderPrivateRoadmaps();
+            showSaveStatus('info', `"${roadmap.title}" is now in the shared workspace.`);
+            updateUI();
+        };
+
+        // ---- Sign out ----
+        function cleanUpSession() {
+            stopAllListeners();
+            closeUsersModal();
+            closePrivateRoadmapsModal();
+            currentUser = null;
+            isAuthenticated = false;
+            useCloudPersistence = false;
+            myRole = null;
+            roadmaps = [];
+            previewRoadmap = null;
+            privateRoadmaps = [];
+            demoAuditLog = [];
+            ownDeletes.clear();
             saveProblemShown = false;
             dismissSaveStatus();
+            document.getElementById('header-user-avatar')?.classList.add('hidden');
+        }
+
+        window.handleSignOut = async function() {
+            if (pendingWriteCount > 0
+                && !confirm('Some changes are not saved yet and will be lost if you sign out. Sign out anyway?')) return;
+            cleanUpSession();
             if (auth) {
                 try {
                     await signOut(auth);
@@ -3318,14 +4226,6 @@
                     console.warn(e);
                 }
             }
-            currentUser = null;
-            isAuthenticated = false;
-            useCloudPersistence = false;
-            roadmaps = [];
-
-            const headerAvatar = document.getElementById('header-user-avatar');
-            if (headerAvatar) headerAvatar.classList.add('hidden');
-            
             showLoginGate();
         };
 
