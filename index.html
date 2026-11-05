@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.0.2" data-released="2026-11-04">
+    <meta name="mapit-version" content="2.0.3" data-released="2026-11-05">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -71,7 +71,8 @@
         .read-only .editor-only,
         .no-edit-role .role-editor-only,
         .not-admin .admin-only,
-        body:not(.no-edit-role) .role-viewer-only {
+        body:not(.no-edit-role) .role-viewer-only,
+        body:not(.can-add-feedback) .feedback-add-only {
             display: none !important;
         }
     </style>
@@ -403,7 +404,7 @@
                     <button onclick="openDataExportModal('feedback')" title="Export Feedback (CSV/Excel/JSON)" class="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all border border-slate-200">
                         <i class="ph-bold ph-download-simple"></i> Export
                     </button>
-                    <button onclick="openAddFeedbackModal()" class="editor-only flex items-center gap-2 px-3.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-brand-500/20 transition-all">
+                    <button onclick="openAddFeedbackModal()" class="feedback-add-only flex items-center gap-2 px-3.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-brand-500/20 transition-all">
                         <i class="ph-bold ph-plus"></i> New Suggestion
                     </button>
                 </div>
@@ -415,7 +416,7 @@
                 <div class="px-4 py-2.5 bg-white border-b border-slate-100 flex flex-wrap items-center gap-2.5 text-xs shrink-0">
                     <div class="relative flex-1 min-w-[180px]">
                         <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-                        <input type="text" id="feedback-search-input" aria-label="Search feedback" oninput="renderFeedbackTable()" placeholder="Search feedback by title, requester, or tags..." class="w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 focus:border-brand-500 rounded-xl outline-none transition-all text-xs text-slate-700">
+                        <input type="text" id="feedback-search-input" aria-label="Search feedback" oninput="renderFeedbackTable()" placeholder="Search title, source, submitter..." class="w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 focus:border-brand-500 rounded-xl outline-none transition-all text-xs text-slate-700">
                     </div>
 
                     <div class="flex items-center">
@@ -433,6 +434,11 @@
                             <option value="ALL">All Categories</option>
                         </select>
                     </div>
+                    <div class="flex items-center">
+                        <select id="feedback-submitter-filter" aria-label="Filter by submitter" onchange="renderFeedbackTable()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
+                            <option value="ALL">All submitters</option>
+                        </select>
+                    </div>
                 </div>
 
                 <!-- Table Content -->
@@ -442,6 +448,7 @@
                             <tr>
                                 <th class="py-3 px-4">Suggestion / Feedback</th>
                                 <th class="py-3 px-4">Category</th>
+                                <th class="hidden md:table-cell py-3 px-4">Source</th>
                                 <th class="hidden md:table-cell py-3 px-4">Submitted By</th>
                                 <th class="py-3 px-4">Status (from Milestone)</th>
                                 <th class="py-3 px-4">Related Milestone(s)</th>
@@ -545,7 +552,11 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div class="space-y-1">
                                 <label for="detail-item-module" class="text-xs font-semibold text-slate-700">Module / Category</label>
-                                <input type="text" id="detail-item-module" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                                <div class="relative">
+                                    <input type="text" id="detail-item-module" required class="w-full pl-3 pr-9 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                                    <button type="button" id="detail-item-module-toggle" tabindex="-1" aria-label="Show modules" class="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-brand-600 rounded-lg"><i class="ph-bold ph-caret-down text-sm"></i></button>
+                                    <ul id="detail-item-module-listbox" role="listbox" aria-label="Existing modules" class="hidden absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto custom-scrollbar bg-white border border-slate-200 rounded-xl shadow-lg py-1"></ul>
+                                </div>
                             </div>
                             <div class="space-y-1">
                                 <label for="detail-item-date" class="text-xs font-semibold text-slate-700">Target Date (Month-Year)</label>
@@ -670,7 +681,11 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div class="space-y-1">
                         <label for="modal-item-module" class="text-xs font-semibold text-slate-700">Module / Domain</label>
-                        <input type="text" id="modal-item-module" required placeholder="e.g. Analytics" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                        <div class="relative">
+                            <input type="text" id="modal-item-module" required placeholder="e.g. Analytics" class="w-full pl-3 pr-9 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                            <button type="button" id="modal-item-module-toggle" tabindex="-1" aria-label="Show modules" class="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-brand-600 rounded-lg"><i class="ph-bold ph-caret-down text-sm"></i></button>
+                            <ul id="modal-item-module-listbox" role="listbox" aria-label="Existing modules" class="hidden absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto custom-scrollbar bg-white border border-slate-200 rounded-xl shadow-lg py-1"></ul>
+                        </div>
                     </div>
                     <div class="space-y-1">
                         <label for="modal-item-date" class="text-xs font-semibold text-slate-700">Target Month (Month-Year)</label>
@@ -722,7 +737,7 @@
 
     <!-- Modal: Add/Edit Feedback -->
     <div id="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-modal-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative">
+        <div id="feedback-modal-panel" class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative max-h-[92vh] overflow-y-auto custom-scrollbar">
             <button type="button" onclick="closeFeedbackModal()" data-dialog-close aria-label="Close" class="absolute top-4 right-4 text-slate-500 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all">
                 <i class="ph-bold ph-x text-lg"></i>
             </button>
@@ -736,7 +751,8 @@
                 </div>
             </div>
 
-            <form id="feedback-form" class="mt-4 space-y-3.5">
+            <div id="feedback-modal-body" class="mt-4 grid grid-cols-1 gap-5">
+            <form id="feedback-form" class="space-y-3.5 min-w-0">
                 <input type="hidden" id="feedback-item-id">
                 <div class="space-y-1">
                     <label for="feedback-form-title" class="text-xs font-semibold text-slate-700">Suggestion Title</label>
@@ -746,11 +762,15 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div class="space-y-1">
                         <label for="feedback-form-category" class="text-xs font-semibold text-slate-700">Category</label>
-                        <input type="text" id="feedback-form-category" required placeholder="e.g. Analytics, Usability, API" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                        <div class="relative">
+                            <input type="text" id="feedback-form-category" required placeholder="e.g. Analytics, Usability, API" class="w-full pl-3 pr-9 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                            <button type="button" id="feedback-form-category-toggle" tabindex="-1" aria-label="Show categories" class="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-brand-600 rounded-lg"><i class="ph-bold ph-caret-down text-sm"></i></button>
+                            <ul id="feedback-form-category-listbox" role="listbox" aria-label="Existing categories" class="hidden absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto custom-scrollbar bg-white border border-slate-200 rounded-xl shadow-lg py-1"></ul>
+                        </div>
                     </div>
                     <div class="space-y-1">
-                        <label for="feedback-form-source" class="text-xs font-semibold text-slate-700">Submitted By / Source</label>
-                        <input type="text" id="feedback-form-source" placeholder="e.g. Acme Corp / Intercom" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                        <label for="feedback-form-source" class="text-xs font-semibold text-slate-700">Source</label>
+                        <input type="text" id="feedback-form-source" placeholder="e.g. Acme Corp / Intercom / sales call" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
                     </div>
                 </div>
 
@@ -760,14 +780,21 @@
                 </div>
 
                 <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button type="button" onclick="closeFeedbackModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+                    <button type="button" id="feedback-cancel-btn" onclick="closeFeedbackModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
                         Cancel
                     </button>
-                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
+                    <button type="submit" id="feedback-save-btn" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
                         <i class="ph-bold ph-check"></i> Save Suggestion
                     </button>
                 </div>
             </form>
+            <!-- History of this feedback item (existing items only) -->
+            <aside id="feedback-history-panel" class="hidden md:col-span-5 bg-slate-50 border border-slate-200 rounded-2xl p-3 min-w-0" aria-labelledby="feedback-history-title">
+                <h4 id="feedback-history-title" class="text-xs font-bold text-slate-800 flex items-center gap-1.5"><i class="ph-bold ph-clock-counter-clockwise text-brand-600"></i> History</h4>
+                <p id="feedback-submitted-by" class="text-[11px] text-slate-500 mt-1 pb-2 mb-2 border-b border-slate-200"></p>
+                <div id="feedback-history-list" class="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1"></div>
+            </aside>
+            </div>
         </div>
     </div>
 
@@ -1497,6 +1524,7 @@
             document.body.classList.toggle('read-only', !canEditActive());
             document.body.classList.toggle('no-edit-role', !canEdit());
             document.body.classList.toggle('not-admin', !isAdmin());
+            document.body.classList.toggle('can-add-feedback', canAddFeedback());
 
             const badge = document.getElementById('header-role-badge');
             if (badge) {
@@ -2424,6 +2452,24 @@
             } else {
                 feedbackCategoryFilter.value = 'ALL';
             }
+            populateFeedbackSubmitterOptions(feedbackList);
+        }
+
+        // Submitter of a feedback item (createdBy), or null for items from before 2.0.3
+        function feedbackSubmitter(fb) {
+            return fb?.createdBy?.email ? { name: fb.createdBy.name || fb.createdBy.email.split('@')[0], email: fb.createdBy.email } : null;
+        }
+
+        function populateFeedbackSubmitterOptions(feedbackList) {
+            const select = document.getElementById('feedback-submitter-filter');
+            if (!select) return;
+            const current = select.value;
+            const people = new Map();
+            feedbackList.forEach(fb => { const s = feedbackSubmitter(fb); if (s) people.set(s.email, s.name); });
+            const sorted = [...people.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+            select.innerHTML = '<option value="ALL">All submitters</option>' +
+                sorted.map(([email, name]) => `<option value="${escapeHtml(email)}">${escapeHtml(name)}</option>`).join('');
+            select.value = people.has(current) ? current : 'ALL';
         }
 
         window.renderFeedbackTable = function() {
@@ -2435,6 +2481,7 @@
             const query = (feedbackSearchInput ? feedbackSearchInput.value : '').trim().toLowerCase();
             const statusFilter = feedbackStatusFilter ? feedbackStatusFilter.value : 'ALL';
             const catFilter = feedbackCategoryFilter ? feedbackCategoryFilter.value : 'ALL';
+            const submitterFilter = document.getElementById('feedback-submitter-filter')?.value || 'ALL';
 
             feedbackTableBody.innerHTML = '';
 
@@ -2449,12 +2496,14 @@
             });
 
             if (query) {
-                filtered = filtered.filter(f => 
-                    (f.title || '').toLowerCase().includes(query) ||
-                    (f.category || '').toLowerCase().includes(query) ||
-                    (f.source || '').toLowerCase().includes(query) ||
-                    (f.description || '').toLowerCase().includes(query)
-                );
+                filtered = filtered.filter(f => {
+                    const s = feedbackSubmitter(f);
+                    return (f.title || '').toLowerCase().includes(query) ||
+                        (f.category || '').toLowerCase().includes(query) ||
+                        (f.source || '').toLowerCase().includes(query) ||
+                        (f.description || '').toLowerCase().includes(query) ||
+                        (s && (s.name.toLowerCase().includes(query) || s.email.toLowerCase().includes(query)));
+                });
             }
 
             if (statusFilter !== 'ALL') {
@@ -2465,13 +2514,17 @@
                 filtered = filtered.filter(f => f.category === catFilter);
             }
 
+            if (submitterFilter !== 'ALL') {
+                filtered = filtered.filter(f => feedbackSubmitter(f)?.email === submitterFilter);
+            }
+
             if (filtered.length === 0) {
                 feedbackTableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="text-center py-12 text-slate-500">
+                        <td colspan="7" class="text-center py-12 text-slate-500">
                             <i class="ph ph-chat-centered-text text-3xl mb-1 text-slate-300"></i>
                             <p class="font-medium text-xs">No feedback or suggestions found.</p>
-                            <button onclick="openAddFeedbackModal()" class="editor-only mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
+                            <button onclick="openAddFeedbackModal()" class="feedback-add-only mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
                                 <i class="ph-bold ph-plus"></i> Add new suggestion
                             </button>
                         </td>
@@ -2489,13 +2542,29 @@
                 else if (item.derivedStatus === 'in-progress') statusBadge = 'bg-brand-50 text-brand-600 border border-brand-200';
                 else if (item.derivedStatus === 'planned') statusBadge = 'bg-amber-50 text-amber-700 border border-amber-200';
 
-                const milestonesHtml = item.linkedMilestones.length > 0 
+                const milestonesHtml = item.linkedMilestones.length > 0
                     ? item.linkedMilestones.map(m => `
-                        <button type="button" onclick="event.stopPropagation(); jumpToMilestone('${m.id}')" title="Target: ${escapeHtml(formatMonthYear(m.date))}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-[11px] font-semibold cursor-pointer border border-brand-200 transition-colors">
+                        <button type="button" onclick="event.stopPropagation(); jumpToMilestone('${escapeHtml(m.id)}')" title="Target: ${escapeHtml(formatMonthYear(m.date))}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-[11px] font-semibold cursor-pointer border border-brand-200 transition-colors">
                             <i class="ph-bold ph-git-commit rotate-90 text-[10px]"></i> ${escapeHtml(m.name)}
                         </button>
                       `).join(' ')
                     : `<span class="text-slate-500 italic text-[11px]">Unlinked (Not in any milestone)</span>`;
+
+                const submitter = feedbackSubmitter(item);
+                const submitterHtml = submitter
+                    ? `<span class="text-xs" title="${escapeHtml(`${submitter.name} (${submitter.email})`)}">${escapeHtml(submitter.name)}</span>`
+                    : '<span class="text-xs text-slate-500" title="Added before 2.0.3">—</span>';
+                const id = escapeHtml(item.id);
+                const actionsHtml = canEditFeedback(item)
+                    ? `<button onclick="editFeedbackItem('${id}')" title="Edit Feedback" aria-label="Edit Feedback" class="p-1.5 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all">
+                            <i class="ph ph-pencil-simple text-base"></i>
+                       </button>
+                       <button onclick="deleteFeedbackItem('${id}')" title="Delete Feedback" aria-label="Delete Feedback" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
+                            <i class="ph ph-trash text-base"></i>
+                       </button>`
+                    : `<button onclick="editFeedbackItem('${id}')" title="View feedback and its history" aria-label="View Feedback" class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all">
+                            <i class="ph ph-eye text-base"></i>
+                       </button>`;
 
                 tr.innerHTML = `
                     <td class="py-3 px-4 font-bold text-slate-800">
@@ -2506,8 +2575,9 @@
                         <span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700">${escapeHtml(item.category)}</span>
                     </td>
                     <td class="hidden md:table-cell py-3 px-4 text-slate-600 whitespace-nowrap">
-                        <span class="text-xs">${escapeHtml(item.source || 'User')}</span>
+                        <span class="text-xs">${item.source ? escapeHtml(item.source) : '<span class="text-slate-500">—</span>'}</span>
                     </td>
+                    <td class="hidden md:table-cell py-3 px-4 text-slate-600 whitespace-nowrap">${submitterHtml}</td>
                     <td class="py-3 px-4 whitespace-nowrap">
                         <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${statusBadge}">
                             ${escapeHtml(item.statusLabel)}
@@ -2519,14 +2589,7 @@
                         </div>
                     </td>
                     <td class="py-3 px-4 text-right whitespace-nowrap">
-                        <div class="flex items-center justify-end gap-1">
-                            <button onclick="editFeedbackItem('${escapeHtml(item.id)}')" title="Edit Feedback" aria-label="Edit Feedback" class="editor-only p-1.5 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all">
-                                <i class="ph ph-pencil-simple text-base"></i>
-                            </button>
-                            <button onclick="deleteFeedbackItem('${escapeHtml(item.id)}')" title="Delete Feedback" aria-label="Delete Feedback" class="editor-only p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
-                                <i class="ph ph-trash text-base"></i>
-                            </button>
-                        </div>
+                        <div class="flex items-center justify-end gap-1">${actionsHtml}</div>
                     </td>
                 `;
                 feedbackTableBody.appendChild(tr);
@@ -2539,16 +2602,73 @@
         };
 
         // Feedback Modals
+        let feedbackHistoryUnsub = null;
+        let openFeedbackActivity = [];
+
+        // mode: 'new' (one column), 'edit' or 'view' (form + History panel; view = read-only)
+        function setFeedbackModalMode(mode) {
+            const wide = mode !== 'new';
+            document.getElementById('feedback-modal-panel')?.classList.toggle('max-w-lg', !wide);
+            document.getElementById('feedback-modal-panel')?.classList.toggle('max-w-3xl', wide);
+            document.getElementById('feedback-modal-body')?.classList.toggle('md:grid-cols-12', wide);
+            document.getElementById('feedback-form')?.classList.toggle('md:col-span-7', wide);
+            document.getElementById('feedback-history-panel')?.classList.toggle('hidden', !wide);
+            const readOnly = mode === 'view';
+            document.querySelectorAll('#feedback-form input:not([type="hidden"]), #feedback-form textarea').forEach(el => { el.disabled = readOnly; });
+            document.getElementById('feedback-save-btn')?.classList.toggle('hidden', readOnly);
+            const cancel = document.getElementById('feedback-cancel-btn');
+            if (cancel) cancel.textContent = readOnly ? 'Close' : 'Cancel';
+            const titleEl = document.getElementById('feedback-modal-title');
+            if (titleEl) titleEl.textContent = mode === 'new' ? 'New Feedback / Suggestion' : mode === 'edit' ? 'Edit Feedback / Suggestion' : 'Feedback Details';
+        }
+
+        function stopFeedbackHistory() {
+            feedbackHistoryUnsub?.();
+            feedbackHistoryUnsub = null;
+            openFeedbackActivity = [];
+        }
+
+        function renderFeedbackHistory(fb) {
+            const header = document.getElementById('feedback-submitted-by');
+            const list = document.getElementById('feedback-history-list');
+            const s = feedbackSubmitter(fb);
+            if (header) {
+                header.innerHTML = s
+                    ? `Submitted by <span class="font-semibold text-slate-700" title="${escapeHtml(`${s.name} (${s.email})`)}">${escapeHtml(s.name)}</span>${fb.createdAt ? ` · <span title="${escapeHtml(formatPHT(fb.createdAt))}">${escapeHtml(formatPHT(fb.createdAt))}</span>` : ''}`
+                    : 'Submitted by: unknown (before 2.0.3)';
+            }
+            if (!list) return;
+            const entries = (useCloudPersistence ? openFeedbackActivity : demoAuditLog.filter(e => e.target?.id === fb.id))
+                .slice().sort((a, b) => toMillis(b.at) - toMillis(a.at));
+            list.innerHTML = entries.map(e => {
+                const lines = describeAudit(e);
+                return `
+                    <div class="flex items-start gap-2.5 p-2 rounded-lg bg-white border border-slate-100 shadow-2xs">
+                        <div class="w-6 h-6 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 mt-0.5 text-xs"><i class="ph-bold ph-git-commit"></i></div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-start justify-between gap-1">
+                                <span class="font-semibold text-slate-800 text-[11px] break-words min-w-0">${escapeHtml(lines[0])}</span>
+                                <span class="text-[10px] text-slate-500 shrink-0" title="${escapeHtml(formatPHT(e.at))}">${escapeHtml(formatRelativeTime(e.at))}</span>
+                            </div>
+                            ${lines.slice(1).map(l => `<span class="text-[11px] text-slate-700 block">${escapeHtml(l)}</span>`).join('')}
+                            <span class="text-[10px] text-slate-500 block" title="${escapeHtml(e.by?.email ? `${e.by.name} (${e.by.email})` : '')}">${escapeHtml(e.by?.name || 'Member')}</span>
+                        </div>
+                    </div>`;
+            }).join('') || '<div class="py-8 text-center text-slate-500 text-xs italic">No activity recorded yet.</div>';
+        }
+
         window.openAddFeedbackModal = function() {
+            if (!canAddFeedback()) return;
+            stopFeedbackHistory();
             const form = document.getElementById('feedback-form');
             if (form) form.reset();
             const idInput = document.getElementById('feedback-item-id');
             if (idInput) idInput.value = '';
-            const titleEl = document.getElementById('feedback-modal-title');
-            if (titleEl) titleEl.textContent = 'New Feedback / Suggestion';
+            setFeedbackModalMode('new');
             if (feedbackModal) feedbackModal.classList.remove('hidden');
         };
 
+        // Opens an item for editing, or read-only (View) when the user may not change it
         window.editFeedbackItem = function(id) {
             const activeRoadmap = getActiveRoadmap();
             if (!activeRoadmap) return;
@@ -2560,11 +2680,23 @@
             document.getElementById('feedback-form-category').value = item.category;
             document.getElementById('feedback-form-source').value = item.source || '';
             document.getElementById('feedback-form-description').value = item.description || '';
-            document.getElementById('feedback-modal-title').textContent = 'Edit Feedback / Suggestion';
+            setFeedbackModalMode(canEditFeedback(item) ? 'edit' : 'view');
+
+            stopFeedbackHistory();
+            if (useCloudPersistence && !activeRoadmap.isPreview) {
+                feedbackHistoryUnsub = onSnapshot(query(wsCollection('auditLog'), where('target.id', '==', id)), snap => {
+                    openFeedbackActivity = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id }))
+                        .filter(e => e.roadmapId === activeRoadmap.id);
+                    const current = getActiveRoadmap()?.feedback.find(f => f.id === id);
+                    if (current) renderFeedbackHistory(current);
+                }, err => console.warn('Feedback history listener error:', err));
+            }
+            renderFeedbackHistory(item);
             if (feedbackModal) feedbackModal.classList.remove('hidden');
         };
 
         window.closeFeedbackModal = function() {
+            stopFeedbackHistory();
             if (feedbackModal) feedbackModal.classList.add('hidden');
         };
 
@@ -2573,12 +2705,14 @@
             feedbackForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const activeRoadmap = getActiveRoadmap();
-                if (!activeRoadmap || !canEditActive()) return;
+                if (!activeRoadmap) return;
 
                 const id = document.getElementById('feedback-item-id')?.value;
+                const existing = id ? (activeRoadmap.feedback || []).find(f => f.id === id) : null;
+                if (id ? !canEditFeedback(existing) : !canAddFeedback()) return;
                 const fields = {
                     title: document.getElementById('feedback-form-title')?.value.trim() || '',
-                    category: document.getElementById('feedback-form-category')?.value.trim() || '',
+                    category: canonicalCategory(document.getElementById('feedback-form-category')?.value, id || null),
                     source: document.getElementById('feedback-form-source')?.value.trim() || '',
                     description: document.getElementById('feedback-form-description')?.value.trim() || ''
                 };
@@ -2619,10 +2753,10 @@
 
         window.deleteFeedbackItem = async function(id) {
             const activeRoadmap = getActiveRoadmap();
-            if (!activeRoadmap || !canEditActive()) return;
+            if (!activeRoadmap) return;
 
             const feedbackItem = (activeRoadmap.feedback || []).find(f => f.id === id);
-            if (!feedbackItem) return;
+            if (!feedbackItem || !canEditFeedback(feedbackItem)) return;
             const linkedCount = (activeRoadmap.items || []).filter(m => (m.feedbackIds || []).includes(id)).length;
             const confirmed = await confirmDelete({
                 kind: 'feedback',
@@ -2779,6 +2913,9 @@
                 if (c.f === 'module') return `Module changed to "${c.to}"`;
                 if (c.f === 'description') return 'Description updated';
                 if (c.f === 'inclusions') return 'Scope inclusions updated';
+                if (c.f === 'title') return `Title changed to "${c.to}"`;
+                if (c.f === 'category') return `Category changed from ${c.from || '—'} to ${c.to}`;
+                if (c.f === 'source') return c.to ? `Source changed to "${c.to}"` : 'Source removed';
                 if (c.f === 'feedback') return String(c.to).startsWith('+') ? `Linked feedback "${String(c.to).slice(1)}"` : `Unlinked feedback "${String(c.to).slice(1)}"`;
                 return `${FIELD_LABELS[c.f] || c.f} changed`;
             };
@@ -2787,6 +2924,8 @@
                 case 'milestone.updated': return changes.length ? changes.map(line) : ['Milestone updated'];
                 case 'milestone.deleted': return ['Milestone deleted'];
                 case 'comment.added': return ['Added comment'];
+                case 'feedback.created': return ['Feedback added'].concat(changes.map(c => `${FIELD_LABELS[c.f] || c.f}: ${c.to}`));
+                case 'feedback.updated': return changes.length ? changes.map(line) : ['Feedback updated'];
                 case 'roadmap.moved': return ['Moved into the shared workspace'];
                 default: return [entry.action];
             }
@@ -2896,6 +3035,7 @@
             const value = document.getElementById(EDIT_FIELDS[field])?.value || '';
             if (field === 'inclusions') return value.split(',').map(s => s.trim()).filter(Boolean).join(', ');
             if (field === 'date' || field === 'status') return value;
+            if (field === 'module') return canonicalModule(value, selectedMilestoneId);
             return value.trim();
         }
 
@@ -3087,7 +3227,7 @@
 
                 const fields = {
                     name: document.getElementById('modal-item-name')?.value.trim() || '',
-                    module: document.getElementById('modal-item-module')?.value.trim() || '',
+                    module: canonicalModule(document.getElementById('modal-item-module')?.value),
                     date: document.getElementById('modal-item-date')?.value || '',
                     status: document.getElementById('modal-item-status')?.value || 'planned',
                     inclusions: (document.getElementById('modal-item-inclusions')?.value || '').split(',').map(s => s.trim()).filter(Boolean),
@@ -3127,6 +3267,134 @@
             if (!canEdit()) return;
             return createRoadmap(sampleRoadmap.title, { fromSample: true });
         };
+
+        // =======================================================
+        // FIELDS WITH SUGGESTIONS: milestone Module, feedback Category (module-picker spec)
+        // =======================================================
+        const normalizeModule = value => String(value || '').trim().replace(/\s+/g, ' ');
+
+        // Distinct values of a field in the open roadmap with how often they're used (optionally ignoring one record)
+        function valueCounts(records, field, excludeId = null) {
+            const counts = new Map();
+            (records || []).forEach(record => {
+                if (record.id === excludeId) return;
+                const name = normalizeModule(record[field]);
+                if (name) counts.set(name, (counts.get(name) || 0) + 1);
+            });
+            return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: 'base' }));
+        }
+        const moduleCounts = (excludeId = null) => valueCounts(getActiveRoadmap()?.items, 'module', excludeId);
+        const categoryCounts = (excludeId = null) => valueCounts(getActiveRoadmap()?.feedback, 'category', excludeId);
+
+        // The existing spelling when the text differs only by letter case or spaces; otherwise the tidied text
+        function canonicalValue(value, entries) {
+            const typed = normalizeModule(value);
+            const existing = entries.find(([name]) => name.toLowerCase() === typed.toLowerCase());
+            return existing ? existing[0] : typed;
+        }
+        const canonicalModule = (value, excludeId = null) => canonicalValue(value, moduleCounts(excludeId));
+        const canonicalCategory = (value, excludeId = null) => canonicalValue(value, categoryCounts(excludeId));
+
+        // getEntries(): [[name, count]]; noun: 'module' | 'category'; unit: what the count counts
+        function setupSuggestCombobox(inputId, { getEntries, noun, unit }) {
+            const input = document.getElementById(inputId);
+            const list = document.getElementById(inputId + '-listbox');
+            const toggle = document.getElementById(inputId + '-toggle');
+            if (!input || !list) return;
+            let options = [];      // [name, count] currently shown
+            let active = -1;
+            const plural = noun === 'category' ? 'categories' : noun + 's';
+
+            input.setAttribute('role', 'combobox');
+            input.setAttribute('aria-autocomplete', 'list');
+            input.setAttribute('aria-expanded', 'false');
+            input.setAttribute('aria-controls', list.id);
+            input.setAttribute('autocomplete', 'off');
+
+            const isOpen = () => !list.classList.contains('hidden');
+            const close = () => {
+                list.classList.add('hidden');
+                input.setAttribute('aria-expanded', 'false');
+                input.removeAttribute('aria-activedescendant');
+                active = -1;
+            };
+            const highlight = text => {
+                const q = input.value.trim();
+                const i = q ? text.toLowerCase().indexOf(q.toLowerCase()) : -1;
+                if (i < 0) return escapeHtml(text);
+                return escapeHtml(text.slice(0, i)) + '<strong class="font-bold text-slate-900">' + escapeHtml(text.slice(i, i + q.length)) + '</strong>' + escapeHtml(text.slice(i + q.length));
+            };
+            const render = () => {
+                const all = getEntries();
+                const q = normalizeModule(input.value).toLowerCase();
+                options = q ? all.filter(([name]) => name.toLowerCase().includes(q)) : all;
+                const exact = all.find(([name]) => name.toLowerCase() === q);
+                let hint = '';
+                if (!all.length) hint = `No ${plural} yet. Type a new one.`;
+                else if (q && !exact) hint = `New ${noun}: "${normalizeModule(input.value)}"`;
+                else if (q && exact && exact[0] !== normalizeModule(input.value)) hint = `Will be saved as "${exact[0]}"`;
+                list.innerHTML = options.map(([name, count], i) => `
+                    <li id="${list.id}-opt-${i}" role="option" aria-selected="${i === active}" data-index="${i}"
+                        class="flex items-center justify-between gap-2 px-3 py-2 text-xs cursor-pointer ${i === active ? 'bg-brand-50 text-brand-800' : 'text-slate-700 hover:bg-slate-50'}">
+                        <span class="truncate">${highlight(name)}</span>
+                        <span class="shrink-0 text-[10px] font-semibold px-1.5 rounded-full bg-slate-100 text-slate-600" aria-label="${pluralize(count, unit)}">${count}</span>
+                    </li>`).join('') +
+                    (hint ? `<li role="presentation" class="${options.length ? 'border-t border-slate-100 mt-1 pt-2' : ''} px-3 pb-1.5 text-[11px] italic text-slate-500">${escapeHtml(hint)}</li>` : '');
+                if (active >= 0 && options[active]) input.setAttribute('aria-activedescendant', `${list.id}-opt-${active}`);
+                else input.removeAttribute('aria-activedescendant');
+            };
+            const open = () => {
+                if (input.disabled || input.readOnly) return;
+                active = -1;
+                render();
+                list.classList.remove('hidden');
+                input.setAttribute('aria-expanded', 'true');
+            };
+            const choose = i => {
+                if (!options[i]) return;
+                input.value = options[i][0];
+                close();
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            };
+
+            input.addEventListener('focus', open);
+            input.addEventListener('input', () => { open(); });
+            input.addEventListener('blur', () => setTimeout(close, 120));
+            input.addEventListener('keydown', e => {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (!isOpen()) { open(); return; }
+                    if (!options.length) return;
+                    active = e.key === 'ArrowDown' ? (active + 1) % options.length : (active - 1 + options.length) % options.length;
+                    render();
+                    document.getElementById(`${list.id}-opt-${active}`)?.scrollIntoView({ block: 'nearest' });
+                } else if (e.key === 'Enter' && isOpen() && active >= 0) {
+                    e.preventDefault();      // pick the option instead of submitting the form
+                    choose(active);
+                } else if (e.key === 'Escape' && isOpen()) {
+                    e.preventDefault();
+                    e.stopPropagation();     // close only the list, not the window
+                    close();
+                } else if (e.key === 'Tab') {
+                    close();
+                }
+            });
+            // mousedown (not click) so the input doesn't lose focus first
+            list.addEventListener('mousedown', e => {
+                e.preventDefault();
+                const li = e.target.closest('[role="option"]');
+                if (li) choose(Number(li.dataset.index));
+            });
+            toggle?.addEventListener('mousedown', e => {
+                e.preventDefault();
+                if (input.disabled) return;
+                if (isOpen()) close(); else { input.focus(); open(); }
+            });
+        }
+
+        setupSuggestCombobox('modal-item-module', { getEntries: () => moduleCounts(), noun: 'module', unit: 'milestone' });
+        setupSuggestCombobox('detail-item-module', { getEntries: () => moduleCounts(selectedMilestoneId), noun: 'module', unit: 'milestone' });
+        setupSuggestCombobox('feedback-form-category', { getEntries: () => categoryCounts(document.getElementById('feedback-item-id')?.value || null), noun: 'category', unit: 'feedback item' });
 
         // =======================================================
         // EXPORT LOGIC
@@ -3396,7 +3664,7 @@
             if (!activeRoadmap) return;
 
             const feedbackList = activeRoadmap.feedback || [];
-            const headers = ['"Suggestion / Title"', '"Category"', '"Submitted By"', '"Status (from Milestone)"', '"Linked Milestone(s)"', '"Description"'];
+            const headers = ['"Suggestion / Title"', '"Category"', '"Source"', '"Submitted By"', '"Submitter Email"', '"Status (from Milestone)"', '"Linked Milestone(s)"', '"Description"'];
 
             const rows = feedbackList.map(f => {
                 const derivation = getFeedbackDerivedStatus(f.id, activeRoadmap);
@@ -3407,7 +3675,9 @@
                 return [
                     escape(f.title),
                     escape(f.category),
-                    escape(f.source || 'User'),
+                    escape(f.source || ''),
+                    escape(feedbackSubmitter(f)?.name || ''),
+                    escape(feedbackSubmitter(f)?.email || ''),
                     escape(derivation.label),
                     escape(linkedMilestoneNames || 'None (Backlog)'),
                     escape(f.description)
@@ -3430,6 +3700,7 @@
                     const derivation = getFeedbackDerivedStatus(f.id, activeRoadmap);
                     return {
                         ...f,
+                        submittedBy: feedbackSubmitter(f),
                         derivedStatus: derivation.status,
                         statusLabel: derivation.label,
                         linkedMilestones: derivation.milestones.map(m => ({ id: m.id, name: m.name, date: m.date, status: m.status }))
@@ -3592,6 +3863,16 @@
             if (!roadmap || roadmap.deletedAt || roadmap.isPreview) return false;
             if (!useCloudPersistence) return canEdit();
             return isAdmin() || (myRole === 'editor' && roadmap.createdBy?.email === myEmail());
+        }
+        // Feedback: Editors/Admins all items; Viewers add, and change only what they submitted (viewer-feedback spec)
+        function canAddFeedback() {
+            const active = getActiveRoadmap();
+            return !!active && !active.deletedAt && !active.isPreview && (canEdit() || myRole === 'viewer');
+        }
+        function canEditFeedback(fb) {
+            if (canEditActive()) return true;
+            const active = getActiveRoadmap();
+            return myRole === 'viewer' && !!active && !active.deletedAt && !active.isPreview && !!fb?.createdBy?.email && fb.createdBy.email === myEmail();
         }
         function rememberRoadmap(id) {
             try { localStorage.setItem(LAST_ROADMAP_KEY, id); } catch (e) { /* private mode */ }
@@ -3829,7 +4110,7 @@
             const fid = newId('fb');
             const entry = auditEntry(roadmap, 'feedback.created', { type: 'feedback', id: fid, label: fields.title }, ['title', 'category'].map(f => ({ f, to: clip(fields[f]) })));
             if (!useCloudPersistence) {
-                (roadmap.feedback ||= []).push({ id: fid, ...fields });
+                (roadmap.feedback ||= []).push({ id: fid, ...fields, createdBy: actor(), createdAt: new Date().toISOString() });
                 logDemo(entry);
                 updateUI();
                 return true;
@@ -4033,6 +4314,7 @@
             roadmapUnsubs.clear();
             stopEditListeners();
             stopUsersListeners();
+            stopFeedbackHistory();
         }
 
         // ---- Users screen (admins) ----
