@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.0.3" data-released="2026-11-05">
+    <meta name="mapit-version" content="2.1.0" data-released="2026-11-05">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -210,6 +210,10 @@
                     <button type="button" role="menuitem" id="private-roadmaps-btn" onclick="closeAccountMenu(); openPrivateRoadmapsModal()" class="hidden w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-lock-simple text-base text-brand-600" aria-hidden="true"></i> Private roadmaps
                         <span id="account-private-count" class="ml-auto text-[10px] font-bold px-1.5 rounded-full bg-brand-50 text-brand-700"></span>
+                    </button>
+                    <button type="button" role="menuitem" id="recycle-bin-btn" onclick="openRecycleBin()" class="hidden w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
+                        <i class="ph-bold ph-trash text-base text-slate-500" aria-hidden="true"></i> Recycle Bin
+                        <span id="account-bin-count" class="ml-auto text-[10px] font-bold px-1.5 rounded-full bg-slate-100 text-slate-600"></span>
                     </button>
                     <button type="button" role="menuitem" id="account-signout" onclick="closeAccountMenu(); handleSignOut()" class="w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-sign-out text-base" aria-hidden="true"></i> Sign out
@@ -849,7 +853,7 @@
             </div>
 
             <p class="text-xs text-slate-600 mb-4 leading-relaxed">
-                Are you sure you want to delete <strong id="delete-roadmap-target-title" class="text-slate-900 font-bold">this roadmap</strong>? It disappears for everyone in the workspace. Its milestones, feedback and activity are kept, and admins can still view it.
+                Are you sure you want to delete <strong id="delete-roadmap-target-title" class="text-slate-900 font-bold">this roadmap</strong>? It moves to the Recycle Bin: hidden for everyone, and restorable for 30 days by its creator or an admin.
             </p>
 
             <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -993,10 +997,44 @@
         </div>
     </div>
 
+    <!-- Modal: Recycle Bin (deleted roadmaps, milestones, feedback; 30 days) -->
+    <div id="recycle-bin-modal" role="dialog" aria-modal="true" aria-labelledby="recycle-bin-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4">
+        <div class="bg-white sm:rounded-2xl max-w-3xl w-full h-full sm:h-auto sm:max-h-[90vh] border border-slate-200 shadow-2xl p-4 sm:p-6 relative flex flex-col overflow-hidden">
+            <button type="button" onclick="closeRecycleBin()" data-dialog-close aria-label="Close" class="absolute top-4 right-4 text-slate-500 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all">
+                <i class="ph-bold ph-x text-lg"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-4 shrink-0">
+                <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center text-xl shrink-0">
+                    <i class="ph-bold ph-trash"></i>
+                </div>
+                <div>
+                    <h3 id="recycle-bin-title" class="text-base font-bold text-slate-900">Recycle Bin</h3>
+                    <p class="text-xs text-slate-500">Deleted items stay here for 30 days, then they are removed for good.</p>
+                </div>
+            </div>
+            <div class="shrink-0 flex flex-wrap items-center gap-2 mb-3">
+                <div role="tablist" aria-label="Item type" class="flex bg-slate-100 rounded-xl p-1">
+                    <button type="button" role="tab" data-bin-tab="roadmap" onclick="setBinTab('roadmap')">Roadmaps <span data-bin-count class="ml-0.5 text-[10px] font-bold">0</span></button>
+                    <button type="button" role="tab" data-bin-tab="milestone" onclick="setBinTab('milestone')">Milestones <span data-bin-count class="ml-0.5 text-[10px] font-bold">0</span></button>
+                    <button type="button" role="tab" data-bin-tab="feedback" onclick="setBinTab('feedback')">Feedback <span data-bin-count class="ml-0.5 text-[10px] font-bold">0</span></button>
+                </div>
+                <div class="relative flex-1 min-w-[160px]">
+                    <i class="ph ph-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                    <input type="text" id="bin-search" oninput="renderRecycleBin()" aria-label="Search the Recycle Bin" placeholder="Search..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl outline-none focus:border-brand-500">
+                </div>
+                <button type="button" id="bin-empty-btn" onclick="emptyRecycleBin()" class="hidden px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 flex items-center gap-1.5">
+                    <i class="ph-bold ph-trash"></i> Empty bin
+                </button>
+            </div>
+            <div id="bin-list" class="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-2"></div>
+        </div>
+    </div>
+
     <!-- Save status: a change that could not be saved, or is waiting for a connection -->
     <div id="save-status" role="status" aria-live="polite" class="hidden">
         <i id="save-status-icon" class="ph-bold text-base shrink-0 mt-px" aria-hidden="true"></i>
         <span id="save-status-text" class="flex-1 leading-relaxed"></span>
+        <button type="button" id="save-status-action" class="hidden shrink-0 px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white font-bold"></button>
         <button type="button" onclick="dismissSaveStatus()" aria-label="Dismiss" class="shrink-0 p-1 rounded-lg hover:bg-white/60"><i class="ph-bold ph-x"></i></button>
     </div>
 
@@ -1004,7 +1042,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, getDocs, updateDoc, collection, query, where, onSnapshot, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, getDocs, updateDoc, collection, query, where, onSnapshot, writeBatch, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Application State
         let currentUser = null;
@@ -1461,14 +1499,13 @@
             renderNotices();
             const activeRoadmap = getActiveRoadmap();
             const liveRoadmaps = roadmaps.filter(r => !r.deletedAt);
-            const deletedRoadmaps = roadmaps.filter(r => r.deletedAt);
 
             if (headerRoadmapSelect) {
                 const option = r => `<option value="${escapeHtml(r.id)}" ${activeRoadmap && r.id === activeRoadmap.id ? 'selected' : ''}>${escapeHtml(r.title)}</option>`;
                 headerRoadmapSelect.innerHTML =
                     (previewRoadmap ? `<option value="" selected>Preview: ${escapeHtml(previewRoadmap.title)}</option>` : '') +
                     (liveRoadmaps.length ? liveRoadmaps.map(option).join('') : '<option value="">No roadmaps yet</option>') +
-                    (isAdmin() && deletedRoadmaps.length ? `<optgroup label="Deleted roadmaps (admin)">${deletedRoadmaps.map(option).join('')}</optgroup>` : '');
+                    (activeRoadmap?.deletedAt ? `<option value="" selected>In the Recycle Bin: ${escapeHtml(activeRoadmap.title)}</option>` : '');
             }
 
             if (roadmapsTabList) {
@@ -1556,10 +1593,15 @@
                 roleLine.textContent = text || '';
                 roleLine.classList.toggle('hidden', !text);
             }
-            // The divider above Sign out only when Users / Private roadmaps are shown
+            const binCount = binEntries().length;
+            const binVisible = !!myRole && (canEdit() || binCount > 0);
+            document.getElementById('recycle-bin-btn')?.classList.toggle('hidden', !binVisible);
+            const binCountEl = document.getElementById('account-bin-count');
+            if (binCountEl) { binCountEl.textContent = binCount || ''; binCountEl.classList.toggle('hidden', !binCount); }
+            // The divider above Sign out only when Users / Private roadmaps / Recycle Bin are shown
             const signOut = document.getElementById('account-signout');
             if (signOut) {
-                const tools = isAdmin() || privateRoadmaps.length > 0;
+                const tools = isAdmin() || privateRoadmaps.length > 0 || binVisible;
                 signOut.classList.toggle('border-t', tools);
                 signOut.classList.toggle('border-slate-100', tools);
                 signOut.classList.toggle('mt-1', tools);
@@ -1581,10 +1623,13 @@
                         ${canEdit() && !active.movedToWorkspace ? `<button type="button" onclick="moveRoadmapById('${escapeHtml(active.sourceId)}')" class="px-2.5 py-1 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-bold">Move to workspace</button>` : ''}
                     </div>`);
             } else if (active?.deletedAt) {
+                const left = daysLeft(active);
                 notices.push(`
                     <div class="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
                         <i class="ph-bold ph-trash text-base"></i>
-                        <span class="flex-1 min-w-0">Deleted roadmap${active.deletedBy?.name ? ` (deleted by <span title="${escapeHtml(active.deletedBy.email || '')}">${escapeHtml(active.deletedBy.name)}</span>, ${escapeHtml(formatPHT(active.deletedAt))})` : ''}. Read only, visible to admins.</span>
+                        <span class="flex-1 min-w-0"><strong>In the Recycle Bin:</strong> deleted${active.deletedBy?.name ? ` by <span title="${escapeHtml(active.deletedBy.email || '')}">${escapeHtml(active.deletedBy.name)}</span>` : ''}, ${escapeHtml(formatPHT(active.deletedAt))}.${left === null ? '' : ` Removed in ${pluralize(left, 'day')}.`} Read only.</span>
+                        ${canRestoreRoadmap(active) ? `<button type="button" onclick="restoreFromBin('roadmap', '${escapeHtml(active.id)}', '${escapeHtml(active.id)}')" class="px-2.5 py-1 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-bold">Restore</button>` : ''}
+                        <button type="button" onclick="leaveDeletedRoadmap()" class="px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white font-bold">Back to workspace</button>
                     </div>`);
             }
             const unmoved = privateRoadmaps.filter(r => !r.movedToWorkspace);
@@ -1730,6 +1775,7 @@
             }
             hideLoginGate();
             loadPrivateRoadmaps();
+            setTimeout(() => maintainRecycleBin().catch(e => console.warn('Recycle Bin housekeeping failed:', e)), 4000);
         }
 
         // Only verified company accounts may use MapIt (also enforced by firestore.rules)
@@ -2761,7 +2807,7 @@
             const confirmed = await confirmDelete({
                 kind: 'feedback',
                 target: feedbackItem.title,
-                detail: linkedCount ? `It will be unlinked from ${pluralize(linkedCount, 'milestone')}.` : ''
+                detail: (linkedCount ? `It will be unlinked from ${pluralize(linkedCount, 'milestone')}. ` : '') + 'It moves to the Recycle Bin for 30 days.'
             });
             if (!confirmed) return;
             await deleteFeedback(activeRoadmap, feedbackItem);
@@ -3060,11 +3106,11 @@
             if (!selectedMilestoneId || editMilestoneModal?.classList.contains('hidden') || getActiveRoadmap()?.id !== roadmap.id) return;
             if (change.type === 'removed') {
                 if (ownDeletes.has(selectedMilestoneId)) return;
-                const id = selectedMilestoneId;
                 closeEditMilestoneModal();
-                getDoc(auditRef('del-milestone-' + id))
-                    .then(s => showSaveStatus('info', `This milestone was deleted${s.exists() ? ' by ' + s.data().by?.name : ''}.`))
-                    .catch(() => showSaveStatus('info', 'This milestone was deleted by someone else.'));
+                const by = change.deletedBy?.name;
+                showSaveStatus('info', change.deletedBy
+                    ? `This milestone was moved to the Recycle Bin by ${by || 'someone else'}.`
+                    : 'This milestone was removed by someone else.');
                 return;
             }
             if (change.type !== 'modified' || change.doc.metadata.hasPendingWrites) return;
@@ -3198,7 +3244,7 @@
             const confirmed = await confirmDelete({
                 kind: 'milestone',
                 target: item.name,
-                detail: 'Its history and comments stay in the activity log.'
+                detail: 'Its comments and history are kept. It moves to the Recycle Bin; you can restore it for 30 days.'
             });
             if (!confirmed) return;
 
@@ -3758,7 +3804,8 @@
             info: ['bg-brand-50 border-brand-200 text-brand-800', 'ph-info']
         };
 
-        function showSaveStatus(kind, message) {
+        // action: { label, run, ms } adds a button (e.g. Undo) and keeps the banner for ms
+        function showSaveStatus(kind, message, action = null) {
             const box = document.getElementById('save-status');
             if (!box) return;
             const [colors, icon] = SAVE_STATUS_STYLES[kind];
@@ -3766,10 +3813,16 @@
             box.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
             document.getElementById('save-status-icon').className = `ph-bold ${icon} text-base shrink-0 mt-px`;
             document.getElementById('save-status-text').textContent = message;
+            const actionBtn = document.getElementById('save-status-action');
+            if (actionBtn) {
+                actionBtn.classList.toggle('hidden', !action);
+                actionBtn.textContent = action?.label || '';
+                actionBtn.onclick = action ? () => { dismissSaveStatus(); action.run(); } : null;
+            }
             saveProblemShown = kind === 'waiting' || kind === 'error';
             clearTimeout(saveStatusTimer);
             if (kind === 'saved') saveStatusTimer = setTimeout(dismissSaveStatus, 3000);
-            if (kind === 'info') saveStatusTimer = setTimeout(dismissSaveStatus, 6000);
+            if (kind === 'info') saveStatusTimer = setTimeout(dismissSaveStatus, action?.ms || 6000);
         }
 
         window.dismissSaveStatus = function() {
@@ -3841,6 +3894,7 @@
         let openMilestoneActivity = [];
         const ownDeletes = new Set();    // ids this user deleted, so the live listener doesn't announce them
         let renderQueued = false;
+        let expiredRoadmaps = [];        // deleted roadmaps past their 30 days, waiting for removal
 
         const wsRef = (...path) => doc(db, ...WORKSPACE_PATH, ...path);
         const wsCollection = (...path) => collection(db, ...WORKSPACE_PATH, ...path);
@@ -3904,6 +3958,7 @@
             requestAnimationFrame(() => {
                 renderQueued = false;
                 if (isAuthenticated) updateUI();
+                if (!document.getElementById('recycle-bin-modal')?.classList.contains('hidden')) renderRecycleBin();
             });
         }
 
@@ -3998,24 +4053,27 @@
             ], 'sample', 'add the sample milestones');
         }
 
-        // Soft delete: hidden for members, kept (read-only) for admins
+        // Move to the Recycle Bin (recycle-bin FR-1): hidden for everyone, restorable for 30 days by its creator or an admin
         async function deleteRoadmap(roadmap) {
             if (!canDeleteRoadmap(roadmap)) return false;
             const counts = [{ f: 'milestones', to: (roadmap.items || []).length }, { f: 'feedback', to: (roadmap.feedback || []).length }];
             const entry = auditEntry(roadmap, 'roadmap.deleted', { type: 'roadmap', id: roadmap.id, label: roadmap.title }, counts);
-            if (!useCloudPersistence) {
-                roadmaps = roadmaps.filter(r => r.id !== roadmap.id);
-                logDemo(entry);
-                if (currentRoadmapId === roadmap.id) currentRoadmapId = roadmaps[0]?.id || null;
-                updateUI();
-                return true;
-            }
             ownDeletes.add(roadmap.id);
-            const aid = 'del-roadmap-' + roadmap.id;
-            return commitBatch(batch => {
-                batch.update(roadmapRef(roadmap.id), { deletedAt: serverTimestamp(), deletedBy: actor(), ...stamp(aid) });
-                batch.set(auditRef(aid), entry);
-            }, 'delete this roadmap');
+            if (!useCloudPersistence) {
+                Object.assign(roadmap, { deletedAt: deletedNow(), deletedBy: actor(), purgeAt: purgeAtValue() });
+                logDemo(entry);
+                if (currentRoadmapId === roadmap.id) currentRoadmapId = roadmaps.find(r => !r.deletedAt)?.id || null;
+                updateUI();
+            } else {
+                const aid = newId('a');
+                const ok = await commitBatch(batch => {
+                    batch.update(roadmapRef(roadmap.id), { deletedAt: serverTimestamp(), deletedBy: actor(), purgeAt: purgeAtValue(), ...stamp(aid) });
+                    batch.set(auditRef(aid), entry);
+                }, 'delete this roadmap');
+                if (!ok) return false;
+            }
+            showUndo(`"${roadmap.title}" moved to the Recycle Bin.`, () => restoreRoadmap(roadmap.id));
+            return true;
         }
 
         // ---- Milestones ----
@@ -4053,22 +4111,27 @@
             }, 'save the milestone');
         }
 
+        // Move to the Recycle Bin; comments, history and feedback links stay with it
         async function deleteMilestone(roadmap, item) {
             const entry = auditEntry(roadmap, 'milestone.deleted', { type: 'milestone', id: item.id, label: item.name },
                 ['name', 'module', 'date', 'status'].map(f => ({ f, to: clip(item[f]) })));
+            ownDeletes.add(item.id);
             if (!useCloudPersistence) {
                 roadmap.items = roadmap.items.filter(i => i.id !== item.id);
+                Object.assign(item, { deletedAt: deletedNow(), deletedBy: actor(), purgeAt: purgeAtValue() });
+                (roadmap.binItems ||= []).push(item);
                 logDemo(entry);
                 updateUI();
-                return true;
+            } else {
+                const aid = newId('a');
+                const ok = await commitBatch(batch => {
+                    batch.update(itemRef(roadmap.id, 'milestones', item.id), { deletedAt: serverTimestamp(), deletedBy: actor(), purgeAt: purgeAtValue(), ...stamp(aid) });
+                    batch.set(auditRef(aid), entry);
+                }, 'delete the milestone');
+                if (!ok) return false;
             }
-            // Its comments are left in place (no longer shown); their text is already in the audit log
-            ownDeletes.add(item.id);
-            const aid = 'del-milestone-' + item.id;
-            return commitBatch(batch => {
-                batch.delete(itemRef(roadmap.id, 'milestones', item.id));
-                batch.set(auditRef(aid), entry);
-            }, 'delete the milestone');
+            showUndo(`"${item.name}" moved to the Recycle Bin.`, () => restoreItem('milestone', roadmap.id, item.id));
+            return true;
         }
 
         async function addComment(roadmap, item, text) {
@@ -4122,24 +4185,292 @@
             }, 'add the feedback');
         }
 
+        // Move to the Recycle Bin; milestones keep their link and it counts again once restored
         async function deleteFeedback(roadmap, feedbackItem) {
             const linked = (roadmap.items || []).filter(m => (m.feedbackIds || []).includes(feedbackItem.id));
             const entry = auditEntry(roadmap, 'feedback.deleted', { type: 'feedback', id: feedbackItem.id, label: feedbackItem.title },
                 [{ f: 'title', to: clip(feedbackItem.title) }, { f: 'unlinkedFrom', to: linked.length }]);
+            ownDeletes.add(feedbackItem.id);
             if (!useCloudPersistence) {
                 roadmap.feedback = roadmap.feedback.filter(f => f.id !== feedbackItem.id);
-                linked.forEach(m => { m.feedbackIds = m.feedbackIds.filter(x => x !== feedbackItem.id); });
+                Object.assign(feedbackItem, { deletedAt: deletedNow(), deletedBy: actor(), purgeAt: purgeAtValue() });
+                (roadmap.binFeedback ||= []).push(feedbackItem);
                 logDemo(entry);
                 updateUI();
+            } else {
+                const aid = newId('a');
+                const ok = await commitBatch(batch => {
+                    batch.update(itemRef(roadmap.id, 'feedback', feedbackItem.id), { deletedAt: serverTimestamp(), deletedBy: actor(), purgeAt: purgeAtValue(), ...stamp(aid) });
+                    batch.set(auditRef(aid), entry);
+                }, 'delete the feedback');
+                if (!ok) return false;
+            }
+            showUndo(`"${feedbackItem.title}" moved to the Recycle Bin.`, () => restoreItem('feedback', roadmap.id, feedbackItem.id));
+            return true;
+        }
+
+        // =======================================================
+        // RECYCLE BIN (recycle-bin spec): deletes are soft for 30 days, then removed (Firestore TTL on purgeAt,
+        // or an admin session as a fallback). Restore = whoever could delete; delete forever = admins.
+        // =======================================================
+        const BIN_DAYS = 30;
+        const DAY_MS = 864e5;
+        const purgeAtValue = () => useCloudPersistence ? Timestamp.fromMillis(Date.now() + BIN_DAYS * DAY_MS) : new Date(Date.now() + BIN_DAYS * DAY_MS).toISOString();
+        const deletedNow = () => useCloudPersistence ? serverTimestamp() : new Date().toISOString();
+        const isExpired = x => !!x?.purgeAt && toMillis(x.purgeAt) <= Date.now();
+        const daysLeft = x => x?.purgeAt ? Math.max(0, Math.ceil((toMillis(x.purgeAt) - Date.now()) / DAY_MS)) : null;
+        const binFieldsCleared = () => ({ deletedAt: null, deletedBy: null, purgeAt: null });
+        const BIN_LABELS = { roadmap: 'roadmap', milestone: 'milestone', feedback: 'feedback item' };
+        const binName = (kind, item) => kind === 'roadmap' ? item.title : kind === 'milestone' ? item.name : item.title;
+
+        function canRestoreRoadmap(roadmap) {
+            if (!useCloudPersistence) return canEdit();
+            return isAdmin() || (myRole === 'editor' && roadmap?.createdBy?.email === myEmail());
+        }
+        function canRestoreItem(kind, roadmap, item) {
+            if (!roadmap || roadmap.deletedAt) return false;
+            if (kind === 'milestone') return canEdit();
+            return canEdit() || (myRole === 'viewer' && item?.createdBy?.email === myEmail());
+        }
+        const canPurge = () => useCloudPersistence ? isAdmin() : canEdit();
+
+        // Everything the user may see in the bin, newest deleted first
+        function binEntries() {
+            const out = [];
+            roadmaps.filter(r => r.deletedAt && !isExpired(r)).forEach(r => out.push({ kind: 'roadmap', roadmap: r, item: r }));
+            roadmaps.forEach(r => {
+                (r.binItems || []).filter(i => !isExpired(i)).forEach(i => out.push({ kind: 'milestone', roadmap: r, item: i }));
+                (r.binFeedback || []).filter(f => !isExpired(f)).forEach(f => out.push({ kind: 'feedback', roadmap: r, item: f }));
+            });
+            const visible = canEdit() ? out : out.filter(e => e.kind === 'feedback' && e.item.createdBy?.email === myEmail());
+            return visible.sort((a, b) => toMillis(b.item.deletedAt) - toMillis(a.item.deletedAt));
+        }
+
+        // Info banner with an Undo button (10 s)
+        function showUndo(message, undo) {
+            showSaveStatus('info', message, { label: 'Undo', run: undo, ms: 10000 });
+        }
+
+        // ---- Restore ----
+        async function restoreRoadmap(roadmapId) {
+            const roadmap = roadmaps.find(r => r.id === roadmapId);
+            if (!roadmap?.deletedAt || !canRestoreRoadmap(roadmap)) return false;
+            if (isExpired(roadmap)) { showSaveStatus('error', 'This roadmap has already been removed.'); return false; }
+            const entry = auditEntry(roadmap, 'roadmap.restored', { type: 'roadmap', id: roadmap.id, label: roadmap.title });
+            ownDeletes.delete(roadmap.id);
+            if (!useCloudPersistence) {
+                Object.assign(roadmap, binFieldsCleared());
+                logDemo(entry);
+            } else {
+                const aid = newId('a');
+                const ok = await commitBatch(batch => {
+                    batch.update(roadmapRef(roadmap.id), { ...binFieldsCleared(), ...stamp(aid) });
+                    batch.set(auditRef(aid), entry);
+                }, 'restore the roadmap');
+                if (!ok) return false;
+            }
+            previewRoadmap = null;
+            currentRoadmapId = roadmap.id;
+            rememberRoadmap(roadmap.id);
+            showSaveStatus('info', `"${roadmap.title}" was restored.`);
+            updateUI();
+            renderRecycleBin();
+            return true;
+        }
+
+        async function restoreItem(kind, roadmapId, itemId) {
+            const roadmap = roadmaps.find(r => r.id === roadmapId);
+            const list = kind === 'milestone' ? roadmap?.binItems : roadmap?.binFeedback;
+            const item = (list || []).find(i => i.id === itemId);
+            if (!item || !canRestoreItem(kind, roadmap, item)) return false;
+            if (isExpired(item)) { showSaveStatus('error', 'This item has already been removed.'); return false; }
+            const label = binName(kind, item);
+            const entry = auditEntry(roadmap, `${kind}.restored`, { type: kind, id: item.id, label });
+            ownDeletes.delete(item.id);
+            if (!useCloudPersistence) {
+                const live = kind === 'milestone' ? 'items' : 'feedback';
+                const bin = kind === 'milestone' ? 'binItems' : 'binFeedback';
+                roadmap[bin] = roadmap[bin].filter(i => i.id !== item.id);
+                Object.assign(item, binFieldsCleared());
+                roadmap[live] = [...(roadmap[live] || []), item];
+                logDemo(entry);
+            } else {
+                const aid = newId('a');
+                const ok = await commitBatch(batch => {
+                    batch.update(itemRef(roadmap.id, kind === 'milestone' ? 'milestones' : 'feedback', item.id), { ...binFieldsCleared(), ...stamp(aid) });
+                    batch.set(auditRef(aid), entry);
+                }, `restore the ${BIN_LABELS[kind]}`);
+                if (!ok) return false;
+            }
+            showSaveStatus('info', `"${label}" was restored.`);
+            updateUI();
+            renderRecycleBin();
+            return true;
+        }
+
+        // ---- Remove for good (admins; also used for expired items) ----
+        // entries: [{ kind, roadmap, item }]; system = automatic removal after 30 days
+        async function purgeEntries(entries, { system = false } = {}) {
+            if (!entries.length) return true;
+            if (!useCloudPersistence) {
+                entries.forEach(({ kind, roadmap, item }) => {
+                    if (kind === 'roadmap') roadmaps = roadmaps.filter(r => r.id !== roadmap.id);
+                    else if (kind === 'milestone') roadmap.binItems = roadmap.binItems.filter(i => i.id !== item.id);
+                    else roadmap.binFeedback = roadmap.binFeedback.filter(f => f.id !== item.id);
+                    logDemo(auditEntry(roadmap, `${kind}.purged`, { type: kind, id: item.id, label: binName(kind, item) }, system ? [{ f: 'reason', to: 'expired' }] : []));
+                });
+                updateUI();
+                renderRecycleBin();
                 return true;
             }
-            // Milestones keep the old id in feedbackIds; the app ignores ids of feedback that no longer exists
-            const aid = 'del-feedback-' + feedbackItem.id;
-            return commitBatch(batch => {
-                batch.delete(itemRef(roadmap.id, 'feedback', feedbackItem.id));
-                batch.set(auditRef(aid), entry);
-            }, 'delete the feedback');
+            // Firestore checks 3 documents per removed item; 6 items per batch stays under its limit of 20
+            for (let i = 0; i < entries.length; i += 6) {
+                const part = entries.slice(i, i + 6);
+                const ok = await commitBatch(batch => {
+                    part.forEach(({ kind, roadmap, item }) => {
+                        const aid = `purge-${kind}-${item.id}`;
+                        const ref = kind === 'roadmap' ? roadmapRef(roadmap.id) : itemRef(roadmap.id, kind === 'milestone' ? 'milestones' : 'feedback', item.id);
+                        batch.delete(ref);
+                        const entry = auditEntry(roadmap, `${kind}.purged`, { type: kind, id: item.id, label: binName(kind, item) }, system ? [{ f: 'reason', to: 'expired' }] : []);
+                        if (system) entry.by = { ...entry.by, name: `System (via ${entry.by.name})` };
+                        batch.set(auditRef(aid), entry);
+                    });
+                }, 'remove items for good');
+                if (!ok) return false;
+            }
+            renderRecycleBin();
+            return true;
         }
+
+        // Admin session housekeeping: remove expired items (if TTL hasn't yet) and date old deleted roadmaps (FR-12, FR-15)
+        let binMaintained = false;
+        async function maintainRecycleBin() {
+            if (binMaintained || !useCloudPersistence || !isAdmin()) return;
+            binMaintained = true;
+            const expired = [];
+            expiredRoadmaps.forEach(r => expired.push({ kind: 'roadmap', roadmap: r, item: r }));
+            roadmaps.forEach(r => {
+                (r.binItems || []).filter(isExpired).forEach(i => expired.push({ kind: 'milestone', roadmap: r, item: i }));
+                (r.binFeedback || []).filter(isExpired).forEach(f => expired.push({ kind: 'feedback', roadmap: r, item: f }));
+            });
+            if (expired.length) await purgeEntries(expired, { system: true });
+            for (const r of roadmaps.filter(x => x.deletedAt && !x.purgeAt)) {
+                const aid = newId('a');
+                await commitBatch(batch => {
+                    batch.update(roadmapRef(r.id), { purgeAt: purgeAtValue(), ...stamp(aid) });
+                    batch.set(auditRef(aid), auditEntry(r, 'roadmap.retention_set', { type: 'roadmap', id: r.id, label: r.title }, [{ f: 'days', to: BIN_DAYS }]));
+                }, 'set the removal date');
+            }
+        }
+
+        // ---- Recycle Bin window ----
+        let binTab = 'roadmap';
+
+        window.openRecycleBin = function() {
+            closeAccountMenu();
+            const entries = binEntries();
+            if (!entries.some(e => e.kind === binTab)) binTab = entries[0]?.kind || (canEdit() ? 'roadmap' : 'feedback');
+            const search = document.getElementById('bin-search');
+            if (search) search.value = '';
+            renderRecycleBin();
+            document.getElementById('recycle-bin-modal')?.classList.remove('hidden');
+        };
+
+        window.closeRecycleBin = function() {
+            document.getElementById('recycle-bin-modal')?.classList.add('hidden');
+        };
+
+        window.setBinTab = function(tab) {
+            binTab = tab;
+            renderRecycleBin();
+        };
+
+        window.renderRecycleBin = function() {
+            const listEl = document.getElementById('bin-list');
+            if (!listEl) return;
+            const all = binEntries();
+            const counts = { roadmap: 0, milestone: 0, feedback: 0 };
+            all.forEach(e => counts[e.kind]++);
+            document.querySelectorAll('[data-bin-tab]').forEach(btn => {
+                const tab = btn.dataset.binTab;
+                btn.querySelector('[data-bin-count]').textContent = counts[tab];
+                btn.className = `px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${tab === binTab ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`;
+                btn.setAttribute('aria-selected', String(tab === binTab));
+            });
+            document.getElementById('bin-empty-btn')?.classList.toggle('hidden', !canPurge() || !all.length);
+            const q = (document.getElementById('bin-search')?.value || '').trim().toLowerCase();
+            const rows = all.filter(e => e.kind === binTab && (!q || binName(e.kind, e.item).toLowerCase().includes(q)));
+            if (!rows.length) {
+                listEl.innerHTML = `<p class="py-10 text-center text-xs text-slate-500 italic">${all.length ? (q ? 'No items match.' : 'Nothing in this tab.') : 'Nothing in the Recycle Bin.'}</p>`;
+                return;
+            }
+            listEl.innerHTML = rows.map(({ kind, roadmap, item }) => {
+                const name = binName(kind, item);
+                const left = daysLeft(item);
+                const by = item.deletedBy;
+                const roadmapGone = kind !== 'roadmap' && roadmap.deletedAt;
+                const args = `'${kind}', '${escapeHtml(roadmap.id)}', '${escapeHtml(item.id)}'`;
+                let actions = '';
+                if (kind === 'roadmap') {
+                    actions += `<button type="button" onclick="openDeletedRoadmap('${escapeHtml(roadmap.id)}')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold flex items-center gap-1"><i class="ph-bold ph-eye"></i> Open</button>`;
+                    if (canRestoreRoadmap(roadmap)) actions += `<button type="button" onclick="restoreFromBin(${args})" class="px-2.5 py-1 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-bold flex items-center gap-1"><i class="ph-bold ph-arrow-counter-clockwise"></i> Restore</button>`;
+                } else if (roadmapGone) {
+                    actions += `<span class="text-[11px] text-slate-500 italic">Restore the roadmap first</span>`;
+                    if (canRestoreRoadmap(roadmap)) actions += `<button type="button" onclick="restoreFromBin('roadmap', '${escapeHtml(roadmap.id)}', '${escapeHtml(roadmap.id)}')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold">Restore roadmap</button>`;
+                } else if (canRestoreItem(kind, roadmap, item)) {
+                    actions += `<button type="button" onclick="restoreFromBin(${args})" class="px-2.5 py-1 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-bold flex items-center gap-1"><i class="ph-bold ph-arrow-counter-clockwise"></i> Restore</button>`;
+                }
+                if (canPurge()) actions += `<button type="button" onclick="purgeFromBin(${args})" class="px-2.5 py-1 rounded-lg text-rose-600 hover:bg-rose-50 text-[11px] font-bold flex items-center gap-1"><i class="ph-bold ph-trash"></i> Delete forever</button>`;
+                return `
+                    <div class="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-slate-200 bg-white">
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-bold text-slate-900 truncate">${escapeHtml(name)}</div>
+                            <div class="text-[11px] text-slate-500">
+                                ${kind !== 'roadmap' ? `${escapeHtml(roadmap.title)}${roadmapGone ? ' (in the bin)' : ''} · ` : ''}deleted by
+                                <span title="${escapeHtml(by?.email ? `${by.name} (${by.email})` : '')}">${escapeHtml(by?.name || 'someone')}</span> ·
+                                <span title="${escapeHtml(formatPHT(item.deletedAt))}">${escapeHtml(formatRelativeTime(item.deletedAt))}</span>
+                            </div>
+                        </div>
+                        <span class="text-[11px] font-semibold ${left !== null && left <= 3 ? 'text-amber-700' : 'text-slate-500'}" title="${escapeHtml(item.purgeAt ? 'Removed on ' + formatPHT(item.purgeAt) : 'An admin session sets the removal date')}">${left === null ? 'Removal date pending' : `Removed in ${pluralize(left, 'day')}`}</span>
+                        <div class="flex items-center gap-1.5">${actions}</div>
+                    </div>`;
+            }).join('');
+        };
+
+        window.restoreFromBin = function(kind, roadmapId, itemId) {
+            return kind === 'roadmap' ? restoreRoadmap(roadmapId) : restoreItem(kind, roadmapId, itemId);
+        };
+
+        window.openDeletedRoadmap = function(roadmapId) {
+            closeRecycleBin();
+            previewRoadmap = null;
+            currentRoadmapId = roadmapId;
+            switchView('roadmap');
+            updateUI();
+        };
+
+        window.purgeFromBin = async function(kind, roadmapId, itemId) {
+            const entry = binEntries().find(e => e.kind === kind && e.roadmap.id === roadmapId && e.item.id === itemId);
+            if (!entry || !canPurge()) return;
+            const confirmed = await confirmAction({
+                title: `Delete ${BIN_LABELS[kind]} forever`,
+                messageHtml: `Remove <strong>"${escapeHtml(binName(kind, entry.item))}"</strong> for good? This can't be undone. Its history stays in the activity log.`,
+                confirmLabel: 'Delete forever'
+            });
+            if (confirmed) await purgeEntries([entry]);
+        };
+
+        window.emptyRecycleBin = async function() {
+            const entries = binEntries();
+            if (!entries.length || !canPurge()) return;
+            const confirmed = await confirmAction({
+                title: 'Empty the Recycle Bin',
+                messageHtml: `Remove all <strong>${pluralize(entries.length, 'item')}</strong> for good? This can't be undone. Their history stays in the activity log.`,
+                confirmLabel: 'Empty bin'
+            });
+            // Roadmaps last, so their separately deleted items go first
+            if (confirmed) await purgeEntries([...entries.filter(e => e.kind !== 'roadmap'), ...entries.filter(e => e.kind === 'roadmap')]);
+        };
 
         // ---- Membership & roles ----
         function withTimeout(promise, ms = 15000) {
@@ -4200,7 +4531,7 @@
                     closeNewRoadmapModal();
                 }
                 if (!isAdmin()) closeUsersModal();
-                if ((oldRole === 'admin') !== (newRole === 'admin')) subscribeRoadmaps().catch(onListenerError);
+                if (['admin', 'editor'].includes(oldRole) !== ['admin', 'editor'].includes(newRole)) subscribeRoadmaps().catch(onListenerError);
             }
             scheduleRender();
         }
@@ -4236,7 +4567,7 @@
         // Members see live roadmaps; admins also see deleted ones (the rules allow nothing else)
         function subscribeRoadmaps() {
             roadmapsUnsub?.();
-            const q = isAdmin() ? wsCollection('roadmaps') : query(wsCollection('roadmaps'), where('deletedAt', '==', null));
+            const q = canEdit() ? wsCollection('roadmaps') : query(wsCollection('roadmaps'), where('deletedAt', '==', null));
             return new Promise((resolve, reject) => {
                 let first = true;
                 roadmapsUnsub = onSnapshot(q, snap => {
@@ -4251,10 +4582,14 @@
         function onRoadmapsSnapshot(snap) {
             const previous = new Map(roadmaps.map(r => [r.id, r]));
             const wasViewing = previewRoadmap ? null : roadmaps.find(r => r.id === currentRoadmapId);
-            roadmaps = snap.docs.map(d => {
+            const all = snap.docs.map(d => {
                 const old = previous.get(d.id);
-                return { ...d.data({ serverTimestamps: 'estimate' }), id: d.id, items: old?.items || [], feedback: old?.feedback || [] };
+                return { ...d.data({ serverTimestamps: 'estimate' }), id: d.id, items: old?.items || [], feedback: old?.feedback || [],
+                    binItems: old?.binItems || [], binFeedback: old?.binFeedback || [] };
             }).sort(byCreated);
+            // Past their 30 days: treated as gone (TTL or an admin session removes them)
+            expiredRoadmaps = all.filter(r => r.deletedAt && isExpired(r));
+            roadmaps = all.filter(r => !(r.deletedAt && isExpired(r)));
 
             const ids = new Set(roadmaps.map(r => r.id));
             for (const [id, unsubs] of roadmapUnsubs) {
@@ -4291,14 +4626,23 @@
                 onSnapshot(wsCollection('roadmaps', roadmapId, 'milestones'), snap => {
                     const roadmap = roadmaps.find(r => r.id === roadmapId);
                     if (!roadmap) return;
-                    roadmap.items = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id })).sort(byCreated);
-                    snap.docChanges().forEach(change => { if (change.doc.id === selectedMilestoneId) onOpenMilestoneChanged(roadmap, change); });
+                    const all = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id })).sort(byCreated);
+                    roadmap.items = all.filter(i => !i.deletedAt);
+                    roadmap.binItems = all.filter(i => i.deletedAt);
+                    snap.docChanges().forEach(change => {
+                        if (change.doc.id !== selectedMilestoneId) return;
+                        const data = change.type === 'removed' ? null : change.doc.data();
+                        // Moved to the bin while open: handled like a removal
+                        onOpenMilestoneChanged(roadmap, data?.deletedAt ? { type: 'removed', doc: change.doc, deletedBy: data.deletedBy } : change);
+                    });
                     scheduleRender();
                 }, onError),
                 onSnapshot(wsCollection('roadmaps', roadmapId, 'feedback'), snap => {
                     const roadmap = roadmaps.find(r => r.id === roadmapId);
                     if (!roadmap) return;
-                    roadmap.feedback = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id })).sort(byCreated);
+                    const all = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id })).sort(byCreated);
+                    roadmap.feedback = all.filter(f => !f.deletedAt);
+                    roadmap.binFeedback = all.filter(f => f.deletedAt);
                     scheduleRender();
                 }, onError)
             ];
@@ -4490,6 +4834,12 @@
             updateUI();
         };
 
+        window.leaveDeletedRoadmap = function() {
+            const live = roadmaps.find(r => !r.deletedAt);
+            currentRoadmapId = live?.id || null;
+            updateUI();
+        };
+
         window.closePreview = function() {
             previewRoadmap = null;
             updateUI();
@@ -4556,6 +4906,9 @@
         // ---- Sign out ----
         function cleanUpSession() {
             closeAccountMenu();
+            closeRecycleBin();
+            binMaintained = false;
+            expiredRoadmaps = [];
             stopAllListeners();
             closeUsersModal();
             closePrivateRoadmapsModal();
