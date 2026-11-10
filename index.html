@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.2.0" data-released="2026-11-10">
+    <meta name="mapit-version" content="2.3.0" data-released="2026-11-10">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -45,6 +45,9 @@
     </script>
 
     <style>
+        /* 2.3.0: drop position while dragging to reorder */
+        .rank-drop-before { box-shadow: inset 0 2px 0 #0c8ee9; }
+        .rank-drop-after { box-shadow: inset 0 -2px 0 #0c8ee9; }
         /* 2.1.2 (U-8): page text is selectable; controls are not */
         button, nav, [role="button"], [role="menuitem"] { user-select: none; }
         .custom-scrollbar::-webkit-scrollbar {
@@ -250,6 +253,9 @@
             </div>
 
             <div id="roadmap-bar-actions" class="flex items-center gap-2 shrink-0 pl-2 border-l border-slate-100">
+                <button id="capacity-btn" onclick="openCapacityModal()" title="Monthly capacity" aria-label="Capacity" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-xs">
+                    <i class="ph-bold ph-gauge text-sm text-brand-600"></i> <span class="hidden sm:inline">Capacity</span>
+                </button>
                 <button id="export-pdf-btn" onclick="exportRoadmapPDF()" title="Export Roadmap as PDF" aria-label="Export Roadmap as PDF" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-xs">
                     <i class="ph-bold ph-file-pdf text-sm text-rose-600"></i> <span id="export-pdf-text" class="hidden sm:inline">Export PDF</span>
                 </button>
@@ -291,6 +297,9 @@
                 <!-- Contextual Subfilter -->
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-2 w-full sm:w-auto justify-between sm:justify-end">
                     <!-- Annual view only: open or close every module row (annual-view FR-7) -->
+                    <button id="show-load-toggle" type="button" role="switch" aria-checked="true" onclick="toggleShowLoad()" class="hidden items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all">
+                        <span class="track w-7 h-4 rounded-full bg-brand-600 relative transition-colors" aria-hidden="true"><span class="knob absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform"></span></span>Show load
+                    </button>
                     <button id="annual-expand-toggle" type="button" onclick="toggleAllAnnualModules()" aria-pressed="false" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition-all">
                         <i class="ph-bold ph-arrows-out-line-vertical text-xs"></i><span>Expand all</span>
                     </button>
@@ -369,8 +378,11 @@
                             <option value="planned">Planned</option>
                             <option value="in-progress">In Progress</option>
                             <option value="done">Completed</option>
+                            <option value="over">Over capacity only</option>
                         </select>
                     </div>
+
+                    <span id="editor-sort-hint" class="hidden text-[11px] text-slate-500">Sort by Rank to reorder.</span>
 
                     <div id="editor-filter-count-badge" class="hidden text-[11px] font-semibold text-brand-700 bg-brand-50 px-2 py-1 rounded-lg border border-brand-200">
                         0 matches
@@ -382,11 +394,14 @@
                     <table class="w-full text-left border-collapse">
                         <thead class="bg-slate-50 sticky top-0 z-10 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                             <tr>
+                                <th class="w-6 pl-3" aria-label="Drag to reorder"></th>
+                                <th class="py-3 px-2"><button type="button" onclick="setEditorSort('rank')" data-sort="rank" class="uppercase tracking-wider font-bold hover:text-slate-800">Rank</button></th>
                                 <th class="py-3 px-4">Deliverable / Feature</th>
                                 <th class="py-3 px-4">Module</th>
-                                <th class="py-3 px-4">Target Date</th>
+                                <th class="py-3 px-4"><button type="button" onclick="setEditorSort('date')" data-sort="date" class="uppercase tracking-wider font-bold hover:text-slate-800">Target Date</button></th>
+                                <th class="py-3 px-4"><button type="button" onclick="setEditorSort('effort')" data-sort="effort" class="uppercase tracking-wider font-bold hover:text-slate-800">Effort</button></th>
                                 <th class="py-3 px-4">Status</th>
-                                <th class="hidden md:table-cell py-3 px-4">Scope / Inclusions</th>
+                                <th class="hidden lg:table-cell py-3 px-4">Scope / Inclusions</th>
                                 <th class="py-3 px-4 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -524,6 +539,8 @@
 
     </main>
 
+    <div id="rank-announcer" class="sr-only" aria-live="polite"></div>
+
     <!-- Phone bottom tab bar (below sm; hidden until authenticated) -->
     <nav id="mobile-nav" aria-label="Main" class="hidden grid grid-cols-3 sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 shadow-[0_-1px_3px_rgba(0,0,0,0.04)]">
         <button id="mob-nav-roadmap" onclick="switchView('roadmap')" class="flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold text-brand-700">
@@ -555,7 +572,9 @@
             <div class="flex items-center gap-2 mb-2">
                 <span id="modal-status-badge" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">Planned</span>
                 <span id="modal-target-date" class="text-xs text-slate-500 font-medium">Q3 2026</span>
+                <span id="modal-rank-effort" class="flex items-center gap-1.5 text-xs text-slate-500"></span>
             </div>
+            <div id="modal-over-note" class="hidden mb-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs"></div>
             <h3 id="modal-feature-name" class="text-lg font-bold text-slate-900 leading-snug">Feature Title</h3>
             <p id="modal-module-name" class="text-xs text-brand-600 font-semibold mb-4">Module Name</p>
             <div class="space-y-3 border-t border-slate-100 pt-3 text-xs">
@@ -576,6 +595,33 @@
                 <button type="button" onclick="editFromDetails()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
                     <i class="ph-bold ph-pencil-simple"></i> <span id="details-edit-label">Edit</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Capacity (2.3.0) -->
+    <div id="capacity-modal" role="dialog" aria-modal="true" aria-labelledby="capacity-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4">
+        <div class="bg-white sm:rounded-2xl max-w-2xl w-full h-full sm:h-auto sm:max-h-[90vh] border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
+                <h3 id="capacity-title" class="text-sm font-black text-slate-900 flex items-center gap-2"><span class="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center" aria-hidden="true"><i class="ph-bold ph-gauge"></i></span><span id="capacity-title-text">Capacity</span></h3>
+                <button type="button" onclick="closeCapacityModal()" data-dialog-close aria-label="Close" class="text-slate-500 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100"><i class="ph-bold ph-x text-base"></i></button>
+            </div>
+            <div class="p-5 space-y-4 text-xs overflow-y-auto custom-scrollbar flex-1">
+                <label class="flex flex-wrap items-center gap-2 font-semibold text-slate-700">Default per month
+                    <input type="number" id="capacity-default" min="0" max="9999" step="0.5" placeholder="Not set" class="w-20 px-2 py-1 border border-slate-200 rounded-lg text-right disabled:bg-slate-50">
+                    person-days <span class="font-normal text-slate-500">(e.g. 3 people × 20 days = 60)</span>
+                </label>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="text-[11px] uppercase tracking-wider text-slate-500"><tr><th class="text-left py-1">Month</th><th class="text-left">Capacity</th><th class="text-right">Load</th><th class="pl-3 text-left">Level</th><th class="text-right">Items</th></tr></thead>
+                        <tbody id="capacity-rows" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+                <p id="capacity-backlog" class="text-slate-600"></p>
+            </div>
+            <div class="flex justify-end gap-2 px-5 py-3 border-t border-slate-100 shrink-0">
+                <button type="button" id="capacity-cancel" onclick="closeCapacityModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
+                <button type="button" id="capacity-save" onclick="saveCapacity()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold">Save</button>
             </div>
         </div>
     </div>
@@ -627,6 +673,19 @@
                                 <input type="month" id="detail-item-date" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
                             </div>
                         </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="space-y-1">
+                                <label for="detail-item-effort" class="text-xs font-semibold text-slate-700">Effort (person-days)</label>
+                                <input type="number" id="detail-item-effort" step="0.5" min="0.5" max="999" placeholder="Not estimated" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                                <p class="text-[10px] text-slate-500">All people combined, e.g. 2 people × 5 days = 10</p>
+                            </div>
+                            <div class="space-y-1">
+                                <label for="detail-item-moveto" class="text-xs font-semibold text-slate-700">Rank <span id="detail-rank-label" class="font-normal text-slate-500"></span></label>
+                                <input type="number" id="detail-item-moveto" step="1" min="1" placeholder="Move to #" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                            </div>
+                        </div>
+                        <p id="detail-load-note" class="hidden" role="status"></p>
 
                         <div class="space-y-1">
                             <label for="detail-item-status" class="text-xs font-semibold text-slate-700">Status</label>
@@ -756,6 +815,13 @@
                         <input type="month" id="modal-item-date" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
                     </div>
                 </div>
+
+                <div class="space-y-1">
+                    <label for="modal-item-effort" class="text-xs font-semibold text-slate-700">Effort (person-days)</label>
+                    <input type="number" id="modal-item-effort" step="0.5" min="0.5" max="999" placeholder="Not estimated" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                    <p class="text-[10px] text-slate-500">All people combined, e.g. 2 people × 5 days = 10</p>
+                </div>
+                <p id="modal-load-note" class="hidden" role="status"></p>
 
                 <div class="space-y-1">
                     <label for="modal-item-status" class="text-xs font-semibold text-slate-700">Initial Status</label>
@@ -1366,6 +1432,11 @@
                 if (active) {
                     populateEditorModuleFilterOptions(active.items || []);
                     renderEditorTable(active.items || []);
+                    // Once per roadmap per session; items added later sort after the ranked ones until someone moves them
+                    if (canEditActive() && !rankInitDone.has(active.id) && (active.items || []).some(i => !hasKey(i))) {
+                        rankInitDone.add(active.id);
+                        ensureRanked(active).then(ok => { if (ok) scheduleRender(); });
+                    }
                 }
             } else if (viewName === 'feedback') {
                 if (feedbackView) {
@@ -2016,6 +2087,7 @@
             if (!roadmapContainer) return;
             roadmapContainer.innerHTML = '';
             updateAnnualToggle();
+            updateShowLoadToggle();
 
             const guideLine = document.getElementById('timeline-vertical-guide');
             if (guideLine) {
@@ -2069,7 +2141,33 @@
         }
 
         // Module rows for one quarter (or the backlog), A–Z, each with its deliverables underneath
+        // Deliverables of one module row (built when the row is open)
+        const annualRowItems = new Map();
+        function annualDeliverablesHtml(key) {
+            const row = annualRowItems.get(key);
+            if (!row) return '';
+            const roadmap = getActiveRoadmap();
+            const { mItems, keyPrefix, placeOf, reorder } = row;
+            return mItems.map(item => `
+                                <li onclick="openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" data-rank-id="${escapeHtml(item.id)}" class="group/row flex items-center gap-2 px-2 py-1 rounded-lg border border-transparent ${overTint(roadmap, item) || 'hover:bg-brand-50/50'} cursor-pointer">
+                                    ${reorder ? reorderHtml(item) : ''}
+                                    ${rankChipHtml(roadmap, item, keyPrefix === 'MOD' ? 0 : placeOf.get(item.id))}
+                                    ${statusDot(item.status)}
+                                    ${overFlagHtml(roadmap, item, false)}
+                                    <span class="text-xs text-slate-700 truncate min-w-0 flex-1">${escapeHtml(item.name)}</span>
+                                    ${overInfo(roadmap, item) ? '<span class="over-tag hidden sm:inline text-[10px] font-bold px-1.5 rounded bg-rose-100 text-rose-700 whitespace-nowrap shrink-0">Over capacity</span>' : ''}
+                                    ${effortHtml(item)}
+                                    <span class="text-[10px] text-slate-500 shrink-0">${escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD')}</span>
+                                    ${reorder ? moveButtonsHtml(item) : ''}
+                                </li>
+                            `).join('');
+        }
+
         function annualModuleRows(items, keyPrefix) {
+            const roadmap = getActiveRoadmap();
+            const periodOrder = sortByRank(roadmap, items);
+            const placeOf = new Map(periodOrder.map((i, n) => [i.id, n + 1]));
+            const reorder = keyPrefix !== 'MOD' && canEditActive();
             const groups = {};
             items.forEach(item => {
                 const mod = item.module || 'General';
@@ -2077,11 +2175,14 @@
             });
             const mods = Object.keys(groups).sort(annualCollator.compare);
             return mods.map(mod => {
-                const mItems = groups[mod].slice().sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || String(a.name).localeCompare(String(b.name)));
+                const mItems = keyPrefix === 'MOD'
+                    ? groups[mod].slice().sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || rankOf(roadmap, a.id) - rankOf(roadmap, b.id))
+                    : sortByRank(roadmap, groups[mod]);
                 const counts = { 'done': 0, 'in-progress': 0, 'planned': 0 };
                 mItems.forEach(i => { counts[i.status] = (counts[i.status] || 0) + 1; });
                 const pct = Math.round((counts.done / mItems.length) * 100);
                 const key = `${keyPrefix}|${mod}`;
+                annualRowItems.set(key, { mItems, keyPrefix, placeOf, reorder });
                 const open = annualOpen.has(key);
                 const label = `${mod}, ${pluralize(mItems.length, 'deliverable')}, ${counts.done} done, ${counts['in-progress']} in progress, ${counts.planned} planned`;
                 const dots = [['done', 'bg-emerald-500', 'done'], ['in-progress', 'bg-brand-500', 'in progress'], ['planned', 'bg-amber-400', 'planned']]
@@ -2097,15 +2198,7 @@
                             ${progressBar(counts.done, mItems.length, 'w-10 sm:w-14')}
                             <span class="w-8 text-right text-[10px] font-bold ${pct === 100 ? 'text-emerald-600' : 'text-slate-600'} shrink-0" aria-hidden="true">${pct}%</span>
                         </button>
-                        <ul class="annual-deliverables ${open ? '' : 'hidden'} pl-8 md:pl-9 pr-3 md:pr-4 pb-2 space-y-0.5">
-                            ${mItems.map(item => `
-                                <li onclick="openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-brand-50/50 cursor-pointer">
-                                    ${statusDot(item.status)}
-                                    <span class="text-xs text-slate-700 truncate min-w-0 flex-1">${escapeHtml(item.name)}</span>
-                                    <span class="text-[10px] text-slate-500 shrink-0">${escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD')}</span>
-                                </li>
-                            `).join('')}
-                        </ul>
+                        <ul class="annual-deliverables ${open ? '' : 'hidden'} pl-6 md:pl-7 pr-3 md:pr-4 pb-2 space-y-0.5" data-rank-list="${escapeHtml(key)}">${open ? annualDeliverablesHtml(key) : ''}</ul>
                     </li>
                 `;
             }).join('');
@@ -2119,7 +2212,9 @@
             const caret = btn.querySelector('.annual-caret');
             caret?.classList.toggle('ph-caret-right', !open);
             caret?.classList.toggle('ph-caret-down', open);
-            btn.nextElementSibling?.classList.toggle('hidden', !open);
+            const list = btn.nextElementSibling;
+            if (list && open && !list.children.length) list.innerHTML = annualDeliverablesHtml(key);
+            list?.classList.toggle('hidden', !open);
             updateAnnualToggle();
         };
 
@@ -2209,6 +2304,7 @@
                                         <span class="text-xs font-black text-slate-900 group-hover/card:text-brand-700 w-6">${qKey}</span>
                                         <span class="text-[10px] text-slate-500 font-medium whitespace-nowrap">${QUARTER_MONTHS[qKey]}</span>
                                         <span class="text-[11px] font-semibold text-slate-600 ml-auto whitespace-nowrap">${pluralize(qItems.length, 'deliverable')} · ${qDone} done</span>
+                                        ${quarterLoadHtml(getActiveRoadmap(), year, Number(qKey.slice(1)))}
                                         ${progressBar(qDone, qItems.length, 'w-8 sm:w-16')}
                                         <i class="ph-bold ph-arrow-right text-xs text-slate-500 group-hover/card:text-brand-600" aria-hidden="true"></i>
                                     </div>
@@ -2334,10 +2430,13 @@
                                     `;
                                 }
                                 const ym = `${group.year}-${String(mNum).padStart(2, '0')}`;
+                                const roadmap = getActiveRoadmap();
+                                const ranked = sortByRank(roadmap, mItems);
+                                const reorder = canEditActive();
                                 return `
                                     <div onclick="drillDown('month', '${ym}')" role="button" tabindex="0" aria-label="Open ${escapeHtml(monthName)} ${group.year} in the Monthly view" title="Open ${escapeHtml(monthName)} ${group.year} in the Monthly view" class="group/card h-64 bg-white border border-slate-200/90 hover:border-brand-300 hover:shadow-sm rounded-xl p-4 shadow-2xs flex flex-col justify-between cursor-pointer transition-all">
                                         <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 shrink-0">
-                                            <span class="text-xs font-black text-slate-800 group-hover/card:text-brand-700">${escapeHtml(monthName)}</span>
+                                            <span class="flex flex-col gap-0.5 min-w-0"><span class="text-xs font-black text-slate-800 group-hover/card:text-brand-700">${escapeHtml(monthName)}</span>${loadLineHtml(roadmap, ym, true)}</span>
                                             <span class="flex items-center gap-1.5">
                                                 <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${mItems.length > 0 && mItems.every(i => i.status === 'done') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}">
                                                     ${pluralize(mItems.length, 'item')}
@@ -2346,15 +2445,15 @@
                                             </span>
                                         </div>
 
-                                        <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
-                                            ${mItems.length > 0 
-                                                ? mItems.map(item => `
-                                                    <div onclick="event.stopPropagation(); openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" class="p-2.5 rounded-xl border border-slate-100 hover:border-brand-200 bg-slate-50/50 hover:bg-brand-50/30 cursor-pointer transition-all">
+                                        <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1" data-rank-list="${ym}">
+                                            ${mItems.length > 0
+                                                ? ranked.map((item, n) => `
+                                                    <div onclick="event.stopPropagation(); openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" data-rank-id="${escapeHtml(item.id)}" class="group/row p-2.5 rounded-xl border ${overTint(roadmap, item) || 'border-slate-100 hover:border-brand-200 bg-slate-50/50 hover:bg-brand-50/30'} cursor-pointer transition-all">
                                                         <div class="flex items-center justify-between gap-1">
-                                                            <span class="text-xs font-bold text-slate-800 line-clamp-1">${escapeHtml(item.name)}</span>
+                                                            <span class="flex items-center gap-1.5 min-w-0">${reorder ? reorderHtml(item) : ''}${rankChipHtml(roadmap, item, n + 1)}${overFlagHtml(roadmap, item, false)}<span class="text-xs font-bold text-slate-800 line-clamp-1">${escapeHtml(item.name)}</span></span>
                                                             ${statusDot(item.status)}
                                                         </div>
-                                                        <div class="text-[10px] text-brand-600 font-semibold mt-1 truncate">${escapeHtml(item.module)}</div>
+                                                        <div class="flex items-center gap-1.5 mt-1"><span class="text-[10px] text-brand-600 font-semibold truncate flex-1">${escapeHtml(item.module)}</span>${overInfo(roadmap, item) ? '<span class="over-tag text-[10px] font-bold px-1.5 rounded bg-rose-100 text-rose-700 whitespace-nowrap">Over capacity</span>' : ''}${effortHtml(item)}${reorder ? moveButtonsHtml(item) : ''}</div>
                                                     </div>
                                                 `).join('')
                                                 : `<div class="h-full flex items-center justify-center text-slate-500 text-[11px] italic">No items</div>`
@@ -2391,8 +2490,10 @@
             const sortedMonths = Object.keys(monthGroups).sort();
             const monthsToDisplay = activeSubfilter === 'ALL' ? sortedMonths : sortedMonths.filter(m => m === activeSubfilter);
 
+            const roadmap = getActiveRoadmap();
+            const reorder = canEditActive();
             monthsToDisplay.forEach(ym => {
-                const mItems = monthGroups[ym];
+                const mItems = sortByRank(roadmap, monthGroups[ym]);
                 const doneCount = mItems.filter(i => i.status === 'done').length;
                 const isAllDone = mItems.length > 0 && doneCount === mItems.length;
 
@@ -2414,17 +2515,18 @@
                     </div>
 
                     <div class="flex-1 w-full bg-white border border-slate-200 rounded-2xl p-5 shadow-xs md:ml-12">
+                        ${loadLineHtml(roadmap, ym) ? `<div class="flex justify-end mb-3">${loadLineHtml(roadmap, ym)}</div>` : ''}
                         <div class="max-h-72 overflow-y-auto custom-scrollbar pr-1">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                ${mItems.map(item => `
-                                    <div onclick="openItemDetails('${item.id}')" role="button" tabindex="0" class="p-4 rounded-xl border border-slate-200 hover:border-brand-300 hover:shadow-xs bg-slate-50/50 hover:bg-white cursor-pointer transition-all">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3" data-rank-list="${ym}">
+                                ${mItems.map((item, n) => `
+                                    <div onclick="openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" data-rank-id="${escapeHtml(item.id)}" class="group/row p-4 rounded-xl border ${overTint(roadmap, item) || 'border-slate-200 hover:border-brand-300 hover:shadow-xs bg-slate-50/50 hover:bg-white'} cursor-pointer transition-all">
                                         <div class="flex items-center justify-between gap-2 mb-1.5">
-                                            <span class="text-xs font-bold text-slate-900">${escapeHtml(item.name)}</span>
+                                            <span class="flex items-center gap-1.5 min-w-0 flex-wrap">${reorder ? reorderHtml(item) : ''}${rankChipHtml(roadmap, item, n + 1)}${overFlagHtml(roadmap, item)}<span class="text-xs font-bold text-slate-900">${escapeHtml(item.name)}</span></span>
                                             <span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${item.status === 'done' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : item.status === 'in-progress' ? 'bg-brand-50 text-brand-600 border border-brand-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">
                                                 ${escapeHtml(STATUS_LABELS[item.status] || item.status)}
                                             </span>
                                         </div>
-                                        <p class="text-xs text-brand-600 font-semibold mb-2">${escapeHtml(item.module)}</p>
+                                        <div class="flex items-center gap-2 mb-2"><p class="text-xs text-brand-600 font-semibold flex-1">${escapeHtml(item.module)}</p>${effortHtml(item)}${reorder ? moveButtonsHtml(item) : ''}</div>
                                         ${item.inclusions && item.inclusions.length ? `
                                             <div class="flex flex-wrap gap-1">
                                                 ${item.inclusions.map(inc => `<span class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded">${escapeHtml(inc)}</span>`).join('')}
@@ -2466,6 +2568,8 @@
 
         // Render Unscheduled Backlog Section (max-h-60 with internal overflow scroll)
         function renderUnscheduledSection(items) {
+            const roadmap = getActiveRoadmap();
+            items = sortByRank(roadmap, items);
             const section = document.createElement('div');
             section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
 
@@ -2485,8 +2589,8 @@
                     <div class="max-h-60 overflow-y-auto custom-scrollbar pr-1">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             ${items.map(item => `
-                                <div onclick="openItemDetails('${item.id}')" role="button" tabindex="0" class="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-brand-300 cursor-pointer transition-all">
-                                    <span class="text-xs font-bold text-slate-900 block">${escapeHtml(item.name)}</span>
+                                <div onclick="openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" class="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-brand-300 cursor-pointer transition-all">
+                                    <span class="text-xs font-bold text-slate-900 flex items-center gap-1.5">${rankChipHtml(roadmap, item)}${escapeHtml(item.name)}${effortHtml(item)}</span>
                                     <span class="text-[11px] text-brand-600 font-semibold">${escapeHtml(item.module)}</span>
                                 </div>
                             `).join('')}
@@ -2527,9 +2631,16 @@
             }
         };
 
+        let editorSort = 'rank';   // 'rank' | 'date' | 'effort'
+        window.setEditorSort = function(key) {
+            editorSort = key;
+            renderEditorTable(getActiveRoadmap()?.items || []);
+        };
+
         function renderEditorTable(items) {
             if (!editorTableBody) return;
             editorTableBody.innerHTML = '';
+            const roadmap = getActiveRoadmap();
 
             const searchVal = (editorSearchInput?.value || '').trim().toLowerCase();
             const modVal = editorModuleFilter?.value || 'ALL';
@@ -2538,7 +2649,7 @@
             let filtered = items;
 
             if (searchVal) {
-                filtered = filtered.filter(i => 
+                filtered = filtered.filter(i =>
                     (i.name || '').toLowerCase().includes(searchVal) ||
                     (i.module || '').toLowerCase().includes(searchVal) ||
                     (i.description || '').toLowerCase().includes(searchVal) ||
@@ -2550,9 +2661,26 @@
                 filtered = filtered.filter(i => i.module === modVal);
             }
 
-            if (statusVal !== 'ALL') {
+            if (statusVal === 'over') {
+                filtered = filtered.filter(i => !!overInfo(roadmap, i));
+            } else if (statusVal !== 'ALL') {
                 filtered = filtered.filter(i => i.status === statusVal);
             }
+
+            // Rank order by default (ranking FR-3); Target date / Effort on request
+            filtered = sortByRank(roadmap, filtered);
+            if (editorSort === 'date') filtered = filtered.slice().sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
+            if (editorSort === 'effort') filtered = filtered.slice().sort((a, b) => effortOf(b) - effortOf(a));
+            document.querySelectorAll('#editor-view th button[data-sort]').forEach(b => {
+                const on = b.dataset.sort === editorSort;
+                b.classList.toggle('text-brand-700', on);
+                b.textContent = b.textContent.replace(/ ▲$/, '') + (on ? ' ▲' : '');
+                b.closest('th')?.setAttribute('aria-sort', on ? 'ascending' : 'none');
+            });
+            const canReorder = canEditActive() && editorSort === 'rank';
+            document.getElementById('editor-sort-hint')?.classList.toggle('hidden', editorSort === 'rank' || !canEditActive());
+            editorTableBody.dataset.rankList = 'editor';
+            editorTableBody.setAttribute('data-rank-list', 'editor');
 
             if (editorFilterCountBadge) {
                 if (searchVal || modVal !== 'ALL' || statusVal !== 'ALL') {
@@ -2566,7 +2694,7 @@
             if (filtered.length === 0) {
                 editorTableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="text-center py-12 text-slate-500">
+                        <td colspan="9" class="text-center py-12 text-slate-500">
                             <i class="ph ph-sliders text-3xl mb-1 text-slate-300"></i>
                             <p class="font-medium text-xs">No deliverables match your search or filter.</p>
                             <button onclick="openAddMilestoneModal()" class="editor-only mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
@@ -2580,7 +2708,10 @@
 
             filtered.forEach(item => {
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 transition-colors cursor-pointer";
+                const tint = overTint(roadmap, item);
+                tr.className = `group/row ${tint || 'hover:bg-slate-50'} transition-colors cursor-pointer`;
+                tr.dataset.rankId = item.id;
+                tr.tabIndex = -1;
                 tr.onclick = () => selectMilestoneForEdit(item.id);
 
                 let statusBadge = 'bg-slate-100 text-slate-600';
@@ -2588,13 +2719,16 @@
                 else if (item.status === 'in-progress') statusBadge = 'bg-brand-50 text-brand-600 border border-brand-200';
                 else if (item.status === 'planned') statusBadge = 'bg-amber-50 text-amber-700 border border-amber-200';
 
-                const inclusionsHtml = (item.inclusions || []).length > 0 
+                const inclusionsHtml = (item.inclusions || []).length > 0
                     ? item.inclusions.map(inc => `<span class="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-[10px] text-slate-600">${escapeHtml(inc)}</span>`).join(' ')
                     : '<span class="text-slate-500 italic text-[11px]">None</span>';
+                const effort = effortOf(item);
 
                 tr.innerHTML = `
+                    <td class="pl-3 w-6">${canReorder ? reorderHtml(item) : ''}</td>
+                    <td class="py-3 px-2 whitespace-nowrap">${rankChipHtml(roadmap, item)}</td>
                     <td class="py-3 px-4 font-bold text-slate-900">
-                        <div class="text-xs font-bold text-slate-900">${escapeHtml(item.name)}</div>
+                        <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">${overFlagHtml(roadmap, item)}<span>${escapeHtml(item.name)}</span></div>
                         ${item.description ? `<p class="text-[11px] font-normal text-slate-500 mt-0.5 max-w-xs truncate">${escapeHtml(item.description)}</p>` : ''}
                     </td>
                     <td class="py-3 px-4 text-brand-600 font-semibold whitespace-nowrap">
@@ -2603,20 +2737,24 @@
                     <td class="py-3 px-4 text-slate-600 whitespace-nowrap">
                         <span class="text-xs font-medium">${escapeHtml(formatMonthYear(item.date))}</span>
                     </td>
+                    <td class="effort-cell py-3 px-4 whitespace-nowrap text-xs ${effort ? 'text-slate-700' : 'text-slate-400'}" ${canEditActive() ? `onclick="event.stopPropagation(); editEffortInline('${escapeHtml(item.id)}', this)" tabindex="0" role="button" aria-label="Effort for ${escapeHtml(item.name)}: ${effort ? fmtDays(effort) : 'not estimated'}. Click to change."` : ''} title="${effort ? '' : 'Not estimated'}">${effort ? fmtDays(effort) : '—'}</td>
                     <td class="py-3 px-4 whitespace-nowrap">
                         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${statusBadge}">
                             ${escapeHtml(STATUS_LABELS[item.status] || item.status)}
                         </span>
                     </td>
-                    <td class="hidden md:table-cell py-3 px-4">
+                    <td class="hidden lg:table-cell py-3 px-4">
                         <div class="flex flex-wrap gap-1 max-w-xs">
                             ${inclusionsHtml}
                         </div>
                     </td>
                     <td class="py-3 px-4 text-right whitespace-nowrap">
+                        <span class="inline-flex items-center justify-end gap-0.5">
+                        ${canReorder ? moveButtonsHtml(item) : ''}
                         <button onclick="event.stopPropagation(); selectMilestoneForEdit('${escapeHtml(item.id)}')" class="editor-only p-1.5 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all" title="Edit Milestone" aria-label="Edit Milestone">
                             <i class="ph ph-pencil-simple text-base"></i>
                         </button>
+                        </span>
                     </td>
                 `;
                 editorTableBody.appendChild(tr);
@@ -3004,8 +3142,18 @@
             document.getElementById('modal-module-name').textContent = item.module;
             document.getElementById('modal-target-date').textContent = formatMonthYear(item.date);
 
+            const rankEffort = document.getElementById('modal-rank-effort');
+            if (rankEffort) rankEffort.innerHTML = `${rankChipHtml(activeRoadmap, item)}${effortOf(item) ? `<span>Effort ${fmtDays(effortOf(item))}</span>` : ''}`;
+            const overNote = document.getElementById('modal-over-note');
+            if (overNote) {
+                const m = item.date ? monthLoads(activeRoadmap).get(item.date) : null;
+                const over = overInfo(activeRoadmap, item);
+                overNote.innerHTML = over ? `<i class="ph-bold ph-warning" aria-hidden="true"></i> <b>Over capacity for ${escapeHtml(formatMonthYear(item.date))}</b>: doesn't fit after higher-ranked work (${Math.round(m.over.get(item.id) * 10) / 10} of ${m.cap} pd already used). Move it to another month or rank it higher.` : '';
+                overNote.classList.toggle('hidden', !over);
+            }
+
             const badge = document.getElementById('modal-status-badge');
-            badge.textContent = item.status.toUpperCase();
+            badge.textContent = STATUS_LABELS[item.status] || item.status;
             if (item.status === 'done') {
                 badge.className = 'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200';
             } else if (item.status === 'in-progress') {
@@ -3095,7 +3243,7 @@
         };
 
         // Audit entry -> lines of text for the activity list (first line is the headline)
-        const FIELD_LABELS = { name: 'Name', module: 'Module', date: 'Target date', status: 'Status', inclusions: 'Scope', description: 'Description', feedbackIds: 'Linked feedback', title: 'Title', category: 'Category', source: 'Source' };
+        const FIELD_LABELS = { name: 'Name', module: 'Module', date: 'Target date', status: 'Status', inclusions: 'Scope', description: 'Description', feedbackIds: 'Linked feedback', title: 'Title', category: 'Category', source: 'Source', rank: 'Rank', effortDays: 'Effort', defaultDays: 'Default capacity' };
         function describeAudit(entry) {
             const changes = entry.changes || [];
             const line = c => {
@@ -3109,6 +3257,8 @@
                 if (c.f === 'category') return `Category changed from ${c.from || '—'} to ${c.to}`;
                 if (c.f === 'source') return c.to ? `Source changed to "${c.to}"` : 'Source removed';
                 if (c.f === 'feedback') return String(c.to).startsWith('+') ? `Linked feedback "${String(c.to).slice(1)}"` : `Unlinked feedback "${String(c.to).slice(1)}"`;
+                if (c.f === 'rank') return `Rank changed from #${c.from} to #${c.to}`;
+                if (c.f === 'effortDays') return `Effort changed from ${c.from === '—' ? 'not estimated' : c.from + ' pd'} to ${c.to === '—' ? 'not estimated' : c.to + ' pd'}`;
                 return `${FIELD_LABELS[c.f] || c.f} changed`;
             };
             switch (entry.action) {
@@ -3210,7 +3360,7 @@
         // ---- Edit window: what the user changed vs. what others changed meanwhile ----
         const EDIT_FIELDS = {
             name: 'detail-item-name', module: 'detail-item-module', date: 'detail-item-date', status: 'detail-item-status',
-            inclusions: 'detail-item-inclusions', description: 'detail-item-description', feedbackIds: null
+            inclusions: 'detail-item-inclusions', description: 'detail-item-description', feedbackIds: null, effortDays: 'detail-item-effort'
         };
         let editBaseline = {};   // field -> value the form started from (updated when someone else saves)
 
@@ -3219,6 +3369,7 @@
             if (field === 'feedbackIds') return [...(item.feedbackIds || [])].sort().join('|');
             if (field === 'status') return item.status || 'planned';
             if (field === 'date') return String(item.date || '');
+            if (field === 'effortDays') return effortOf(item) ? String(effortOf(item)) : '';
             return String(item[field] ?? '').trim();
         }
 
@@ -3228,6 +3379,7 @@
             if (field === 'inclusions') return value.split(',').map(s => s.trim()).filter(Boolean).join(', ');
             if (field === 'date' || field === 'status') return value;
             if (field === 'module') return canonicalModule(value, selectedMilestoneId);
+            if (field === 'effortDays') return value.trim() === '' ? '' : (validEffort(value.trim()) ? String(Number(value)) : value.trim());
             return value.trim();
         }
 
@@ -3306,6 +3458,11 @@
             document.querySelectorAll('#edit-detail-form .ring-amber-300').forEach(el => { el.classList.remove('ring-2', 'ring-amber-300'); el.title = ''; });
             document.getElementById('edit-remote-notice')?.classList.add('hidden');
             setEditReadOnly(!canEditActive());
+            const moveTo = document.getElementById('detail-item-moveto');
+            if (moveTo) { moveTo.value = ''; moveTo.max = String((activeRoadmap.items || []).length); }
+            const rankLabel = document.getElementById('detail-rank-label');
+            if (rankLabel) rankLabel.textContent = rankOf(activeRoadmap, item.id) ? `#${rankOf(activeRoadmap, item.id)} of ${(activeRoadmap.items || []).length}` : '';
+            updateLoadNote('detail');
 
             stopEditListeners();
             if (useCloudPersistence && !activeRoadmap.isPreview) {
@@ -3369,11 +3526,35 @@
                     } else if (field === 'description') {
                         updates.description = now;
                         changes.push({ f: field, to: clip(now) });
+                    } else if (field === 'effortDays') {
+                        updates.effortDays = now === '' ? null : Number(now);
+                        changes.push({ f: field, from: before || '—', to: now || '—' });
                     } else {
                         updates[field] = now;
                         changes.push({ f: field, from: clip(before), to: clip(now) });
                     }
                 });
+
+                const effortInput = document.getElementById('detail-item-effort');
+                if (effortInput && effortInput.value.trim() !== '' && !validEffort(effortInput.value.trim())) {
+                    effortInput.classList.add('border-rose-400', 'ring-2', 'ring-rose-200');
+                    effortInput.focus();
+                    return;
+                }
+                // Rank: "Move to #", else a new month puts it last in that month (ranking FR-4c)
+                const moveToValue = parseInt(document.getElementById('detail-item-moveto')?.value, 10);
+                if (moveToValue >= 1 || updates.date !== undefined) {
+                    if ((activeRoadmap.items || []).every(hasKey) || await ensureRanked(activeRoadmap)) {
+                        const from = rankOf(activeRoadmap, item.id);
+                        const probe = { ...item, date: updates.date ?? item.date };
+                        const index = moveToValue >= 1 ? moveToValue - 1 : monthEndIndex(activeRoadmap, probe, probe.date);
+                        const target = await keyForIndex(activeRoadmap, item, index);
+                        if (target && target.to !== from) {
+                            updates.rankKey = target.key;
+                            changes.push({ f: 'rank', from, to: target.to });
+                        }
+                    }
+                }
 
                 closeEditMilestoneModal();
                 await updateMilestone(activeRoadmap, item, updates, changes);
@@ -3403,6 +3584,7 @@
             const form = document.getElementById('modal-add-item-form');
             if (form) form.reset();
             populateFeedbackCheckboxes('add-milestone-feedback-list', []);
+            updateLoadNote('modal');
             if (addMilestoneModal) addMilestoneModal.classList.remove('hidden');
         };
 
@@ -3426,6 +3608,14 @@
                     description: document.getElementById('modal-item-description')?.value.trim() || '',
                     feedbackIds: getCheckedFeedbackIds('add-milestone-feedback-list')
                 };
+                const effortRaw = document.getElementById('modal-item-effort')?.value.trim() || '';
+                if (effortRaw !== '' && !validEffort(effortRaw)) {
+                    const el = document.getElementById('modal-item-effort');
+                    el.classList.add('border-rose-400', 'ring-2', 'ring-rose-200');
+                    el.focus();
+                    return;
+                }
+                if (effortRaw !== '') fields.effortDays = Number(effortRaw);
 
                 closeAddMilestoneModal();
                 await addMilestone(activeRoadmap, fields);
@@ -3788,13 +3978,13 @@
             const activeRoadmap = getActiveRoadmap();
             if (!activeRoadmap) return;
 
-            const items = activeRoadmap.items || [];
+            const items = rankedItems(activeRoadmap);
             const feedbackMap = {};
             (activeRoadmap.feedback || []).forEach(f => {
                 feedbackMap[f.id] = f.title;
             });
 
-            const headers = ['"Deliverable Name"', '"Module"', '"Target Date"', '"Quarter"', '"Status"', '"Scope Inclusions"', '"Description"', '"Linked Feedback"', '"Last Changed By"', '"Last Changed At"'];
+            const headers = ['"Rank"', '"Deliverable Name"', '"Module"', '"Target Date"', '"Quarter"', '"Status"', '"Effort (person-days)"', '"Scope Inclusions"', '"Description"', '"Linked Feedback"', '"Last Changed By"', '"Last Changed At"'];
             
             const rows = items.map(item => {
                 let quarter = 'Unscheduled';
@@ -3809,11 +3999,13 @@
                 const escape = csvCell;
 
                 return [
+                    escape(rankOf(activeRoadmap, item.id)),
                     escape(item.name),
                     escape(item.module),
                     escape(item.date),
                     escape(quarter),
                     escape(item.status),
+                    escape(effortOf(item) || ''),
                     escape(inclusions),
                     escape(item.description),
                     escape(linkedFb),
@@ -3831,7 +4023,7 @@
             const activeRoadmap = getActiveRoadmap();
             if (!activeRoadmap) return;
 
-            const milestones = (activeRoadmap.items || []).map(m => ({ ...m }));
+            const milestones = rankedItems(activeRoadmap).map(m => ({ ...m, rank: rankOf(activeRoadmap, m.id), effortDays: effortOf(m) || null }));
             if (useCloudPersistence && !activeRoadmap.isPreview) {
                 for (const m of milestones) {
                     try {
@@ -3848,6 +4040,7 @@
             const payload = {
                 roadmapTitle: activeRoadmap.title,
                 exportedAt: new Date().toISOString(),
+                capacity: activeRoadmap.capacity || null,
                 milestones: plainData(milestones)
             };
 
@@ -4129,7 +4322,8 @@
         function logDemo(entry) { demoAuditLog.push({ ...entry, id: newId('a') }); }
         function stamp(auditId) { return { updatedBy: actor(), updatedAt: serverTimestamp(), lastAuditId: auditId }; }
         function milestoneFields(m) {
-            return { name: m.name || '', module: m.module || '', date: m.date || '', status: m.status || 'planned', inclusions: m.inclusions || [], description: m.description || '', feedbackIds: m.feedbackIds || [] };
+            return { name: m.name || '', module: m.module || '', date: m.date || '', status: m.status || 'planned', inclusions: m.inclusions || [], description: m.description || '', feedbackIds: m.feedbackIds || [],
+                ...(typeof m.rankKey === 'number' ? { rankKey: m.rankKey } : {}), ...(effortOf(m) ? { effortDays: effortOf(m) } : {}) };
         }
         function feedbackFields(f) {
             return { title: f.title || '', category: f.category || '', source: f.source || '', description: f.description || '' };
@@ -4230,6 +4424,11 @@
         // ---- Milestones ----
         async function addMilestone(roadmap, fields) {
             const id = newId('m');
+            const keys = (roadmap.items || []).filter(hasKey).map(i => i.rankKey);
+            const unranked = (roadmap.items || []).some(i => !hasKey(i));
+            // Bottom of the ranking (FR-2): after the last key; with unranked items left, those already sort last
+            if (keys.length && !unranked) fields = { ...fields, rankKey: Math.max(...keys) + RANK_STEP };
+            else if (!(roadmap.items || []).length) fields = { ...fields, rankKey: RANK_STEP };
             const entry = auditEntry(roadmap, 'milestone.created', { type: 'milestone', id, label: fields.name },
                 ['name', 'module', 'date', 'status'].map(f => ({ f, to: clip(fields[f]) })));
             if (!useCloudPersistence) {
@@ -4830,6 +5029,584 @@
         }
 
         // =======================================================
+        // RANKING AND MONTHLY CAPACITY (2.3.0, specs/ranking-and-capacity.md)
+        // =======================================================
+        const RANK_STEP = 1000;
+        const SHOW_LOAD_KEY = 'mapit.showLoad';
+        let showLoad = (() => { try { return localStorage.getItem(SHOW_LOAD_KEY) !== 'off'; } catch (e) { return true; } })();
+        const rankInitInFlight = new Set();
+        const rankInitDone = new Set();      // roadmaps whose starting order this session already saved
+
+        const hasKey = i => typeof i.rankKey === 'number' && isFinite(i.rankKey);
+        // The overall order: ranked items by key; items from before 2.3.0 after them, by month then name (TBD last)
+        function rankedItems(roadmap) {
+            return (roadmap?.items || []).slice().sort((a, b) => {
+                const ka = hasKey(a), kb = hasKey(b);
+                if (ka && kb) return a.rankKey - b.rankKey || String(a.name).localeCompare(String(b.name));
+                if (ka !== kb) return ka ? -1 : 1;
+                return (a.date || '9999').localeCompare(b.date || '9999') || String(a.name).localeCompare(String(b.name));
+            });
+        }
+        // Within one synchronous redraw the order and loads can't change: reuse them (cleared on the next microtask)
+        let tickCache = null;
+        function tick() {
+            if (!tickCache) { tickCache = new Map(); queueMicrotask(() => { tickCache = null; }); }
+            return tickCache;
+        }
+        const rankCache = new WeakMap();
+        function rankMap(roadmap) {
+            if (!roadmap) return new Map();
+            const t = tick();
+            if (t.has(roadmap)) return t.get(roadmap);
+            const map = rankMapUncached(roadmap);
+            t.set(roadmap, map);
+            return map;
+        }
+        function rankMapUncached(roadmap) {
+            const sig = (roadmap.items || []).map(i => `${i.id}:${i.rankKey ?? ''}:${i.date || ''}:${i.name}`).join('|');
+            const cached = rankCache.get(roadmap);
+            if (cached && cached.sig === sig) return cached.map;
+            const map = new Map(rankedItems(roadmap).map((i, n) => [i.id, n + 1]));
+            rankCache.set(roadmap, { sig, map });
+            return map;
+        }
+        function rankOf(roadmap, id) { return rankMap(roadmap).get(id) || 0; }
+        function sortByRank(roadmap, list) {
+            const m = rankMap(roadmap);
+            return list.slice().sort((a, b) => (m.get(a.id) || 1e9) - (m.get(b.id) || 1e9));
+        }
+        function ordinal(n) {
+            const s = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+            return `${n}${s}`;
+        }
+
+        // ---- Effort, capacity and load ----
+        function effortOf(item) { const n = Number(item?.effortDays); return isFinite(n) && n > 0 ? n : 0; }
+        function fmtDays(n) { return `${Math.round(n * 10) / 10} pd`; }
+        function capacityOf(roadmap, ym) {
+            const c = roadmap?.capacity || {};
+            const o = c.months?.[ym];
+            if (typeof o === 'number' && o >= 0) return o;
+            return typeof c.defaultDays === 'number' && c.defaultDays > 0 ? c.defaultDays : null;
+        }
+        const hasLoadTick = new WeakMap();
+        function hasLoadData(roadmap) {
+            if (!roadmap) return false;
+            const t = tick();
+            const k = hasLoadTick.get(roadmap);
+            if (k && t.has(k)) return t.get(k);
+            const key = {};
+            hasLoadTick.set(roadmap, key);
+            const v = hasLoadDataUncached(roadmap);
+            t.set(key, v);
+            return v;
+        }
+        function hasLoadDataUncached(roadmap) {
+            const c = roadmap?.capacity || {};
+            return (typeof c.defaultDays === 'number' && c.defaultDays > 0) || Object.keys(c.months || {}).length > 0 || (roadmap?.items || []).some(i => effortOf(i) > 0);
+        }
+        function loadVisible(roadmap) { return showLoad && hasLoadData(roadmap); }
+        function loadLevel(load, cap) {
+            if (cap == null) return 'none';
+            if (cap === 0) return load > 0 ? 'over' : 'ok';
+            const p = load / cap;
+            return p > 1 ? 'over' : p > 0.8 ? 'near' : 'ok';
+        }
+        // Per month: load, capacity, level, items in rank order, and the deliverables that don't fit (FR-15)
+        const loadCache = new WeakMap();
+        const loadTick = new WeakMap();
+        function monthLoads(roadmap) {
+            if (!roadmap) return new Map();
+            const t = tick();
+            const key = loadTick.get(roadmap);
+            if (key && t.has(key)) return t.get(key);
+            const result = monthLoadsUncached(roadmap);
+            const k = {};
+            loadTick.set(roadmap, k);
+            t.set(k, result);
+            return result;
+        }
+        function monthLoadsUncached(roadmap) {
+            const sig = JSON.stringify(roadmap.capacity || null) + '|' + (roadmap.items || []).map(i => `${i.id}:${i.rankKey ?? ''}:${i.date || ''}:${i.effortDays ?? ''}:${i.status}:${i.name}`).join('|');
+            const cached = loadCache.get(roadmap);
+            if (cached && cached.sig === sig) return cached.map;
+            const byMonth = new Map();
+            rankedItems(roadmap).forEach(i => { if (i.date) { if (!byMonth.has(i.date)) byMonth.set(i.date, []); byMonth.get(i.date).push(i); } });
+            const map = new Map();
+            byMonth.forEach((items, ym) => {
+                const load = items.reduce((s, i) => s + effortOf(i), 0);
+                const cap = capacityOf(roadmap, ym);
+                const over = new Map();   // id -> load already used before it
+                if (cap != null && load > cap) {
+                    let used = items.filter(i => i.status === 'done').reduce((s, i) => s + effortOf(i), 0);
+                    items.filter(i => i.status !== 'done').forEach(i => {
+                        const e = effortOf(i);
+                        if (!e) return;
+                        if (used + e > cap) over.set(i.id, used);
+                        used += e;
+                    });
+                }
+                map.set(ym, { ym, load, cap, level: loadLevel(load, cap), items, notEstimated: items.filter(i => !effortOf(i)).length, over });
+            });
+            loadCache.set(roadmap, { sig, map });
+            return map;
+        }
+        function overInfo(roadmap, item) {
+            if (!item?.date || !loadVisible(roadmap)) return null;
+            const m = monthLoads(roadmap).get(item.date);
+            if (!m || !m.over.has(item.id)) return null;
+            return `Over capacity: doesn't fit ${formatMonthYear(item.date)}. ${Math.round(m.over.get(item.id) * 10) / 10} of ${m.cap} pd already used by higher-ranked work.`;
+        }
+
+        // ---- Small HTML pieces ----
+        function rankChipHtml(roadmap, item, place) {
+            const n = rankOf(roadmap, item.id);
+            if (!n) return '';
+            const total = (roadmap.items || []).length;
+            return `${place ? `<span class="rank-place text-[10px] text-slate-500 shrink-0" aria-hidden="true">${ordinal(place)}</span>` : ''}<span class="rank-chip text-[10px] font-bold tabular-nums px-1.5 rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0" title="Rank ${n} of ${total}">#${n}</span>`;
+        }
+        function overFlagHtml(roadmap, item, withTag = true) {
+            const info = overInfo(roadmap, item);
+            if (!info) return '';
+            return `<i class="over-icon ph-bold ph-warning text-rose-600 shrink-0" title="${escapeHtml(info)}" aria-hidden="true"></i>${withTag ? '<span class="over-tag text-[10px] font-bold px-1.5 rounded bg-rose-100 text-rose-700 whitespace-nowrap shrink-0">Over capacity</span>' : ''}<span class="sr-only">${escapeHtml(info)}</span>`;
+        }
+        function overTint(roadmap, item) { return overInfo(roadmap, item) ? 'over-capacity !bg-rose-50/60 !border-rose-200' : ''; }
+        function effortHtml(item) { return effortOf(item) ? `<span class="text-[10px] text-slate-500 whitespace-nowrap shrink-0">${fmtDays(effortOf(item))}</span>` : ''; }
+        // Drag handle and ↑ / ↓ for reordering inside a period (Editors)
+        function reorderHtml(item) {
+            if (!canEditActive()) return '';
+            return `<span class="rank-handle cursor-grab text-slate-400 hover:text-slate-600 shrink-0 select-none" draggable="true" data-drag-handle title="Drag to reorder" aria-hidden="true" onclick="event.stopPropagation()">⋮⋮</span>`;
+        }
+        function moveButtonsHtml(item) {
+            if (!canEditActive()) return '';
+            const id = escapeHtml(item.id);
+            return `<span class="rank-moves flex items-center shrink-0 sm:opacity-0 sm:group-hover/row:opacity-100 sm:focus-within:opacity-100">
+                <button type="button" onclick="event.stopPropagation(); moveInList(this, 'up')" aria-label="Move up" title="Move up" class="px-1 text-slate-500 hover:text-brand-700">↑</button>
+                <button type="button" onclick="event.stopPropagation(); moveInList(this, 'down')" aria-label="Move down" title="Move down" class="px-1 text-slate-500 hover:text-brand-700">↓</button>
+            </span>`;
+        }
+        function loadLineHtml(roadmap, ym, compact = false) {
+            if (!loadVisible(roadmap)) return '';
+            const m = monthLoads(roadmap).get(ym);
+            if (!m) return '';
+            if (m.cap == null) return m.load ? `<span class="load-line text-[11px] font-semibold text-slate-600 whitespace-nowrap">${compact ? '' : 'Load '}${fmtDays(m.load)}</span>` : '';
+            const pct = m.cap ? Math.round(m.load / m.cap * 100) : (m.load ? 999 : 0);
+            const [bar, text, word] = {
+                ok: ['bg-brand-600', 'text-slate-600', 'OK'],
+                near: ['bg-amber-500', 'text-amber-700', 'Near full'],
+                over: ['bg-rose-500', 'text-rose-700', `Over by ${fmtDays(m.load - m.cap)}`]
+            }[m.level];
+            return `<span class="load-line load-${m.level} flex items-center gap-1.5 text-[11px] font-semibold ${text} whitespace-nowrap" title="${escapeHtml(`${formatMonthYear(ym)}: ${Math.round(m.load * 10) / 10} of ${m.cap} pd (${pct}%) · ${word}`)}">
+                ${compact ? '' : 'Load '}${Math.round(m.load * 10) / 10} / ${m.cap} pd
+                <span class="${compact ? 'w-10' : 'w-20'} h-1.5 bg-slate-100 rounded-full overflow-hidden" aria-hidden="true"><span class="block h-full ${bar}" style="width:${Math.min(pct, 100)}%"></span></span>
+                ${compact ? '' : `${pct}% · ${escapeHtml(word)}`}
+            </span>`;
+        }
+        // Quarter header: summed load / capacity of its 3 months, ⚠ when any of them is over
+        function quarterLoadHtml(roadmap, year, qNum) {
+            if (!loadVisible(roadmap)) return '';
+            const loads = monthLoads(roadmap);
+            let load = 0, cap = 0, anyCap = false;
+            const over = [];
+            for (let m = (qNum - 1) * 3 + 1; m <= qNum * 3; m++) {
+                const ym = `${year}-${String(m).padStart(2, '0')}`;
+                const info = loads.get(ym);
+                const c = capacityOf(roadmap, ym);
+                if (c != null) { cap += c; anyCap = true; }
+                if (info) { load += info.load; if (info.level === 'over') over.push(`${formatMonthYear(ym)} over by ${fmtDays(info.load - info.cap)}`); }
+            }
+            if (!load && !anyCap) return '';
+            const tone = over.length ? 'text-rose-700' : anyCap && load > cap * 0.8 ? 'text-amber-700' : 'text-slate-600';
+            return `<span class="quarter-load text-[11px] font-semibold ${tone} whitespace-nowrap" ${over.length ? `title="${escapeHtml(over.join('; '))}"` : ''}>· ${anyCap ? `${Math.round(load * 10) / 10}/${cap}` : Math.round(load * 10) / 10} pd${over.length ? ' <i class="ph-bold ph-warning text-rose-600" aria-hidden="true"></i><span class="sr-only">' + escapeHtml(over.join('; ')) + '</span>' : ''}</span>`;
+        }
+
+        // ---- Saving the order ----
+        function announceRank(text) {
+            const el = document.getElementById('rank-announcer');
+            if (el) { el.textContent = ''; setTimeout(() => { el.textContent = text; }, 30); }
+        }
+        // Give every deliverable a key in the current order (first use, or when keys got too close). Batches of 6.
+        async function ensureRanked(roadmap, respace = false) {
+            if (!roadmap || !canEditActive()) return false;
+            const order = rankedItems(roadmap);
+            if (!respace && order.every(hasKey)) return true;
+            if (rankInitInFlight.has(roadmap.id)) return false;
+            rankInitInFlight.add(roadmap.id);
+            try {
+                const keyed = order.map((item, n) => ({ item, key: (n + 1) * RANK_STEP }));
+                if (!useCloudPersistence) {
+                    keyed.forEach(({ item, key }) => { item.rankKey = key; });
+                    tickCache = null;
+                    logDemo(auditEntry(roadmap, 'roadmap.ranking_initialized', { type: 'roadmap', id: roadmap.id, label: roadmap.title }, [{ f: 'items', to: keyed.length }, ...(respace ? [{ f: 'reason', to: 're-spaced' }] : [])]));
+                    return true;
+                }
+                for (let i = 0; i < keyed.length; i += 6) {
+                    const part = keyed.slice(i, i + 6);
+                    const aid = newId('a');
+                    const ok = await commitBatch(batch => {
+                        part.forEach(({ item, key }) => batch.update(itemRef(roadmap.id, 'milestones', item.id), { rankKey: key, ...stamp(aid) }));
+                        batch.set(auditRef(aid), auditEntry(roadmap, 'roadmap.ranking_initialized', { type: 'roadmap', id: roadmap.id, label: roadmap.title },
+                            [{ f: 'items', to: part.length }, ...(respace ? [{ f: 'reason', to: 're-spaced' }] : [])]));
+                    }, 'save the ranking');
+                    if (!ok) return false;
+                    part.forEach(({ item, key }) => { item.rankKey = key; });
+                }
+                return true;
+            } finally {
+                rankInitInFlight.delete(roadmap.id);
+            }
+        }
+        function keyBetween(prev, next) {
+            const a = prev && hasKey(prev) ? prev.rankKey : null;
+            const b = next && hasKey(next) ? next.rankKey : null;
+            if (a == null && b == null) return RANK_STEP;
+            if (a == null) return b - RANK_STEP;
+            if (b == null) return a + RANK_STEP;
+            const mid = (a + b) / 2;
+            return (b - a) > 1e-6 && mid > a && mid < b ? mid : null;
+        }
+        // The key and new #number for putting `item` at position `index` of the order without it
+        async function keyForIndex(roadmap, item, index) {
+            for (let attempt = 0; attempt < 2; attempt++) {
+                const order = rankedItems(roadmap).filter(i => i.id !== item.id);
+                const idx = Math.max(0, Math.min(index, order.length));
+                const key = keyBetween(order[idx - 1], order[idx]);
+                if (key != null) return { key, to: idx + 1 };
+                if (!(await ensureRanked(roadmap, true))) return null;
+            }
+            return null;
+        }
+        async function moveToIndex(roadmap, item, index) {
+            if (!roadmap || !item || !canEditActive()) return false;
+            if (!(await ensureRanked(roadmap))) return false;
+            const from = rankOf(roadmap, item.id);
+            const target = await keyForIndex(roadmap, item, index);
+            if (!target || target.to === from) return true;
+            const ok = await updateMilestone(roadmap, item, { rankKey: target.key }, [{ f: 'rank', from, to: target.to }]);
+            if (ok) {
+                item.rankKey = target.key;
+                tickCache = null;
+                announceRank(`${item.name} moved to #${target.to}`);
+                scheduleRender();
+            }
+            return ok;
+        }
+        // Put `id` just before / after `targetId` in the overall order
+        async function moveRelative(id, targetId, where) {
+            const roadmap = getActiveRoadmap();
+            const item = roadmap?.items.find(i => i.id === id);
+            if (!item || id === targetId) return false;
+            const order = rankedItems(roadmap).filter(i => i.id !== id);
+            let idx = order.findIndex(i => i.id === targetId);
+            if (idx < 0) return false;
+            if (where === 'after') idx++;
+            return moveToIndex(roadmap, item, idx);
+        }
+        // ↑ / ↓ inside the list the button sits in (a month, a module row in a quarter, the Editor table)
+        window.moveInList = function(btn, dir) {
+            const row = btn.closest('[data-rank-id]');
+            const list = row?.closest('[data-rank-list]');
+            if (!row || !list) return;
+            const ids = [...list.querySelectorAll('[data-rank-id]')].filter(r => r.closest('[data-rank-list]') === list).map(r => r.dataset.rankId);
+            const i = ids.indexOf(row.dataset.rankId);
+            const neighbour = ids[dir === 'up' ? i - 1 : i + 1];
+            if (!neighbour) return;
+            moveRelative(row.dataset.rankId, neighbour, dir === 'up' ? 'before' : 'after');
+        };
+        window.moveToRank = function(id, n) {
+            const roadmap = getActiveRoadmap();
+            const item = roadmap?.items.find(i => i.id === id);
+            if (item && n >= 1) return moveToIndex(roadmap, item, n - 1);
+        };
+        // Insertion index for a deliverable whose month changes: last in its new month (FR-4c)
+        function monthEndIndex(roadmap, item, newDate) {
+            const order = rankedItems(roadmap).filter(i => i.id !== item.id);
+            let anchor = -1;
+            if (newDate) {
+                order.forEach((i, n) => { if (i.date === newDate) anchor = n; });
+                if (anchor < 0) {
+                    const earlier = order.map(i => i.date).filter(d => d && d < newDate).sort().pop();
+                    if (earlier) order.forEach((i, n) => { if (i.date === earlier) anchor = n; });
+                }
+            } else {
+                order.forEach((i, n) => { if (!i.date) anchor = n; });
+                if (anchor < 0) anchor = order.length - 1;
+            }
+            return anchor + 1;
+        }
+
+        // ---- Drag and drop inside one list ----
+        let dragRankId = null, dragList = null;
+        function clearDropMarks() { document.querySelectorAll('.rank-drop-before, .rank-drop-after').forEach(el => el.classList.remove('rank-drop-before', 'rank-drop-after')); }
+        document.addEventListener('dragstart', e => {
+            const handle = e.target.closest?.('[data-drag-handle]');
+            const row = handle?.closest('[data-rank-id]');
+            if (!row) return;
+            try { e.dataTransfer.setDragImage(row, 16, 16); } catch (err) { /* not supported */ }
+            dragRankId = row.dataset.rankId;
+            dragList = row.closest('[data-rank-list]');
+            e.dataTransfer.effectAllowed = 'move';
+            try { e.dataTransfer.setData('text/plain', dragRankId); } catch (err) { /* old browsers */ }
+            row.classList.add('opacity-60');
+        });
+        document.addEventListener('dragover', e => {
+            if (!dragRankId) return;
+            const row = e.target.closest?.('[data-rank-id]');
+            if (!row || row.closest('[data-rank-list]') !== dragList || row.dataset.rankId === dragRankId) return;
+            e.preventDefault();
+            clearDropMarks();
+            const r = row.getBoundingClientRect();
+            row.classList.add(e.clientY < r.top + r.height / 2 ? 'rank-drop-before' : 'rank-drop-after');
+        });
+        document.addEventListener('drop', e => {
+            if (!dragRankId) return;
+            const row = e.target.closest?.('[data-rank-id]');
+            const id = dragRankId;
+            const where = row?.classList.contains('rank-drop-before') ? 'before' : 'after';
+            clearDropMarks();
+            dragRankId = null;
+            if (!row || row.closest('[data-rank-list]') !== dragList || row.dataset.rankId === id) return;
+            e.preventDefault();
+            moveRelative(id, row.dataset.rankId, where);
+        });
+        document.addEventListener('dragend', e => {
+            document.querySelectorAll('[data-rank-id].opacity-60').forEach(el => el.classList.remove('opacity-60'));
+            clearDropMarks();
+            dragRankId = null;
+            dragList = null;
+        });
+        // Alt + ↑ / ↓ on a focused row
+        document.addEventListener('keydown', e => {
+            if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+            const row = e.target.closest?.('[data-rank-id]');
+            const btn = row?.querySelector(`.rank-moves button[aria-label="${e.key === 'ArrowUp' ? 'Move up' : 'Move down'}"]`);
+            if (!btn) return;
+            e.preventDefault();
+            btn.click();
+        });
+
+        // ---- "Show load" switch ----
+        window.toggleShowLoad = function() {
+            showLoad = !showLoad;
+            try { localStorage.setItem(SHOW_LOAD_KEY, showLoad ? 'on' : 'off'); } catch (e) { /* private mode */ }
+            updateUI();
+        };
+        function updateShowLoadToggle() {
+            const t = document.getElementById('show-load-toggle');
+            if (!t) return;
+            const active = getActiveRoadmap();
+            const show = !!active && hasLoadData(active) && activePerspective !== 'module';
+            t.classList.toggle('hidden', !show);
+            t.classList.toggle('flex', show);
+            t.setAttribute('aria-checked', String(showLoad));
+            const knob = t.querySelector('.knob');
+            const track = t.querySelector('.track');
+            track?.classList.toggle('bg-brand-600', showLoad);
+            track?.classList.toggle('bg-slate-300', !showLoad);
+            knob?.classList.toggle('translate-x-3', showLoad);
+        }
+
+        // ---- Effort typed in the Editor table ----
+        window.editEffortInline = function(id, cell) {
+            const roadmap = getActiveRoadmap();
+            const item = roadmap?.items.find(i => i.id === id);
+            if (!item || !canEditActive() || cell.querySelector('input')) return;
+            const before = effortOf(item) ? String(effortOf(item)) : '';
+            cell.innerHTML = `<input type="number" step="0.5" min="0.5" max="999" value="${escapeHtml(before)}" aria-label="Effort in person-days for ${escapeHtml(item.name)}" class="effort-input w-16 px-1.5 py-0.5 text-xs border border-brand-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500/20">`;
+            const input = cell.querySelector('input');
+            input.focus();
+            input.select();
+            let done = false;
+            const finish = async save => {
+                if (done) return;
+                const raw = input.value.trim();
+                if (save && raw !== '' && !validEffort(raw)) {
+                    input.classList.add('border-rose-400', 'ring-2', 'ring-rose-200');
+                    input.title = 'Use 0.5 to 999, in steps of 0.5';
+                    return;
+                }
+                done = true;
+                const now = raw === '' ? '' : String(Number(raw));
+                if (save && now !== before) {
+                    await updateMilestone(roadmap, item, { effortDays: now === '' ? null : Number(now) }, [{ f: 'effortDays', from: before || '—', to: now || '—' }]);
+                }
+                renderEditorTable(getActiveRoadmap()?.items || []);
+            };
+            input.addEventListener('keydown', e => {
+                e.stopPropagation();
+                if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); finish(true); }
+                if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+            });
+            input.addEventListener('click', e => e.stopPropagation());
+            input.addEventListener('blur', () => finish(true));
+        };
+        function validEffort(raw) {
+            const n = Number(raw);
+            return raw !== '' && isFinite(n) && n >= 0.5 && n <= 999 && Math.abs(n * 2 - Math.round(n * 2)) < 1e-9;
+        }
+
+        // ---- Load note in the Add / Edit windows (FR-13, FR-4c) ----
+        function updateLoadNote(prefix) {
+            const note = document.getElementById(`${prefix}-load-note`);
+            if (!note) return;
+            const roadmap = getActiveRoadmap();
+            const editing = prefix === 'detail';
+            const item = editing ? roadmap?.items.find(i => i.id === document.getElementById('detail-item-id')?.value) : null;
+            const date = document.getElementById(`${prefix}-item-date`)?.value || '';
+            const raw = document.getElementById(`${prefix}-item-effort`)?.value.trim() || '';
+            const effort = validEffort(raw) ? Number(raw) : 0;
+            const lines = [];
+            let tone = 'slate';
+            if (roadmap && date) {
+                const others = (roadmap.items || []).filter(i => i.date === date && i.id !== item?.id);
+                const before = others.reduce((s, i) => s + effortOf(i), 0) + (item && item.date === date ? effortOf(item) : 0);
+                const after = others.reduce((s, i) => s + effortOf(i), 0) + effort;
+                const cap = capacityOf(roadmap, date);
+                if (cap != null && (effort || before)) {
+                    const level = loadLevel(after, cap);
+                    tone = level === 'over' ? 'rose' : level === 'near' ? 'amber' : 'slate';
+                    lines.push(`${formatMonthYear(date)}: ${Math.round(before * 10) / 10}${before !== after ? ` → ${Math.round(after * 10) / 10}` : ''} of ${cap} pd${level === 'over' ? ` (over by ${Math.round((after - cap) * 10) / 10})` : level === 'near' ? ' (near full)' : ''}`);
+                } else if (cap == null && after) {
+                    lines.push(`${formatMonthYear(date)}: ${Math.round(after * 10) / 10} pd planned`);
+                }
+            }
+            if (editing && item && date !== (item.date || '') && !document.getElementById('detail-item-moveto')?.value) {
+                const idx = monthEndIndex(roadmap, item, date);
+                lines.push(`It will be last in ${date ? formatMonthFull(parseInt(date.slice(5), 10)) : 'the backlog'} (#${idx + 1}). You can move it up afterwards.`);
+            }
+            note.textContent = lines.join(' ');
+            note.className = `${lines.length ? '' : 'hidden '}p-2.5 rounded-xl text-xs border ${{ rose: 'bg-rose-50 border-rose-200 text-rose-800', amber: 'bg-amber-50 border-amber-200 text-amber-800', slate: 'bg-slate-50 border-slate-200 text-slate-700' }[tone]}`;
+        }
+        ['modal', 'detail'].forEach(prefix => {
+            ['date', 'effort'].forEach(f => document.getElementById(`${prefix}-item-${f}`)?.addEventListener('input', () => updateLoadNote(prefix)));
+        });
+        document.getElementById('detail-item-moveto')?.addEventListener('input', () => updateLoadNote('detail'));
+
+        // ---- Capacity window (FR-10) ----
+        function capacityMonths(roadmap) {
+            const now = new Date();
+            const thisYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const dates = (roadmap.items || []).map(i => i.date).filter(Boolean).sort();
+            const start = dates[0] && dates[0] < thisYm ? dates[0] : thisYm;
+            const set = new Set(dates);
+            Object.keys(roadmap.capacity?.months || {}).forEach(m => set.add(m));
+            let [y, m] = start.split('-').map(Number);
+            const end = new Date(now.getFullYear(), now.getMonth() + 12, 1);
+            const endYm = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}`;
+            for (let guard = 0; guard < 240; guard++) {
+                const ym = `${y}-${String(m).padStart(2, '0')}`;
+                if (ym > endYm) break;
+                set.add(ym);
+                m++; if (m > 12) { m = 1; y++; }
+            }
+            return [...set].sort();
+        }
+        window.openCapacityModal = function() {
+            const roadmap = getActiveRoadmap();
+            if (!roadmap) return;
+            renderCapacityModal(roadmap);
+            document.getElementById('capacity-modal')?.classList.remove('hidden');
+        };
+        window.closeCapacityModal = function() { document.getElementById('capacity-modal')?.classList.add('hidden'); };
+        function renderCapacityModal(roadmap) {
+            const editable = canEditActive();
+            const c = roadmap.capacity || {};
+            document.getElementById('capacity-title-text').textContent = `Capacity · ${roadmap.title}`;
+            const def = document.getElementById('capacity-default');
+            def.value = typeof c.defaultDays === 'number' && c.defaultDays > 0 ? String(c.defaultDays) : '';
+            def.disabled = !editable;
+            document.getElementById('capacity-save').classList.toggle('hidden', !editable);
+            document.getElementById('capacity-cancel').textContent = editable ? 'Cancel' : 'Close';
+            renderCapacityRows(roadmap);
+        }
+        // Rows reflect the values typed so far (default + overrides) against the current load
+        function renderCapacityRows(roadmap) {
+            const editable = canEditActive();
+            const def = document.getElementById('capacity-default').value.trim();
+            const typed = Object.fromEntries([...document.querySelectorAll('#capacity-rows input[data-ym]')].map(i => [i.dataset.ym, i.value.trim()]));
+            const draft = { defaultDays: def === '' ? null : Number(def), months: { ...(roadmap.capacity?.months || {}) } };
+            Object.entries(typed).forEach(([ym, v]) => { if (v === '') delete draft.months[ym]; else draft.months[ym] = Number(v); });
+            const probe = { ...roadmap, capacity: draft };
+            const loads = monthLoads(probe);
+            const wasShown = showLoad;
+            showLoad = true;
+            const rows = capacityMonths(roadmap).map(ym => {
+                const info = loads.get(ym);
+                const load = info?.load || 0;
+                const cap = capacityOf(probe, ym);
+                const override = draft.months[ym];
+                const level = loadLevel(load, cap);
+                const pct = cap ? Math.round(load / cap * 100) : 0;
+                const tone = { over: ['bg-rose-500', 'text-rose-700'], near: ['bg-amber-500', 'text-amber-700'], ok: ['bg-brand-600', 'text-slate-600'], none: ['bg-slate-300', 'text-slate-500'] }[level];
+                const word = level === 'over' ? `Over by ${fmtDays(load - cap)}` : level === 'near' ? 'Near full' : level === 'ok' ? 'OK' : 'No capacity';
+                const overItems = info ? info.items.filter(i => info.over.has(i.id)) : [];
+                return `<tr class="capacity-row" data-ym="${ym}">
+                    <td class="py-2 font-semibold text-slate-800 whitespace-nowrap">${escapeHtml(formatMonthYear(ym))}</td>
+                    <td class="whitespace-nowrap">
+                        <input type="number" min="0" max="9999" step="0.5" data-ym="${ym}" value="${typeof override === 'number' ? override : ''}" placeholder="${def || '—'}" ${editable ? '' : 'disabled'} aria-label="Capacity for ${escapeHtml(formatMonthYear(ym))}" oninput="renderCapacityRows(getActiveRoadmapForCapacity())" class="w-16 px-2 py-0.5 border ${typeof override === 'number' ? 'border-brand-300' : 'border-slate-200'} rounded-lg text-right text-xs placeholder:text-slate-400 disabled:bg-slate-50">
+                        ${typeof override === 'number' && editable ? `<button type="button" onclick="resetCapacityMonth('${ym}')" title="Use the default" aria-label="Use the default for ${escapeHtml(formatMonthYear(ym))}" class="text-slate-500 hover:text-brand-700 px-1">↺</button>` : `<span class="text-[10px] text-slate-400">${def ? 'default' : ''}</span>`}
+                    </td>
+                    <td class="text-right font-semibold text-slate-800">${Math.round(load * 10) / 10}</td>
+                    <td class="pl-3"><span class="flex items-center gap-2 ${tone[1]} text-[11px] font-semibold whitespace-nowrap"><span class="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden"><span class="block h-full ${tone[0]}" style="width:${Math.min(pct, 100)}%"></span></span>${cap ? pct + '% ' : ''}${escapeHtml(word)}</span></td>
+                    <td class="text-right text-slate-600 whitespace-nowrap">${info?.items.length || 0}${info?.notEstimated ? ` · <span class="text-amber-700">${info.notEstimated} not estimated</span>` : ''}</td>
+                </tr>${overItems.length ? `<tr class="capacity-over"><td></td><td colspan="4" class="pb-2 text-[11px] text-rose-700"><i class="ph-bold ph-warning" aria-hidden="true"></i> Doesn't fit: ${overItems.map(i => `<button type="button" onclick="closeCapacityModal(); openItemDetails('${escapeHtml(i.id)}')" class="underline hover:text-rose-900">#${rankOf(roadmap, i.id)} ${escapeHtml(i.name)} (${fmtDays(effortOf(i))})</button>`).join(', ')}</td></tr>` : ''}`;
+            }).join('');
+            showLoad = wasShown;
+            const focused = document.activeElement?.dataset?.ym;
+            const caret = document.activeElement?.selectionStart;
+            document.getElementById('capacity-rows').innerHTML = rows;
+            if (focused) { const el = document.querySelector(`#capacity-rows input[data-ym="${focused}"]`); el?.focus(); try { if (caret != null) el.setSelectionRange(caret, caret); } catch (e) { /* number inputs */ } }
+            const backlog = (roadmap.items || []).filter(i => !i.date);
+            const backlogDays = backlog.reduce((s, i) => s + effortOf(i), 0);
+            document.getElementById('capacity-backlog').innerHTML = backlog.length ? `Backlog: <b>${fmtDays(backlogDays)}</b> not scheduled (${pluralize(backlog.length, 'deliverable')})` : '';
+        }
+        window.getActiveRoadmapForCapacity = () => getActiveRoadmap();
+        window.renderCapacityRows = renderCapacityRows;
+        window.resetCapacityMonth = function(ym) {
+            const input = document.querySelector(`#capacity-rows input[data-ym="${ym}"]`);
+            if (input) input.value = '';
+            const roadmap = getActiveRoadmap();
+            if (roadmap?.capacity?.months?.[ym] !== undefined) {
+                // the draft drops it on the next render
+            }
+            renderCapacityRows(roadmap);
+        };
+        document.getElementById('capacity-default')?.addEventListener('input', () => renderCapacityRows(getActiveRoadmap()));
+        window.saveCapacity = async function() {
+            const roadmap = getActiveRoadmap();
+            if (!roadmap || !canEditActive()) return;
+            const inputs = [document.getElementById('capacity-default'), ...document.querySelectorAll('#capacity-rows input[data-ym]')];
+            const bad = inputs.find(i => i.value.trim() !== '' && !(Number(i.value) >= 0 && Number(i.value) <= 9999 && Math.abs(Number(i.value) * 2 - Math.round(Number(i.value) * 2)) < 1e-9));
+            if (bad) { bad.classList.add('border-rose-400', 'ring-2', 'ring-rose-200'); bad.focus(); return; }
+            const def = document.getElementById('capacity-default').value.trim();
+            const months = {};
+            Object.entries(roadmap.capacity?.months || {}).forEach(([ym, v]) => { months[ym] = v; });
+            document.querySelectorAll('#capacity-rows input[data-ym]').forEach(i => { if (i.value.trim() === '') delete months[i.dataset.ym]; else months[i.dataset.ym] = Number(i.value); });
+            const next = { defaultDays: def === '' ? null : Number(def), months };
+            const prev = { defaultDays: roadmap.capacity?.defaultDays ?? null, months: roadmap.capacity?.months || {} };
+            const changes = [];
+            if (prev.defaultDays !== next.defaultDays) changes.push({ f: 'defaultDays', from: prev.defaultDays ?? '—', to: next.defaultDays ?? '—' });
+            new Set([...Object.keys(prev.months), ...Object.keys(next.months)]).forEach(ym => {
+                if (prev.months[ym] !== next.months[ym]) changes.push({ f: `capacity ${ym}`, from: prev.months[ym] ?? 'default', to: next.months[ym] ?? 'default' });
+            });
+            closeCapacityModal();
+            if (!changes.length) return;
+            const entry = auditEntry(roadmap, 'roadmap.capacity_changed', { type: 'roadmap', id: roadmap.id, label: roadmap.title }, changes.slice(0, 60));
+            if (!useCloudPersistence) {
+                roadmap.capacity = next;
+                logDemo(entry);
+                updateUI();
+                return;
+            }
+            const aid = newId('a');
+            const ok = await commitBatch(batch => {
+                batch.update(roadmapRef(roadmap.id), { capacity: next, ...stamp(aid) });
+                batch.set(auditRef(aid), entry);
+            }, 'save the capacity');
+            if (ok) { roadmap.capacity = next; scheduleRender(); }
+        };
+
+        // =======================================================
         // ACTIVITY VIEW (2.2.0, specs/activity-view.md): the audit log as one timeline, Editors + Admins
         // =======================================================
         const ACTIVITY_PAGE = 50;
@@ -4887,11 +5664,13 @@
             if (f === 'status') return STATUS_LABELS[v] || v;
             if (f === 'date') return v ? formatMonthYear(v) : 'TBD';
             if (f === 'role' || f === 'defaultRole') return ROLE_NAMES[v] || v;
+            if (f === 'rank') return '#' + v;
+            if (f === 'effortDays' || f === 'defaultDays' || String(f).startsWith('capacity ')) return v === '—' || v === 'default' ? (v === 'default' ? 'default' : 'not set') : `${v} pd`;
             if (Array.isArray(v)) return v.join(', ') || '—';
             return String(v);
         }
         function activityChangeLine(c) {
-            const label = FIELD_LABELS[c.f] || (c.f === 'role' ? 'Role' : c.f === 'defaultRole' ? 'Default role' : c.f === 'text' ? 'Comment' : c.f);
+            const label = FIELD_LABELS[c.f] || (c.f === 'role' ? 'Role' : c.f === 'defaultRole' ? 'Default role' : c.f === 'text' ? 'Comment' : String(c.f).startsWith('capacity ') ? `Capacity ${formatMonthYear(String(c.f).slice(9))}` : c.f);
             if (c.f === 'feedback') return String(c.to).startsWith('+') ? `Linked feedback "${String(c.to).slice(1)}"` : `Unlinked feedback "${String(c.to).slice(1)}"`;
             if (c.f === 'description' || c.f === 'text') return `${label}: ${activityValue(c.f, c.to)}`;
             return c.from !== undefined ? `${label}: ${activityValue(c.f, c.from)} → ${activityValue(c.f, c.to)}` : `${label}: ${activityValue(c.f, c.to)}`;
@@ -4935,13 +5714,15 @@
                 case 'roadmap.moved': text = `${who} moved ${q(label)} into the shared workspace`; break;
                 case 'roadmap.items_added': text = `${who} added ${escapeHtml(pluralize(Number(changes[0]?.to) || 0, 'item'))} to ${q(label)}`; break;
                 case 'roadmap.retention_set': text = `${who} set the Recycle Bin removal date of ${q(label)}`; break;
+                case 'roadmap.capacity_changed': text = `${who} changed the monthly capacity of ${q(label)}`; break;
+                case 'roadmap.ranking_initialized': text = `${who} ${changes.some(c => c.f === 'reason') ? 're-spaced' : 'saved'} the ranking of ${q(label)} (${escapeHtml(pluralize(Number(changes[0]?.to) || 0, 'deliverable'))})`; break;
                 case 'workspace.created': text = `${who} set up the workspace`; break;
                 case 'member.joined': text = `${who} joined the workspace as ${escapeHtml(activityValue('role', changes[0]?.to))}`; break;
                 case 'member.role_changed': text = `${who} made <b class="font-bold text-slate-800" title="${escapeHtml(e.target?.id || '')}">${escapeHtml(label || e.target?.id || '')}</b> ${escapeHtml(changes[0]?.to === 'blocked' ? 'Blocked' : (changes[0]?.to === 'admin' ? 'an Admin' : 'a' + (changes[0]?.to === 'editor' ? 'n Editor' : ' Viewer')))}`; break;
                 case 'workspace.default_role_changed': text = `${who} changed the default role for new members to ${escapeHtml(activityValue('role', changes[0]?.to))}`; break;
                 default: text = `${who} ${escapeHtml(e.action || 'changed')} ${label ? q(label) : ''}`;
             }
-            const details = (e.action === 'milestone.updated' || e.action === 'feedback.updated' || e.action === 'feedback.created' || e.action === 'roadmap.deleted' || e.action === 'feedback.deleted')
+            const details = (e.action === 'milestone.updated' || e.action === 'feedback.updated' || e.action === 'feedback.created' || e.action === 'roadmap.deleted' || e.action === 'feedback.deleted' || e.action === 'roadmap.capacity_changed')
                 ? changes.map(activityChangeLine) : [];
             const more = (e.action === 'milestone.updated' || e.action === 'feedback.updated') ? changes.length - 1 : 0;
             return { text, details, more };
