@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.3.1" data-released="2026-11-10">
+    <meta name="mapit-version" content="2.4.0" data-released="2026-11-10">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -66,7 +66,7 @@
             background: #94a3b8;
         }
         .snap-container {
-            scroll-snap-type: y mandatory;
+            scroll-snap-type: y proximity;
             scroll-behavior: smooth;
         }
         .snap-item {
@@ -323,11 +323,11 @@
             <div id="roadmap-scroll-wrapper" class="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-y-auto custom-scrollbar snap-container relative p-4 pt-6 md:p-8 md:pt-10 scroll-pt-6 md:scroll-pt-10">
                 <!-- Positioning box that grows with the content, so the guide line spans all sections when scrolled -->
                 <div class="relative">
-                    <!-- Timeline Central Vertical Guide Line: centred on the section markers (left-[152px] + 16px) -->
-                    <div id="timeline-vertical-guide" class="hidden md:block absolute left-[167px] top-8 bottom-6 w-0.5 bg-slate-200 pointer-events-none"></div>
+                    <!-- Timeline guide line: centred on the section markers (label w-20 + gap-3 + half of the w-5 marker) -->
+                    <div id="timeline-vertical-guide" class="hidden md:block absolute left-[101px] top-4 bottom-4 w-0.5 bg-slate-200 pointer-events-none"></div>
 
                     <!-- Dynamic Container for Timeline Sections -->
-                    <div id="roadmap-container" class="space-y-10 relative">
+                    <div id="roadmap-container" class="space-y-4 relative">
                         <!-- Populated dynamically via JS -->
                     </div>
                 </div>
@@ -1491,6 +1491,7 @@
         // Card click: open the next, finer view scrolled to that period. The filter stays "Show All",
         // so the whole roadmap remains scrollable; the target is briefly highlighted.
         window.drillDown = function(perspective, period) {
+            openListTarget(perspective, period);
             setPerspective(perspective);
             const target = [...(roadmapContainer?.querySelectorAll('[data-period]') || [])].find(el => el.dataset.period === period);
             if (!target) return;
@@ -1517,6 +1518,19 @@
                 // Mandatory snapping can pick a neighbouring section; scroll with it off, then turn it back on
                 wrapper.style.scrollSnapType = 'none';
                 wrapper.scrollTo({ top, behavior: 'smooth' });
+                // Styles for newly drawn rows can arrive a moment later and move the target: correct once
+                setTimeout(() => {
+                    if (!target.isConnected) return;
+                    const again = target.getBoundingClientRect().top - wrapper.getBoundingClientRect().top + wrapper.scrollTop - padTop;
+                    if (Math.abs(again - wrapper.scrollTop) > 4) {
+                        const more = again + wrapper.clientHeight - wrapper.scrollHeight;
+                        const spacer = document.getElementById('drill-spacer');
+                        if (more > 0) { if (spacer) spacer.style.height = (parseFloat(spacer.style.height) || 0) + Math.ceil(more) + 'px'; else { const sp = document.createElement('div'); sp.id = 'drill-spacer'; sp.setAttribute('aria-hidden', 'true'); sp.style.height = Math.ceil(more) + 'px'; roadmapContainer.appendChild(sp); } }
+                        wrapper.style.scrollSnapType = 'none';
+                        wrapper.scrollTo({ top: again, behavior: 'auto' });
+                        setTimeout(() => { wrapper.style.scrollSnapType = ''; }, 300);
+                    }
+                }, 450);
                 const restore = () => { wrapper.style.scrollSnapType = ''; wrapper.removeEventListener('scrollend', restore); };
                 wrapper.addEventListener('scrollend', restore);
                 setTimeout(restore, 1200);
@@ -2081,17 +2095,19 @@
         };
 
         // =======================================================
-        // TIMELINE RENDERING (FIXED HEIGHT CARDS WITH OVERFLOW)
+        // TIMELINE RENDERING (2.4.0: list cards, see "UNIFORM LIST-CARD VIEWS")
         // =======================================================
         function renderTimeline(items) {
             if (!roadmapContainer) return;
             roadmapContainer.innerHTML = '';
+            listKeys = new Map();
+            listBodies.clear();
             updateAnnualToggle();
             updateShowLoadToggle();
 
             const guideLine = document.getElementById('timeline-vertical-guide');
             if (guideLine) {
-                guideLine.style.display = (activePerspective === 'module') ? 'none' : 'block';
+                guideLine.style.display = (activePerspective === 'module') ? 'none' : '';
             }
 
             if (items.length === 0) {
@@ -2126,478 +2142,293 @@
                         <button onclick="applySubfilter('ALL')" class="mt-3 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all">Show All</button>
                     </div>`;
             }
+            updateAnnualToggle();
         }
 
-        // 1. Annual Perspective (2.1.1): each year lists Q1–Q4 as compact rows; each quarter lists its
-        // modules as one-line summaries that expand to their deliverables. No fixed heights.
+        // =======================================================
+        // 2.4.0 UNIFORM LIST-CARD VIEWS (design/uniform-list-views.md)
+        // Every view: collapsible period cards -> (sub-period rows) -> flat, rank-ordered deliverable rows
+        // =======================================================
         const QUARTER_MONTHS = { Q1: 'Jan – Mar', Q2: 'Apr – Jun', Q3: 'Jul – Sep', Q4: 'Oct – Dec' };
-        // Open module rows ("2026|Q3|Billing", "TBD|Billing"): kept in memory until reload (annual-view FR-6)
-        const annualOpen = new Set();
         const annualCollator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true }); // A–Z, 'Mod 2' before 'Mod 10'
+        // Open / closed choices the user made, kept until reload (key -> true / false); otherwise the default applies
+        const listState = new Map();
+        // Per render: every list key with its default, and the builder of its body (closed bodies are built when opened)
+        let listKeys = new Map();
+        const listBodies = new Map();
 
         function progressBar(done, total, width = 'w-16') {
             const pct = total ? Math.round((done / total) * 100) : 0;
             return `<span class="${width} bg-slate-100 h-1.5 rounded-full overflow-hidden shrink-0" aria-hidden="true"><span class="block h-full rounded-full ${pct === 100 ? 'bg-emerald-500' : 'bg-brand-600'}" style="width: ${pct}%"></span></span>`;
         }
+        function isListOpen(key) { return listState.has(key) ? listState.get(key) : !!listKeys.get(key); }
 
-        // Module rows for one quarter (or the backlog), A–Z, each with its deliverables underneath
-        // Deliverables of one module row (built when the row is open)
-        const annualRowItems = new Map();
-        function annualDeliverablesHtml(key) {
-            const row = annualRowItems.get(key);
-            if (!row) return '';
-            const roadmap = getActiveRoadmap();
-            const { mItems, keyPrefix, placeOf, reorder } = row;
-            return mItems.map(item => `
-                                <li onclick="openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" data-rank-id="${escapeHtml(item.id)}" class="group/row flex items-center gap-2 px-2 py-1 rounded-lg border border-transparent ${overTint(roadmap, item) || 'hover:bg-brand-50/50'} cursor-pointer">
-                                    ${reorder ? reorderHtml(item) : ''}
-                                    ${rankChipHtml(roadmap, item, keyPrefix === 'MOD' ? 0 : placeOf.get(item.id))}
-                                    ${statusDot(item.status)}
-                                    <span class="text-xs text-slate-700 truncate min-w-0 flex-1">${escapeHtml(item.name)}</span>
-                                    ${overFlagHtml(roadmap, item, true)}
-                                    ${effortHtml(item)}
-                                    <span class="text-[10px] text-slate-500 shrink-0">${escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD')}</span>
-                                    ${reorder ? moveButtonsHtml(item) : ''}
-                                </li>
-                            `).join('');
+        // Current and next period start open; when every period is in the past, the last two
+        function defaultOpenSet(keys, currentKey) {
+            const sorted = keys.slice().sort();
+            let i = sorted.findIndex(k => k >= currentKey);
+            if (i < 0) i = Math.max(0, sorted.length - 2);
+            return new Set(sorted.slice(i, i + 2));
+        }
+        function nowYm(offsetMonths = 0) {
+            const d = new Date();
+            const t = new Date(d.getFullYear(), d.getMonth() + offsetMonths, 1);
+            return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`;
+        }
+        const quarterOf = ym => `${ym.slice(0, 4)}-Q${Math.ceil(parseInt(ym.slice(5, 7), 10) / 3)}`;
+
+        // ---- Building blocks ----
+        const LIST_COLS = 'md:grid-cols-[18px_84px_minmax(0,1fr)_130px_64px_150px_80px_52px]';
+        function listColumnsHtml() {
+            return `<div class="list-columns hidden md:grid ${LIST_COLS} gap-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 border-t border-slate-100" aria-hidden="true">
+                <span></span><span>#</span><span>Deliverable</span><span>Module</span><span>Effort</span><span>Status</span><span>Target</span><span></span></div>`;
+        }
+        // Deliverable rows of one list, in rank order (place = position in this list)
+        function listRowsHtml(roadmap, items, listKey, withPlace = true) {
+            const rows = sortByRank(roadmap, items);
+            const reorder = canEditActive();
+            const statusText = s => escapeHtml(STATUS_LABELS[s] || s);
+            return listColumnsHtml() + `<div data-rank-list="${escapeHtml(listKey)}">` + rows.map((item, n) => {
+                const effort = effortOf(item);
+                const tint = overTint(roadmap, item);
+                const badge = overFlagHtml(roadmap, item);
+                return `<div onclick="openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" data-rank-id="${escapeHtml(item.id)}" ${item.description ? `title="${escapeHtml(item.description)}"` : ''}
+                    class="list-row group/row flex flex-wrap items-center gap-x-2 gap-y-0.5 md:grid ${LIST_COLS} md:gap-2 px-3 py-2 text-xs border-t border-slate-100 border-l-2 border-l-transparent ${tint || 'hover:bg-slate-50'} cursor-pointer">
+                    <span class="hidden md:block">${reorder ? reorderHtml(item) : ''}</span>
+                    <span class="flex items-center gap-1 shrink-0">${rankChipHtml(roadmap, item, withPlace ? n + 1 : 0)}</span>
+                    <span class="list-name font-bold text-slate-900 truncate min-w-0 flex-1 md:flex-none">${escapeHtml(item.name)}</span>
+                    <span class="hidden md:block text-brand-600 font-semibold truncate">${escapeHtml(item.module)}</span>
+                    <span class="hidden md:block ${effort ? 'text-slate-700' : 'text-slate-400'}" ${effort ? '' : 'title="Not estimated"'}>${effort ? fmtDays(effort) : '—'}</span>
+                    <span class="hidden md:flex flex-col items-start gap-1"><span class="flex items-center gap-1.5">${statusDot(item.status)}<span aria-hidden="true">${statusText(item.status)}</span></span>${badge}</span>
+                    <span class="hidden md:block text-slate-600 whitespace-nowrap">${escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD')}</span>
+                    <span class="flex justify-end">${reorder ? moveButtonsHtml(item) : ''}</span>
+                    <span class="md:hidden w-full pl-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-slate-500" aria-hidden="true">
+                        <span class="text-brand-600 font-semibold">${escapeHtml(item.module)}</span>${effort ? `<span>· ${fmtDays(effort)}</span>` : ''}
+                        <span class="flex items-center gap-1">· <span class="w-2 h-2 rounded-full ${item.status === 'done' ? 'bg-emerald-500' : item.status === 'in-progress' ? 'bg-brand-500' : 'bg-amber-400'}"></span>${statusText(item.status)}</span>
+                        <span>· ${escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD')}</span>${badge ? `<span class="over-tag-phone">${badge}</span>` : ''}
+                    </span>
+                </div>`;
+            }).join('') + '</div>';
+        }
+        // A collapsible header (level 1 = card header, level 2 = sub-period row) and its body
+        function listBlockHtml({ key, defaultOpen, title, sub, items, loadHtml, drill, level, body, attrs = '' }) {
+            listKeys.set(key, defaultOpen);
+            listBodies.set(key, body);
+            const open = isListOpen(key);
+            const done = items.filter(i => i.status === 'done').length;
+            const summary = `${pluralize(items.length, 'deliverable')} · ${done} done`;
+            return `<div class="list-block ${level === 1 ? '' : 'border-t border-slate-100'}" data-list-block="${escapeHtml(key)}" ${attrs}>
+                <div class="list-head flex items-center gap-1 pr-2 ${level === 1 ? 'bg-slate-50/80' : 'bg-white'} hover:bg-brand-50/40">
+                    <button type="button" onclick="toggleListBlock(this)" data-list-key="${escapeHtml(key)}" aria-expanded="${open}" class="flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 ${level === 1 ? 'py-2.5' : 'py-2'} text-left">
+                        <i class="list-caret ph-bold ${open ? 'ph-caret-down' : 'ph-caret-right'} text-[10px] text-slate-500 shrink-0" aria-hidden="true"></i>
+                        <span class="${level === 1 ? 'text-sm font-black' : 'text-xs font-bold'} text-slate-900">${escapeHtml(title)}</span>
+                        ${sub ? `<span class="text-[10px] text-slate-500 font-medium whitespace-nowrap">${escapeHtml(sub)}</span>` : ''}
+                        <span class="list-summary w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-4 sm:pl-0">
+                            <span class="text-[11px] font-semibold text-slate-600 whitespace-nowrap">${summary}</span>
+                            ${loadHtml || progressBar(done, items.length, 'w-12 sm:w-16')}
+                        </span>
+                    </button>
+                    ${drill ? `<button type="button" onclick="drillDown('${drill.perspective}', '${escapeHtml(drill.period)}')" aria-label="${escapeHtml(drill.label)}" title="${escapeHtml(drill.label)}" class="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:text-brand-600"><i class="ph-bold ph-arrow-right text-xs" aria-hidden="true"></i></button>` : ''}
+                </div>
+                <div class="list-body ${open ? '' : 'hidden'} ${level === 2 ? 'md:pl-5' : ''}" data-list-body="${escapeHtml(key)}">${open ? body() : ''}</div>
+            </div>`;
+        }
+        function listEmptyHtml(title, sub) {
+            return `<div class="list-empty flex items-center gap-2 px-3 py-1.5 border-t border-dashed border-slate-200 text-xs">
+                <span class="w-2.5 shrink-0"></span><span class="font-bold text-slate-600">${escapeHtml(title)}</span>${sub ? `<span class="text-[10px] text-slate-500">${escapeHtml(sub)}</span>` : ''}
+                <span class="ml-auto text-[11px] text-slate-500 italic">No deliverables</span></div>`;
+        }
+        // One section: slim timeline label + marker on the left, the card on the right
+        function listSection({ period, label, sublabel, allDone, muted, card }) {
+            const section = document.createElement('div');
+            section.className = 'snap-item list-section flex items-start gap-3 relative';
+            if (period) section.dataset.period = period;
+            section.innerHTML = `
+                <div class="hidden md:block w-20 shrink-0 text-right pt-2">
+                    <span class="block text-base font-black leading-tight ${muted ? 'text-slate-500' : 'text-slate-900'}">${escapeHtml(label)}</span>
+                    ${sublabel ? `<span class="block text-[11px] font-bold ${muted ? 'text-slate-500' : 'text-brand-600'}">${escapeHtml(sublabel)}</span>` : ''}
+                </div>
+                <div class="hidden md:flex w-5 shrink-0 mt-2.5 relative z-10 justify-center"><span class="w-5 h-5 rounded-full bg-white border-[3px] ${muted ? 'border-slate-300' : allDone ? 'border-emerald-500' : 'border-brand-600'}"></span></div>
+                <div class="flex-1 min-w-0 w-full border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">${card}</div>`;
+            roadmapContainer.appendChild(section);
         }
 
-        function annualModuleRows(items, keyPrefix) {
-            const roadmap = getActiveRoadmap();
-            const periodOrder = sortByRank(roadmap, items);
-            const placeOf = new Map(periodOrder.map((i, n) => [i.id, n + 1]));
-            const reorder = keyPrefix !== 'MOD' && canEditActive();
-            const groups = {};
-            items.forEach(item => {
-                const mod = item.module || 'General';
-                (groups[mod] = groups[mod] || []).push(item);
-            });
-            const mods = Object.keys(groups).sort(annualCollator.compare);
-            return mods.map(mod => {
-                const mItems = keyPrefix === 'MOD'
-                    ? groups[mod].slice().sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || rankOf(roadmap, a.id) - rankOf(roadmap, b.id))
-                    : sortByRank(roadmap, groups[mod]);
-                const counts = { 'done': 0, 'in-progress': 0, 'planned': 0 };
-                mItems.forEach(i => { counts[i.status] = (counts[i.status] || 0) + 1; });
-                const pct = Math.round((counts.done / mItems.length) * 100);
-                const key = `${keyPrefix}|${mod}`;
-                annualRowItems.set(key, { mItems, keyPrefix, placeOf, reorder });
-                const open = annualOpen.has(key);
-                const label = `${mod}, ${pluralize(mItems.length, 'deliverable')}, ${counts.done} done, ${counts['in-progress']} in progress, ${counts.planned} planned`;
-                const dots = [['done', 'bg-emerald-500', 'done'], ['in-progress', 'bg-brand-500', 'in progress'], ['planned', 'bg-amber-400', 'planned']]
-                    .filter(([s]) => counts[s] > 0)
-                    .map(([s, color, word]) => `<span class="flex items-center gap-1" title="${counts[s]} ${word}"><span class="w-2 h-2 rounded-full ${color}"></span>${counts[s]}<span class="hidden sm:inline">${word}</span></span>`).join('');
-                return `
-                    <li class="annual-module">
-                        <button type="button" onclick="toggleAnnualModule(this)" data-annual-key="${escapeHtml(key)}" aria-expanded="${open}" aria-label="${escapeHtml(label)}" class="w-full flex items-center gap-2 px-3 md:px-4 py-1 text-left hover:bg-slate-50 transition-colors">
-                            <i class="annual-caret ph-bold ${open ? 'ph-caret-down' : 'ph-caret-right'} text-[10px] text-slate-500 shrink-0" aria-hidden="true"></i>
-                            <span class="text-xs font-bold text-slate-800 truncate min-w-0 flex-1">${escapeHtml(mod)}</span>
-                            <span class="hidden sm:inline text-[10px] text-slate-500 shrink-0" aria-hidden="true">${pluralize(mItems.length, 'deliverable')}</span>
-                            <span class="flex items-center gap-2 text-[10px] font-semibold text-slate-600 shrink-0" aria-hidden="true">${dots}</span>
-                            ${progressBar(counts.done, mItems.length, 'w-10 sm:w-14')}
-                            <span class="w-8 text-right text-[10px] font-bold ${pct === 100 ? 'text-emerald-600' : 'text-slate-600'} shrink-0" aria-hidden="true">${pct}%</span>
-                        </button>
-                        <ul class="annual-deliverables ${open ? '' : 'hidden'} pl-6 md:pl-7 pr-3 md:pr-4 pb-2 space-y-0.5" data-rank-list="${escapeHtml(key)}">${open ? annualDeliverablesHtml(key) : ''}</ul>
-                    </li>
-                `;
-            }).join('');
-        }
-
-        window.toggleAnnualModule = function(btn) {
-            const key = btn.dataset.annualKey;
-            const open = !annualOpen.has(key);
-            if (open) annualOpen.add(key); else annualOpen.delete(key);
+        window.toggleListBlock = function(btn) {
+            const key = btn.dataset.listKey;
+            const open = !isListOpen(key);
+            listState.set(key, open);
             btn.setAttribute('aria-expanded', String(open));
-            const caret = btn.querySelector('.annual-caret');
+            const caret = btn.querySelector('.list-caret');
             caret?.classList.toggle('ph-caret-right', !open);
             caret?.classList.toggle('ph-caret-down', open);
-            const list = btn.nextElementSibling;
-            if (list && open && !list.children.length) list.innerHTML = annualDeliverablesHtml(key);
-            list?.classList.toggle('hidden', !open);
+            const body = btn.closest('[data-list-block]')?.querySelector(':scope > [data-list-body]');
+            if (body) {
+                if (open && !body.children.length) body.innerHTML = listBodies.get(key)?.() || '';
+                body.classList.toggle('hidden', !open);
+            }
             updateAnnualToggle();
         };
-
-        // "Expand all / Collapse all" in the perspective bar (Annual and Modules views)
+        // "Expand all / Collapse all" (every view)
         window.toggleAllAnnualModules = function() {
-            const btns = [...(roadmapContainer?.querySelectorAll('[data-annual-key]') || [])];
-            const expand = btns.some(b => !annualOpen.has(b.dataset.annualKey));
-            btns.forEach(b => { if (annualOpen.has(b.dataset.annualKey) !== expand) toggleAnnualModule(b); });
-            updateAnnualToggle();
+            const keys = [...listKeys.keys()];
+            const expand = keys.some(k => !isListOpen(k));
+            keys.forEach(k => listState.set(k, expand));
+            const active = getActiveRoadmap();
+            if (active) renderTimeline(active.items || []);
         };
-
         function updateAnnualToggle() {
             const toggle = document.getElementById('annual-expand-toggle');
             if (!toggle) return;
-            const btns = [...(roadmapContainer?.querySelectorAll('[data-annual-key]') || [])];
-            const show = (activePerspective === 'year' || activePerspective === 'module') && btns.length > 0;
+            const keys = [...listKeys.keys()];
+            const show = keys.length > 0 && !!roadmapContainer?.querySelector('[data-list-key]');
             toggle.classList.toggle('hidden', !show);
             toggle.classList.toggle('flex', show);
-            const allOpen = btns.length > 0 && btns.every(b => annualOpen.has(b.dataset.annualKey));
+            const allOpen = show && keys.every(k => isListOpen(k));
             toggle.setAttribute('aria-pressed', String(allOpen));
             toggle.querySelector('i').className = `ph-bold ${allOpen ? 'ph-arrows-in-line-vertical' : 'ph-arrows-out-line-vertical'} text-xs`;
             toggle.querySelector('span').textContent = allOpen ? 'Collapse all' : 'Expand all';
         }
+        // Drilling down opens the target (and its parent)
+        function openListTarget(perspective, period) {
+            if (perspective === 'quarter') {
+                const [q, y] = period.split(' ');
+                listState.set(`Q|${y}|${q.slice(1)}`, true);
+            } else if (perspective === 'month') {
+                listState.set(`M|${period}`, true);
+                listState.set(`Q|${period.slice(0, 4)}|${Math.ceil(parseInt(period.slice(5, 7), 10) / 3)}`, true);
+            }
+        }
 
+        // ---- The four views ----
+        function groupByMonth(items) {
+            const g = {};
+            items.forEach(i => { if (i.date) (g[i.date] = g[i.date] || []).push(i); });
+            return g;
+        }
+        function backlogSection(roadmap, unscheduled) {
+            if (!unscheduled.length || !(activeSubfilter === 'ALL' || activeSubfilter === 'Unscheduled')) return;
+            const backlogEffort = unscheduled.reduce((s, i) => s + effortOf(i), 0);
+            listSection({ label: 'TBD', sublabel: 'Backlog', muted: true, card: listBlockHtml({
+                key: 'TBD', defaultOpen: false, title: 'No date yet', items: unscheduled, level: 1,
+                loadHtml: loadVisible(roadmap) && backlogEffort ? `<span class="text-[11px] font-semibold text-slate-600 whitespace-nowrap">${fmtDays(backlogEffort)} not scheduled</span>` : '',
+                body: () => listRowsHtml(roadmap, unscheduled, 'TBD')
+            }) });
+        }
+
+        // 1. Annual: year cards -> quarter rows -> deliverables
         function renderAnnualTimeline(items) {
-            const yearGroups = {};
-            const unscheduled = [];
-
-            items.forEach(item => {
-                if (!item.date) {
-                    unscheduled.push(item);
-                    return;
-                }
-                const year = item.date.slice(0, 4);
-                if (!yearGroups[year]) {
-                    yearGroups[year] = { Q1: [], Q2: [], Q3: [], Q4: [] };
-                }
-                const month = parseInt(item.date.slice(5, 7), 10);
-                const qKey = `Q${Math.ceil(month / 3)}`;
-                yearGroups[year][qKey].push(item);
+            const roadmap = getActiveRoadmap();
+            const years = {};
+            items.forEach(i => { if (i.date) (years[i.date.slice(0, 4)] = years[i.date.slice(0, 4)] || []).push(i); });
+            const sortedYears = Object.keys(years).sort();
+            const shown = activeSubfilter === 'ALL' ? sortedYears : sortedYears.filter(y => y === activeSubfilter);
+            const openYears = defaultOpenSet(sortedYears, nowYm().slice(0, 4));
+            const quarterKeys = [];
+            sortedYears.forEach(y => [1, 2, 3, 4].forEach(n => { if (years[y].some(i => Math.ceil(parseInt(i.date.slice(5, 7), 10) / 3) === n)) quarterKeys.push(`${y}-Q${n}`); }));
+            const openQuarters = defaultOpenSet(quarterKeys, quarterOf(nowYm()));
+            shown.forEach(year => {
+                const yItems = years[year];
+                const done = yItems.filter(i => i.status === 'done').length;
+                const body = () => [1, 2, 3, 4].map(n => {
+                    const qKey = `Q${n}`;
+                    const qItems = yItems.filter(i => Math.ceil(parseInt(i.date.slice(5, 7), 10) / 3) === n);
+                    if (!qItems.length) return listEmptyHtml(qKey, QUARTER_MONTHS[qKey]);
+                    return listBlockHtml({
+                        key: `Q|${year}|${n}`, defaultOpen: openQuarters.has(`${year}-Q${n}`), title: qKey, sub: QUARTER_MONTHS[qKey], items: qItems, level: 2,
+                        attrs: `data-quarter="${qKey} ${year}"`,
+                        loadHtml: loadVisible(roadmap) ? quarterLoadHtml(roadmap, year, n) : '',
+                        drill: { perspective: 'quarter', period: `${qKey} ${year}`, label: `Open ${qKey} ${year} in the Quarterly view` },
+                        body: () => listRowsHtml(roadmap, qItems, `Q|${year}|${n}`)
+                    });
+                }).join('');
+                // Register the quarter keys even while the year is closed (Expand all reaches them)
+                if (!isListOpen(`Y|${year}`)) [1, 2, 3, 4].forEach(n => { if (yItems.some(i => Math.ceil(parseInt(i.date.slice(5, 7), 10) / 3) === n)) listKeys.set(`Q|${year}|${n}`, openQuarters.has(`${year}-Q${n}`)); });
+                listSection({ period: year, label: year, sublabel: 'Annual', allDone: done === yItems.length, card: listBlockHtml({
+                    key: `Y|${year}`, defaultOpen: openYears.has(year), title: year, items: yItems, level: 1, body
+                }) });
             });
-
-            const sortedYears = Object.keys(yearGroups).sort();
-            const yearsToDisplay = activeSubfilter === 'ALL' ? sortedYears : sortedYears.filter(y => y === activeSubfilter);
-
-            yearsToDisplay.forEach(year => {
-                const quarters = yearGroups[year];
-                const yearItems = [...quarters.Q1, ...quarters.Q2, ...quarters.Q3, ...quarters.Q4];
-                const doneCount = yearItems.filter(i => i.status === 'done').length;
-                const isAllDone = yearItems.length > 0 && doneCount === yearItems.length;
-
-                const section = document.createElement('div');
-                section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
-                section.dataset.period = year;
-
-                section.innerHTML = `
-                    <div class="w-full md:w-32 shrink-0 flex md:flex-col items-center md:items-end justify-between md:justify-start pr-0 md:pr-6 text-left md:text-right">
-                        <div>
-                            <span class="text-2xl md:text-3xl font-black text-slate-900 tracking-tight block">${year}</span>
-                            <span class="text-[11px] font-bold uppercase tracking-wider text-brand-600 block">Annual Plan</span>
-                            <span class="text-[11px] font-semibold text-slate-500 block">${doneCount}/${yearItems.length} Done</span>
-                            <span class="flex md:justify-end mt-1">${progressBar(doneCount, yearItems.length, 'w-20')}</span>
-                        </div>
-                    </div>
-
-                    <div class="hidden md:flex absolute left-[152px] top-4 w-8 h-8 rounded-full bg-white border-4 ${isAllDone ? 'border-emerald-500' : 'border-brand-600'} shadow-md items-center justify-center z-10">
-                        <div class="w-2.5 h-2.5 rounded-full ${isAllDone ? 'bg-emerald-500' : 'bg-brand-600'}"></div>
-                    </div>
-
-                    <div class="flex-1 w-full bg-slate-50/70 border border-slate-200 rounded-2xl p-2.5 md:p-3 shadow-xs md:ml-12 space-y-1.5">
-                        ${['Q1', 'Q2', 'Q3', 'Q4'].map(qKey => {
-                            const qItems = quarters[qKey];
-                            const qDone = qItems.filter(i => i.status === 'done').length;
-                            // Empty quarters are one line and not clickable
-                            if (qItems.length === 0) {
-                                return `
-                                    <div class="annual-quarter flex items-center gap-2 px-3 md:px-4 py-1.5 bg-white border border-dashed border-slate-200 rounded-xl">
-                                        <span class="text-xs font-black text-slate-700 w-6">${qKey}</span>
-                                        <span class="text-[10px] text-slate-500 font-medium whitespace-nowrap">${QUARTER_MONTHS[qKey]}</span>
-                                        <span class="text-[11px] text-slate-500 italic ml-auto">No deliverables</span>
-                                    </div>
-                                `;
-                            }
-                            return `
-                                <div class="annual-quarter bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden" data-quarter="${qKey} ${year}">
-                                    <div onclick="drillDown('quarter', '${qKey} ${year}')" role="button" tabindex="0" aria-label="Open ${qKey} ${year} in the Quarterly view" title="Open ${qKey} ${year} in the Quarterly view" class="annual-quarter-head group/card flex items-center gap-2 px-3 md:px-4 py-1.5 bg-slate-50/60 hover:bg-brand-50/50 border-b border-slate-100 cursor-pointer transition-colors">
-                                        <span class="text-xs font-black text-slate-900 group-hover/card:text-brand-700 w-6">${qKey}</span>
-                                        <span class="text-[10px] text-slate-500 font-medium whitespace-nowrap">${QUARTER_MONTHS[qKey]}</span>
-                                        <span class="text-[11px] font-semibold text-slate-600 ml-auto whitespace-nowrap">${pluralize(qItems.length, 'deliverable')} · ${qDone} done</span>
-                                        ${quarterLoadHtml(getActiveRoadmap(), year, Number(qKey.slice(1)))}
-                                        ${progressBar(qDone, qItems.length, 'w-8 sm:w-16')}
-                                        <i class="ph-bold ph-arrow-right text-xs text-slate-500 group-hover/card:text-brand-600" aria-hidden="true"></i>
-                                    </div>
-                                    <ul class="divide-y divide-slate-100">
-                                        ${annualModuleRows(qItems, `${year}|${qKey}`)}
-                                    </ul>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                `;
-                roadmapContainer.appendChild(section);
-            });
-
-            if (unscheduled.length > 0 && (activeSubfilter === 'ALL' || activeSubfilter === 'Unscheduled')) {
-                renderAnnualBacklog(unscheduled);
-            }
-            updateAnnualToggle();
+            backlogSection(roadmap, items.filter(i => !i.date));
         }
 
-        // Backlog / TBD in the Annual view: the same module rows (annual-view FR-10)
-        function renderAnnualBacklog(items) {
-            const section = document.createElement('div');
-            section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
-            section.innerHTML = `
-                <div class="w-full md:w-32 shrink-0 flex md:flex-col items-center md:items-end justify-between md:justify-start pr-0 md:pr-6 text-left md:text-right">
-                    <div>
-                        <span class="text-xl md:text-2xl font-black text-slate-500 tracking-tight block">TBD</span>
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-500 block">Backlog</span>
-                    </div>
-                </div>
-
-                <div class="hidden md:flex absolute left-[152px] top-4 w-8 h-8 rounded-full bg-white border-4 border-slate-300 shadow-md items-center justify-center z-10">
-                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
-                </div>
-
-                <div class="flex-1 w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 md:p-4 shadow-xs md:ml-12">
-                    <div class="annual-quarter bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden">
-                        <div class="flex items-center gap-2 px-3 md:px-4 py-2 bg-slate-50/60 border-b border-slate-100">
-                            <span class="text-xs font-black text-slate-700">No date yet</span>
-                            <span class="text-[11px] font-semibold text-slate-600 ml-auto">${pluralize(items.length, 'deliverable')}</span>
-                        </div>
-                        <ul class="divide-y divide-slate-100">
-                            ${annualModuleRows(items, 'TBD')}
-                        </ul>
-                    </div>
-                </div>
-            `;
-            roadmapContainer.appendChild(section);
-        }
-
-        // 2. Quarterly Perspective: Fixed height cards (h-64) with internal overflow scroll
+        // 2. Quarterly: quarter cards -> month rows -> deliverables
         function renderQuarterlyTimeline(items) {
-            const quarterGroups = {};
-            const unscheduled = [];
-
-            items.forEach(item => {
-                if (!item.date) {
-                    unscheduled.push(item);
-                    return;
-                }
-                const [y, mStr] = item.date.split('-');
-                const m = parseInt(mStr, 10);
-                const qNum = Math.ceil(m / 3);
-                const qKey = `Q${qNum} ${y}`;
-                if (!quarterGroups[qKey]) {
-                    quarterGroups[qKey] = {
-                        year: y,
-                        quarterNum: qNum,
-                        months: {}
-                    };
-                    const startMonth = (qNum - 1) * 3 + 1;
-                    for (let i = startMonth; i <= startMonth + 2; i++) {
-                        quarterGroups[qKey].months[i] = [];
-                    }
-                }
-                quarterGroups[qKey].months[m].push(item);
+            const roadmap = getActiveRoadmap();
+            const quarters = {};
+            items.forEach(i => { if (i.date) { const n = Math.ceil(parseInt(i.date.slice(5, 7), 10) / 3); const k = `${i.date.slice(0, 4)}-Q${n}`; (quarters[k] = quarters[k] || []).push(i); } });
+            const sorted = Object.keys(quarters).sort();
+            const label = k => `Q${k.slice(6)} ${k.slice(0, 4)}`;
+            const shown = activeSubfilter === 'ALL' ? sorted : sorted.filter(k => label(k) === activeSubfilter);
+            const openQuarters = defaultOpenSet(sorted, quarterOf(nowYm()));
+            const allMonths = Object.keys(groupByMonth(items)).sort();
+            const openMonths = defaultOpenSet(allMonths, nowYm());
+            shown.forEach(k => {
+                const year = k.slice(0, 4), n = Number(k.slice(6));
+                const qItems = quarters[k];
+                const byMonth = groupByMonth(qItems);
+                const yms = [1, 2, 3].map(j => `${year}-${String((n - 1) * 3 + j).padStart(2, '0')}`);
+                const done = qItems.filter(i => i.status === 'done').length;
+                const body = () => yms.map(ym => {
+                    const mItems = byMonth[ym] || [];
+                    const monthName = formatMonthFull(parseInt(ym.slice(5), 10));
+                    if (!mItems.length) return listEmptyHtml(monthName, '');
+                    return listBlockHtml({
+                        key: `M|${ym}`, defaultOpen: openMonths.has(ym), title: monthName, items: mItems, level: 2,
+                        loadHtml: loadLineHtml(roadmap, ym),
+                        drill: { perspective: 'month', period: ym, label: `Open ${monthName} ${year} in the Monthly view` },
+                        body: () => listRowsHtml(roadmap, mItems, `M|${ym}`)
+                    });
+                }).join('');
+                if (!isListOpen(`Q|${year}|${n}`)) yms.forEach(ym => { if (byMonth[ym]) listKeys.set(`M|${ym}`, openMonths.has(ym)); });
+                const firstMonth = yms.find(ym => byMonth[ym]);
+                listSection({ period: label(k), label: `Q${n}`, sublabel: `'${year.slice(2)}`, allDone: done === qItems.length, card: listBlockHtml({
+                    key: `Q|${year}|${n}`, defaultOpen: openQuarters.has(k), title: label(k), sub: QUARTER_MONTHS[`Q${n}`], items: qItems, level: 1,
+                    loadHtml: loadVisible(roadmap) ? quarterLoadHtml(roadmap, year, n) : '',
+                    drill: firstMonth ? { perspective: 'month', period: firstMonth, label: `Open ${formatMonthFull(parseInt(firstMonth.slice(5), 10))} ${year} in the Monthly view` } : null,
+                    body
+                }) });
             });
-
-            const sortedQuarterKeys = Object.keys(quarterGroups).sort((a, b) => {
-                const [qA, yA] = a.split(' ');
-                const [qB, yB] = b.split(' ');
-                return yA !== yB ? yA.localeCompare(yB) : qA.localeCompare(qB);
-            });
-
-            const quartersToDisplay = activeSubfilter === 'ALL' ? sortedQuarterKeys : sortedQuarterKeys.filter(k => k === activeSubfilter);
-
-            quartersToDisplay.forEach(qKey => {
-                const group = quarterGroups[qKey];
-                const allQItems = Object.values(group.months).flat();
-                const doneCount = allQItems.filter(i => i.status === 'done').length;
-                const isAllDone = allQItems.length > 0 && doneCount === allQItems.length;
-
-                const section = document.createElement('div');
-                section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
-                section.dataset.period = qKey;
-
-                section.innerHTML = `
-                    <div class="w-full md:w-32 shrink-0 flex md:flex-col items-center md:items-end justify-between md:justify-start pr-0 md:pr-6 text-left md:text-right">
-                        <div>
-                            <span class="text-2xl md:text-3xl font-black text-slate-900 tracking-tight block">${qKey.split(' ')[0]}</span>
-                            <span class="text-sm font-bold text-brand-600 block">${qKey.split(' ')[1]}</span>
-                            <span class="text-[11px] font-semibold text-slate-500 block">${doneCount}/${allQItems.length} Done</span>
-                        </div>
-                    </div>
-
-                    <div class="hidden md:flex absolute left-[152px] top-4 w-8 h-8 rounded-full bg-white border-4 ${isAllDone ? 'border-emerald-500' : 'border-brand-600'} shadow-md items-center justify-center z-10">
-                        <div class="w-2.5 h-2.5 rounded-full ${isAllDone ? 'bg-emerald-500' : 'bg-brand-600'}"></div>
-                    </div>
-
-                    <div class="flex-1 w-full bg-slate-50/70 border border-slate-200 rounded-2xl p-5 shadow-xs md:ml-12">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            ${Object.keys(group.months).map(mNum => {
-                                const mItems = group.months[mNum];
-                                const monthName = formatMonthFull(parseInt(mNum, 10));
-                                // Empty months collapse to a one-line strip
-                                if (mItems.length === 0) {
-                                    return `
-                                        <div class="self-start flex items-center justify-between px-4 py-2.5 bg-white border border-dashed border-slate-200 rounded-xl">
-                                            <span class="text-xs font-black text-slate-700">${escapeHtml(monthName)}</span>
-                                            <span class="text-[11px] text-slate-500 italic">No items</span>
-                                        </div>
-                                    `;
-                                }
-                                const ym = `${group.year}-${String(mNum).padStart(2, '0')}`;
-                                const roadmap = getActiveRoadmap();
-                                const ranked = sortByRank(roadmap, mItems);
-                                const reorder = canEditActive();
-                                return `
-                                    <div onclick="drillDown('month', '${ym}')" role="button" tabindex="0" aria-label="Open ${escapeHtml(monthName)} ${group.year} in the Monthly view" title="Open ${escapeHtml(monthName)} ${group.year} in the Monthly view" class="group/card h-64 bg-white border border-slate-200/90 hover:border-brand-300 hover:shadow-sm rounded-xl p-4 shadow-2xs flex flex-col justify-between cursor-pointer transition-all">
-                                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 shrink-0">
-                                            <span class="flex flex-col gap-0.5 min-w-0"><span class="text-xs font-black text-slate-800 group-hover/card:text-brand-700">${escapeHtml(monthName)}</span>${loadLineHtml(roadmap, ym, true)}</span>
-                                            <span class="flex items-center gap-1.5">
-                                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${mItems.length > 0 && mItems.every(i => i.status === 'done') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}">
-                                                    ${pluralize(mItems.length, 'item')}
-                                                </span>
-                                                <i class="ph-bold ph-arrow-right text-xs text-slate-500 group-hover/card:text-brand-600" aria-hidden="true"></i>
-                                            </span>
-                                        </div>
-
-                                        <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1" data-rank-list="${ym}">
-                                            ${mItems.length > 0
-                                                ? ranked.map((item, n) => `
-                                                    <div onclick="event.stopPropagation(); openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" data-rank-id="${escapeHtml(item.id)}" class="group/row p-2.5 rounded-xl border ${overTint(roadmap, item) || 'border-slate-100 hover:border-brand-200 bg-slate-50/50 hover:bg-brand-50/30'} cursor-pointer transition-all">
-                                                        <div class="flex items-center justify-between gap-1">
-                                                            <span class="flex items-center gap-1.5 min-w-0">${reorder ? reorderHtml(item) : ''}${rankChipHtml(roadmap, item, n + 1)}<span class="text-xs font-bold text-slate-800 line-clamp-1">${escapeHtml(item.name)}</span></span>
-                                                            ${statusDot(item.status)}
-                                                        </div>
-                                                        <div class="flex items-center gap-1.5 mt-1"><span class="text-[10px] text-brand-600 font-semibold truncate flex-1">${escapeHtml(item.module)}</span>${overFlagHtml(roadmap, item)}${effortHtml(item)}${reorder ? moveButtonsHtml(item) : ''}</div>
-                                                    </div>
-                                                `).join('')
-                                                : `<div class="h-full flex items-center justify-center text-slate-500 text-[11px] italic">No items</div>`
-                                            }
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
-                `;
-                roadmapContainer.appendChild(section);
-            });
-
-            if (unscheduled.length > 0 && (activeSubfilter === 'ALL' || activeSubfilter === 'Unscheduled')) {
-                renderUnscheduledSection(unscheduled);
-            }
+            backlogSection(roadmap, items.filter(i => !i.date));
         }
 
-        // 3. Monthly Perspective: Constrained height container (max-h-72) with internal overflow scroll
+        // 3. Monthly: month cards -> deliverables
         function renderMonthlyTimeline(items) {
-            const monthGroups = {};
-            const unscheduled = [];
-
-            items.forEach(item => {
-                if (!item.date) {
-                    unscheduled.push(item);
-                    return;
-                }
-                if (!monthGroups[item.date]) monthGroups[item.date] = [];
-                monthGroups[item.date].push(item);
-            });
-
-            const sortedMonths = Object.keys(monthGroups).sort();
-            const monthsToDisplay = activeSubfilter === 'ALL' ? sortedMonths : sortedMonths.filter(m => m === activeSubfilter);
-
             const roadmap = getActiveRoadmap();
-            const reorder = canEditActive();
-            monthsToDisplay.forEach(ym => {
-                const mItems = sortByRank(roadmap, monthGroups[ym]);
-                const doneCount = mItems.filter(i => i.status === 'done').length;
-                const isAllDone = mItems.length > 0 && doneCount === mItems.length;
-
-                const section = document.createElement('div');
-                section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
-                section.dataset.period = ym;
-
-                section.innerHTML = `
-                    <div class="w-full md:w-32 shrink-0 flex md:flex-col items-center md:items-end justify-between md:justify-start pr-0 md:pr-6 text-left md:text-right">
-                        <div>
-                            <span class="text-xl md:text-2xl font-black text-slate-900 tracking-tight block">${formatMonthYear(ym).split(' ')[0]}</span>
-                            <span class="text-sm font-bold text-brand-600 block">${formatMonthYear(ym).split(' ')[1]}</span>
-                            <span class="text-[11px] font-semibold text-slate-500 block">${doneCount}/${mItems.length} Done</span>
-                        </div>
-                    </div>
-
-                    <div class="hidden md:flex absolute left-[152px] top-4 w-8 h-8 rounded-full bg-white border-4 ${isAllDone ? 'border-emerald-500' : 'border-brand-600'} shadow-md items-center justify-center z-10">
-                        <div class="w-2.5 h-2.5 rounded-full ${isAllDone ? 'bg-emerald-500' : 'bg-brand-600'}"></div>
-                    </div>
-
-                    <div class="flex-1 w-full bg-white border border-slate-200 rounded-2xl p-5 shadow-xs md:ml-12">
-                        ${loadLineHtml(roadmap, ym) ? `<div class="flex justify-end mb-3">${loadLineHtml(roadmap, ym)}</div>` : ''}
-                        <div class="max-h-72 overflow-y-auto custom-scrollbar pr-1">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3" data-rank-list="${ym}">
-                                ${mItems.map((item, n) => `
-                                    <div onclick="openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" data-rank-id="${escapeHtml(item.id)}" class="group/row p-4 rounded-xl border ${overTint(roadmap, item) || 'border-slate-200 hover:border-brand-300 hover:shadow-xs bg-slate-50/50 hover:bg-white'} cursor-pointer transition-all">
-                                        <div class="flex items-center justify-between gap-2 mb-1.5">
-                                            <span class="flex items-center gap-1.5 min-w-0 flex-wrap">${reorder ? reorderHtml(item) : ''}${rankChipHtml(roadmap, item, n + 1)}<span class="text-xs font-bold text-slate-900">${escapeHtml(item.name)}</span></span>
-                                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${item.status === 'done' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : item.status === 'in-progress' ? 'bg-brand-50 text-brand-600 border border-brand-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">
-                                                ${escapeHtml(STATUS_LABELS[item.status] || item.status)}
-                                            </span>
-                                        </div>
-                                        <div class="flex items-center gap-2 mb-2"><p class="text-xs text-brand-600 font-semibold flex-1">${escapeHtml(item.module)}</p>${overFlagHtml(roadmap, item)}${effortHtml(item)}${reorder ? moveButtonsHtml(item) : ''}</div>
-                                        ${item.inclusions && item.inclusions.length ? `
-                                            <div class="flex flex-wrap gap-1">
-                                                ${item.inclusions.map(inc => `<span class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded">${escapeHtml(inc)}</span>`).join('')}
-                                            </div>
-                                        ` : ''}
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    </div>
-                `;
-                roadmapContainer.appendChild(section);
+            const byMonth = groupByMonth(items);
+            const sorted = Object.keys(byMonth).sort();
+            const shown = activeSubfilter === 'ALL' ? sorted : sorted.filter(m => m === activeSubfilter);
+            const openMonths = defaultOpenSet(sorted, nowYm());
+            shown.forEach(ym => {
+                const mItems = byMonth[ym];
+                const done = mItems.filter(i => i.status === 'done').length;
+                const [mon, yr] = formatMonthYear(ym).split(' ');
+                listSection({ period: ym, label: mon, sublabel: yr, allDone: done === mItems.length, card: listBlockHtml({
+                    key: `M|${ym}`, defaultOpen: openMonths.has(ym), title: `${formatMonthFull(parseInt(ym.slice(5), 10))} ${yr}`, items: mItems, level: 1,
+                    loadHtml: loadLineHtml(roadmap, ym),
+                    body: () => listRowsHtml(roadmap, mItems, `M|${ym}`)
+                }) });
             });
-
-            if (unscheduled.length > 0 && (activeSubfilter === 'ALL' || activeSubfilter === 'Unscheduled')) {
-                renderUnscheduledSection(unscheduled);
-            }
+            backlogSection(roadmap, items.filter(i => !i.date));
         }
 
-        // 4. Modules Perspective (2.1.2, R-9): one compact list of modules (A–Z) that expand to their deliverables
+        // 4. Modules: module cards (A–Z) -> deliverables in rank order
         function renderModulesView(items) {
-            const shown = activeSubfilter === 'ALL' ? items : items.filter(i => (i.module || 'General') === activeSubfilter);
-            // Picking one module in the filter opens it
-            if (activeSubfilter !== 'ALL') annualOpen.add(`MOD|${activeSubfilter}`);
-            const box = document.createElement('div');
-            box.className = "w-full";
-            box.innerHTML = `
-                <div class="annual-quarter bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden">
-                    <div class="flex items-center gap-2 px-3 md:px-4 py-1.5 bg-slate-50/60 border-b border-slate-100">
-                        <span class="text-xs font-black text-slate-700">Modules</span>
-                        <span class="text-[11px] font-semibold text-slate-600 ml-auto whitespace-nowrap">${pluralize(new Set(shown.map(i => i.module || 'General')).size, 'module')} · ${pluralize(shown.length, 'deliverable')}</span>
-                        ${progressBar(shown.filter(i => i.status === 'done').length, shown.length, 'w-8 sm:w-16')}
-                    </div>
-                    <ul class="divide-y divide-slate-100">${annualModuleRows(shown, 'MOD')}</ul>
-                </div>`;
-            roadmapContainer.appendChild(box);
-            updateAnnualToggle();
-        }
-
-        // Render Unscheduled Backlog Section (max-h-60 with internal overflow scroll)
-        function renderUnscheduledSection(items) {
             const roadmap = getActiveRoadmap();
-            items = sortByRank(roadmap, items);
-            const section = document.createElement('div');
-            section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
-
-            section.innerHTML = `
-                <div class="w-full md:w-32 shrink-0 flex md:flex-col items-center md:items-end justify-between md:justify-start pr-0 md:pr-6 text-left md:text-right">
-                    <div>
-                        <span class="text-xl md:text-2xl font-black text-slate-500 tracking-tight block">TBD</span>
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-500 block">Backlog</span>
-                    </div>
-                </div>
-
-                <div class="hidden md:flex absolute left-[152px] top-4 w-8 h-8 rounded-full bg-white border-4 border-slate-300 shadow-md items-center justify-center z-10">
-                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
-                </div>
-
-                <div class="flex-1 w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-xs md:ml-12">
-                    <div class="max-h-60 overflow-y-auto custom-scrollbar pr-1">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            ${items.map(item => `
-                                <div onclick="openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" class="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-brand-300 cursor-pointer transition-all">
-                                    <span class="text-xs font-bold text-slate-900 flex items-center gap-1.5">${rankChipHtml(roadmap, item)}${escapeHtml(item.name)}${effortHtml(item)}</span>
-                                    <span class="text-[11px] text-brand-600 font-semibold">${escapeHtml(item.module)}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
-            roadmapContainer.appendChild(section);
+            const groups = {};
+            items.forEach(i => { const m = i.module || 'General'; (groups[m] = groups[m] || []).push(i); });
+            const mods = Object.keys(groups).sort(annualCollator.compare);
+            const shown = activeSubfilter === 'ALL' ? mods : mods.filter(m => m === activeSubfilter);
+            const soon = new Set([nowYm(), nowYm(1)]);
+            shown.forEach(mod => {
+                const mItems = groups[mod];
+                const done = mItems.filter(i => i.status === 'done').length;
+                // Open when it has work in the current or next month; picking it in the Filter opens it
+                const defaultOpen = activeSubfilter === mod || mItems.some(i => soon.has(i.date));
+                if (activeSubfilter === mod) listState.set(`MOD|${mod}`, true);
+                const box = document.createElement('div');
+                box.className = 'list-section border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs';
+                box.innerHTML = listBlockHtml({ key: `MOD|${mod}`, defaultOpen, title: mod, items: mItems, level: 1, body: () => listRowsHtml(roadmap, mItems, `MOD|${mod}`, false) });
+                roadmapContainer.appendChild(box);
+            });
         }
 
         // =======================================================
