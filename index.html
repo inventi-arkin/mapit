@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.1.0" data-released="2026-11-05">
+    <meta name="mapit-version" content="2.1.1" data-released="2026-11-09">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -286,6 +286,10 @@
 
                 <!-- Contextual Subfilter -->
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-2 w-full sm:w-auto justify-between sm:justify-end">
+                    <!-- Annual view only: open or close every module row (annual-view FR-7) -->
+                    <button id="annual-expand-toggle" type="button" onclick="toggleAllAnnualModules()" aria-pressed="false" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition-all">
+                        <i class="ph-bold ph-arrows-out-line-vertical text-xs"></i><span>Expand all</span>
+                    </button>
                     <!-- Status legend for the timeline dots -->
                     <div id="status-legend" class="flex items-center gap-3 text-[11px] font-medium text-slate-500" aria-label="Status legend">
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Done</span>
@@ -1940,6 +1944,7 @@
         function renderTimeline(items) {
             if (!roadmapContainer) return;
             roadmapContainer.innerHTML = '';
+            updateAnnualToggle();
 
             const guideLine = document.getElementById('timeline-vertical-guide');
             if (guideLine) {
@@ -1971,7 +1976,94 @@
             }
         }
 
-        // 1. Annual Perspective: Fixed height cards (h-64) with internal overflow scroll
+        // 1. Annual Perspective (2.1.1): each year lists Q1–Q4 as compact rows; each quarter lists its
+        // modules as one-line summaries that expand to their deliverables. No fixed heights.
+        const QUARTER_MONTHS = { Q1: 'Jan – Mar', Q2: 'Apr – Jun', Q3: 'Jul – Sep', Q4: 'Oct – Dec' };
+        // Open module rows ("2026|Q3|Billing", "TBD|Billing"): kept in memory until reload (annual-view FR-6)
+        const annualOpen = new Set();
+        const annualCollator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true }); // A–Z, 'Mod 2' before 'Mod 10'
+
+        function progressBar(done, total, width = 'w-16') {
+            const pct = total ? Math.round((done / total) * 100) : 0;
+            return `<span class="${width} bg-slate-100 h-1.5 rounded-full overflow-hidden shrink-0" aria-hidden="true"><span class="block h-full rounded-full ${pct === 100 ? 'bg-emerald-500' : 'bg-brand-600'}" style="width: ${pct}%"></span></span>`;
+        }
+
+        // Module rows for one quarter (or the backlog), A–Z, each with its deliverables underneath
+        function annualModuleRows(items, keyPrefix) {
+            const groups = {};
+            items.forEach(item => {
+                const mod = item.module || 'General';
+                (groups[mod] = groups[mod] || []).push(item);
+            });
+            const mods = Object.keys(groups).sort(annualCollator.compare);
+            return mods.map(mod => {
+                const mItems = groups[mod].slice().sort((a, b) => (a.date || '').localeCompare(b.date || '') || String(a.name).localeCompare(String(b.name)));
+                const counts = { 'done': 0, 'in-progress': 0, 'planned': 0 };
+                mItems.forEach(i => { counts[i.status] = (counts[i.status] || 0) + 1; });
+                const pct = Math.round((counts.done / mItems.length) * 100);
+                const key = `${keyPrefix}|${mod}`;
+                const open = annualOpen.has(key);
+                const label = `${mod}, ${pluralize(mItems.length, 'deliverable')}, ${counts.done} done, ${counts['in-progress']} in progress, ${counts.planned} planned`;
+                const dots = [['done', 'bg-emerald-500', 'done'], ['in-progress', 'bg-brand-500', 'in progress'], ['planned', 'bg-amber-400', 'planned']]
+                    .filter(([s]) => counts[s] > 0)
+                    .map(([s, color, word]) => `<span class="flex items-center gap-1" title="${counts[s]} ${word}"><span class="w-2 h-2 rounded-full ${color}"></span>${counts[s]}<span class="hidden sm:inline">${word}</span></span>`).join('');
+                return `
+                    <li class="annual-module">
+                        <button type="button" onclick="toggleAnnualModule(this)" data-annual-key="${escapeHtml(key)}" aria-expanded="${open}" aria-label="${escapeHtml(label)}" class="w-full flex items-center gap-2 px-3 md:px-4 py-1 text-left hover:bg-slate-50 transition-colors">
+                            <i class="annual-caret ph-bold ${open ? 'ph-caret-down' : 'ph-caret-right'} text-[10px] text-slate-500 shrink-0" aria-hidden="true"></i>
+                            <span class="text-xs font-bold text-slate-800 truncate min-w-0 flex-1">${escapeHtml(mod)}</span>
+                            <span class="hidden sm:inline text-[10px] text-slate-500 shrink-0" aria-hidden="true">${pluralize(mItems.length, 'deliverable')}</span>
+                            <span class="flex items-center gap-2 text-[10px] font-semibold text-slate-600 shrink-0" aria-hidden="true">${dots}</span>
+                            ${progressBar(counts.done, mItems.length, 'w-10 sm:w-14')}
+                            <span class="w-8 text-right text-[10px] font-bold ${pct === 100 ? 'text-emerald-600' : 'text-slate-600'} shrink-0" aria-hidden="true">${pct}%</span>
+                        </button>
+                        <ul class="annual-deliverables ${open ? '' : 'hidden'} pl-8 md:pl-9 pr-3 md:pr-4 pb-2 space-y-0.5">
+                            ${mItems.map(item => `
+                                <li onclick="openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-brand-50/50 cursor-pointer">
+                                    ${statusDot(item.status)}
+                                    <span class="text-xs text-slate-700 truncate min-w-0 flex-1">${escapeHtml(item.name)}</span>
+                                    <span class="text-[10px] text-slate-500 shrink-0">${escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD')}</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </li>
+                `;
+            }).join('');
+        }
+
+        window.toggleAnnualModule = function(btn) {
+            const key = btn.dataset.annualKey;
+            const open = !annualOpen.has(key);
+            if (open) annualOpen.add(key); else annualOpen.delete(key);
+            btn.setAttribute('aria-expanded', String(open));
+            const caret = btn.querySelector('.annual-caret');
+            caret?.classList.toggle('ph-caret-right', !open);
+            caret?.classList.toggle('ph-caret-down', open);
+            btn.nextElementSibling?.classList.toggle('hidden', !open);
+            updateAnnualToggle();
+        };
+
+        // "Expand all / Collapse all" in the perspective bar (Annual only, annual-view FR-7)
+        window.toggleAllAnnualModules = function() {
+            const btns = [...(roadmapContainer?.querySelectorAll('[data-annual-key]') || [])];
+            const expand = btns.some(b => !annualOpen.has(b.dataset.annualKey));
+            btns.forEach(b => { if (annualOpen.has(b.dataset.annualKey) !== expand) toggleAnnualModule(b); });
+            updateAnnualToggle();
+        };
+
+        function updateAnnualToggle() {
+            const toggle = document.getElementById('annual-expand-toggle');
+            if (!toggle) return;
+            const btns = [...(roadmapContainer?.querySelectorAll('[data-annual-key]') || [])];
+            const show = activePerspective === 'year' && btns.length > 0;
+            toggle.classList.toggle('hidden', !show);
+            toggle.classList.toggle('flex', show);
+            const allOpen = btns.length > 0 && btns.every(b => annualOpen.has(b.dataset.annualKey));
+            toggle.setAttribute('aria-pressed', String(allOpen));
+            toggle.querySelector('i').className = `ph-bold ${allOpen ? 'ph-arrows-in-line-vertical' : 'ph-arrows-out-line-vertical'} text-xs`;
+            toggle.querySelector('span').textContent = allOpen ? 'Collapse all' : 'Expand all';
+        }
+
         function renderAnnualTimeline(items) {
             const yearGroups = {};
             const unscheduled = [];
@@ -2009,6 +2101,7 @@
                             <span class="text-2xl md:text-3xl font-black text-slate-900 tracking-tight block">${year}</span>
                             <span class="text-[11px] font-bold uppercase tracking-wider text-brand-600 block">Annual Plan</span>
                             <span class="text-[11px] font-semibold text-slate-500 block">${doneCount}/${yearItems.length} Done</span>
+                            <span class="flex md:justify-end mt-1">${progressBar(doneCount, yearItems.length, 'w-20')}</span>
                         </div>
                     </div>
 
@@ -2016,67 +2109,75 @@
                         <div class="w-2.5 h-2.5 rounded-full ${isAllDone ? 'bg-emerald-500' : 'bg-brand-600'}"></div>
                     </div>
 
-                    <div class="flex-1 w-full bg-slate-50/70 border border-slate-200 rounded-2xl p-5 shadow-xs md:ml-12">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            ${['Q1', 'Q2', 'Q3', 'Q4'].map(qKey => {
-                                const qItems = quarters[qKey];
-                                const qDone = qItems.filter(i => i.status === 'done').length;
-                                // Empty quarters collapse to a one-line strip so planned work stays above the fold
-                                if (qItems.length === 0) {
-                                    return `
-                                        <div class="self-start flex items-center justify-between px-4 py-2.5 bg-white border border-dashed border-slate-200 rounded-xl">
-                                            <div class="flex items-center gap-1.5">
-                                                <span class="text-xs font-black text-slate-700">${qKey}</span>
-                                                <span class="text-[10px] text-slate-500 font-medium">${year}</span>
-                                            </div>
-                                            <span class="text-[11px] text-slate-500 italic">No deliverables scheduled</span>
-                                        </div>
-                                    `;
-                                }
+                    <div class="flex-1 w-full bg-slate-50/70 border border-slate-200 rounded-2xl p-2.5 md:p-3 shadow-xs md:ml-12 space-y-1.5">
+                        ${['Q1', 'Q2', 'Q3', 'Q4'].map(qKey => {
+                            const qItems = quarters[qKey];
+                            const qDone = qItems.filter(i => i.status === 'done').length;
+                            // Empty quarters are one line and not clickable
+                            if (qItems.length === 0) {
                                 return `
-                                    <div onclick="drillDown('quarter', '${qKey} ${year}')" role="button" tabindex="0" aria-label="Open ${qKey} ${year} in the Quarterly view" title="Open ${qKey} ${year} in the Quarterly view" class="group/card h-64 bg-white border border-slate-200/90 hover:border-brand-300 hover:shadow-sm rounded-xl p-4 shadow-2xs flex flex-col justify-between cursor-pointer transition-all">
-                                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 shrink-0">
-                                            <div class="flex items-center gap-1.5">
-                                                <span class="text-xs font-black text-slate-900 group-hover/card:text-brand-700">${qKey}</span>
-                                                <span class="text-[10px] text-slate-500 font-medium">${year}</span>
-                                            </div>
-                                            <span class="flex items-center gap-1.5">
-                                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${qItems.length > 0 && qDone === qItems.length ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-slate-600'}">
-                                                    ${qItems.length ? `${qDone}/${qItems.length} Done` : 'No plans'}
-                                                </span>
-                                                <i class="ph-bold ph-arrow-right text-xs text-slate-500 group-hover/card:text-brand-600" aria-hidden="true"></i>
-                                            </span>
-                                        </div>
-
-                                        <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
-                                            ${qItems.length > 0 
-                                                ? qItems.map(item => `
-                                                    <div onclick="event.stopPropagation(); openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" class="p-2.5 rounded-xl border border-slate-100 hover:border-brand-200 bg-slate-50/50 hover:bg-brand-50/30 cursor-pointer transition-all">
-                                                        <div class="flex items-center justify-between gap-1">
-                                                            <span class="text-xs font-bold text-slate-800 line-clamp-1">${escapeHtml(item.name)}</span>
-                                                            ${statusDot(item.status)}
-                                                        </div>
-                                                        <div class="flex items-center justify-between text-[10px] text-slate-500 mt-1">
-                                                            <span class="font-medium text-brand-600 truncate">${escapeHtml(item.module)}</span>
-                                                            <span>${escapeHtml(formatMonthYear(item.date))}</span>
-                                                        </div>
-                                                    </div>
-                                                `).join('') 
-                                                : `<div class="h-full flex items-center justify-center text-slate-500 text-[11px] italic">No deliverables scheduled</div>`
-                                            }
-                                        </div>
+                                    <div class="annual-quarter flex items-center gap-2 px-3 md:px-4 py-1.5 bg-white border border-dashed border-slate-200 rounded-xl">
+                                        <span class="text-xs font-black text-slate-700 w-6">${qKey}</span>
+                                        <span class="text-[10px] text-slate-500 font-medium whitespace-nowrap">${QUARTER_MONTHS[qKey]}</span>
+                                        <span class="text-[11px] text-slate-500 italic ml-auto">No deliverables</span>
                                     </div>
                                 `;
-                            }).join('')}
-                        </div>
+                            }
+                            return `
+                                <div class="annual-quarter bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden" data-quarter="${qKey} ${year}">
+                                    <div onclick="drillDown('quarter', '${qKey} ${year}')" role="button" tabindex="0" aria-label="Open ${qKey} ${year} in the Quarterly view" title="Open ${qKey} ${year} in the Quarterly view" class="annual-quarter-head group/card flex items-center gap-2 px-3 md:px-4 py-1.5 bg-slate-50/60 hover:bg-brand-50/50 border-b border-slate-100 cursor-pointer transition-colors">
+                                        <span class="text-xs font-black text-slate-900 group-hover/card:text-brand-700 w-6">${qKey}</span>
+                                        <span class="text-[10px] text-slate-500 font-medium whitespace-nowrap">${QUARTER_MONTHS[qKey]}</span>
+                                        <span class="text-[11px] font-semibold text-slate-600 ml-auto whitespace-nowrap">${pluralize(qItems.length, 'deliverable')} · ${qDone} done</span>
+                                        ${progressBar(qDone, qItems.length, 'w-8 sm:w-16')}
+                                        <i class="ph-bold ph-arrow-right text-xs text-slate-500 group-hover/card:text-brand-600" aria-hidden="true"></i>
+                                    </div>
+                                    <ul class="divide-y divide-slate-100">
+                                        ${annualModuleRows(qItems, `${year}|${qKey}`)}
+                                    </ul>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 `;
                 roadmapContainer.appendChild(section);
             });
 
             if (unscheduled.length > 0 && (activeSubfilter === 'ALL' || activeSubfilter === 'Unscheduled')) {
-                renderUnscheduledSection(unscheduled);
+                renderAnnualBacklog(unscheduled);
             }
+            updateAnnualToggle();
+        }
+
+        // Backlog / TBD in the Annual view: the same module rows (annual-view FR-10)
+        function renderAnnualBacklog(items) {
+            const section = document.createElement('div');
+            section.className = "snap-item flex flex-col md:flex-row items-start gap-4 md:gap-8 relative pt-2 pb-6";
+            section.innerHTML = `
+                <div class="w-full md:w-32 shrink-0 flex md:flex-col items-center md:items-end justify-between md:justify-start pr-0 md:pr-6 text-left md:text-right">
+                    <div>
+                        <span class="text-xl md:text-2xl font-black text-slate-500 tracking-tight block">TBD</span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-500 block">Backlog</span>
+                    </div>
+                </div>
+
+                <div class="hidden md:flex absolute left-[152px] top-4 w-8 h-8 rounded-full bg-white border-4 border-slate-300 shadow-md items-center justify-center z-10">
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                </div>
+
+                <div class="flex-1 w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 md:p-4 shadow-xs md:ml-12">
+                    <div class="annual-quarter bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden">
+                        <div class="flex items-center gap-2 px-3 md:px-4 py-2 bg-slate-50/60 border-b border-slate-100">
+                            <span class="text-xs font-black text-slate-700">No date yet</span>
+                            <span class="text-[11px] font-semibold text-slate-600 ml-auto">${pluralize(items.length, 'deliverable')}</span>
+                        </div>
+                        <ul class="divide-y divide-slate-100">
+                            ${annualModuleRows(items, 'TBD')}
+                        </ul>
+                    </div>
+                </div>
+            `;
+            roadmapContainer.appendChild(section);
         }
 
         // 2. Quarterly Perspective: Fixed height cards (h-64) with internal overflow scroll
