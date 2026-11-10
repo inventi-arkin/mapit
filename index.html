@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.1.2" data-released="2026-11-10">
+    <meta name="mapit-version" content="2.2.0" data-released="2026-11-10">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -175,6 +175,12 @@
                 <i class="ph ph-chat-centered-text text-sm"></i> <span class="hidden lg:inline">Feedback & Suggestions</span><span class="lg:hidden">Feedback</span>
                 <span id="nav-feedback-count" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700 font-bold ml-0.5">0</span>
             </button>
+            <span class="role-editor-only contents">
+                <button id="nav-activity" onclick="switchView('activity')" aria-label="Activity" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
+                    <i class="ph ph-clock-counter-clockwise text-sm"></i> Activity
+                    <span id="nav-activity-count" class="hidden px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500 text-white font-bold ml-0.5"></span>
+                </button>
+            </span>
         </nav>
 
         <!-- Right Side: account and New Roadmap (the roadmap selector is in the Roadmaps bar) -->
@@ -469,6 +475,53 @@
             </div>
         </div>
 
+        <!-- ======================================================= -->
+        <!-- VIEW 4: ACTIVITY (2.2.0, Editors + Admins)              -->
+        <!-- ======================================================= -->
+        <div id="activity-view" class="hidden max-w-6xl mx-auto w-full flex-1 min-h-0 overflow-hidden flex-col gap-4">
+            <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm shrink-0 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+                <div id="activity-scope" role="group" aria-label="Activity scope" class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0 max-w-full overflow-x-auto">
+                    <button type="button" data-scope="this" onclick="setActivityScope('this')" class="px-3 py-1 rounded-lg text-xs font-semibold transition-all">This<span class="hidden sm:inline"> roadmap</span></button>
+                    <button type="button" data-scope="all" onclick="setActivityScope('all')" class="px-3 py-1 rounded-lg text-xs font-semibold transition-all">All<span class="hidden sm:inline"> roadmaps</span></button>
+                    <button type="button" data-scope="deleted" onclick="setActivityScope('deleted')" class="px-3 py-1 rounded-lg text-xs font-semibold transition-all">Deleted<span class="hidden sm:inline"> roadmaps</span></button>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <label for="activity-area" class="text-slate-500 font-medium">Area:</label>
+                    <select id="activity-area" onchange="applyActivityFilters()" class="text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 cursor-pointer outline-none">
+                        <option value="ALL">All</option>
+                        <option value="roadmap">Roadmap</option>
+                        <option value="milestone">Milestones</option>
+                        <option value="feedback">Feedback</option>
+                        <option value="comment">Comments</option>
+                        <option value="bin">Recycle Bin</option>
+                        <option value="people">People</option>
+                    </select>
+                    <label for="activity-person" class="text-slate-500 font-medium">Person:</label>
+                    <select id="activity-person" onchange="applyActivityFilters()" class="max-w-[180px] truncate text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 cursor-pointer outline-none">
+                        <option value="ALL">Anyone</option>
+                    </select>
+                    <button type="button" id="activity-clear" onclick="clearActivityFilters()" class="hidden px-2 py-1.5 text-xs font-semibold text-brand-700 hover:underline">Clear filters</button>
+                    <button type="button" id="activity-export" onclick="exportActivityCSV()" class="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all">
+                        <i class="ph-bold ph-download-simple"></i> CSV
+                    </button>
+                </div>
+            </div>
+
+            <div id="activity-scroll" class="flex-1 min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-y-auto custom-scrollbar relative">
+                <div class="sticky top-0 z-10 flex justify-center h-0">
+                    <button type="button" id="activity-new-pill" onclick="showNewActivity()" aria-live="polite" class="hidden mt-3 px-3 py-1 rounded-full bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-bold shadow-md"></button>
+                </div>
+                <div class="p-4 md:p-5">
+                    <div id="activity-notice" class="hidden mb-3"></div>
+                    <div id="activity-list"></div>
+                    <div class="text-center mt-3">
+                        <button type="button" id="activity-more" onclick="loadMoreActivity()" class="hidden px-4 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700">Show more</button>
+                    </div>
+                    <p id="activity-end-note" class="hidden mt-4 text-center text-[11px] text-slate-500">Activity before 2.0 isn't in the log. Older milestone history is still on each milestone's History tab.</p>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <!-- Phone bottom tab bar (below sm; hidden until authenticated) -->
@@ -482,6 +535,11 @@
         <button id="mob-nav-feedback" onclick="switchView('feedback')" class="flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold text-slate-500">
             <span class="relative"><i class="ph ph-chat-centered-text text-lg"></i><span id="mob-nav-feedback-count" class="absolute -top-1 -right-3 px-1 rounded-full text-[9px] bg-slate-200 text-slate-700 font-bold">0</span></span> Feedback
         </button>
+        <span class="role-editor-only contents">
+            <button id="mob-nav-activity" onclick="switchView('activity')" class="flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold text-slate-500">
+                <span class="relative"><i class="ph ph-clock-counter-clockwise text-lg"></i><span id="mob-nav-activity-count" class="hidden absolute -top-1 -right-3 px-1 rounded-full text-[9px] bg-rose-500 text-white font-bold"></span></span> Activity
+            </button>
+        </span>
     </nav>
 
     <!-- ======================================================= -->
@@ -1044,7 +1102,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, getDocs, updateDoc, collection, query, where, onSnapshot, writeBatch, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, getDocs, updateDoc, collection, query, where, orderBy, limit, startAfter, onSnapshot, writeBatch, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Application State
         let currentUser = null;
@@ -1206,6 +1264,7 @@
 
         // DOM Handles
         const roadmapView = document.getElementById('roadmap-view');
+        const activityView = document.getElementById('activity-view');
         const editorView = document.getElementById('editor-view');
         const feedbackView = document.getElementById('feedback-view');
 
@@ -1253,15 +1312,22 @@
         // CORE NAVIGATION & PERSPECTIVE HELPERS
         // =======================================================
         window.switchView = function(viewName) {
+            // Activity is for Editors and Admins (activity-view FR-1)
+            if (viewName === 'activity' && !canEdit()) viewName = 'roadmap';
+            const leavingActivity = activityViewOpen() && viewName !== 'activity';
             document.getElementById('roadmap-bar-actions')?.classList.toggle('hidden', viewName !== 'roadmap');
             if (roadmapView) roadmapView.classList.add('hidden');
             if (editorView) editorView.classList.add('hidden');
             if (feedbackView) feedbackView.classList.add('hidden');
+            if (activityView) { activityView.classList.add('hidden'); activityView.classList.remove('flex'); }
+            // What was on screen while Activity was open counts as read
+            if (leavingActivity) markActivitySeen();
 
             const navButtons = [
                 { el: navRoadmap, id: 'roadmap' },
                 { el: navEditor, id: 'editor' },
-                { el: navFeedback, id: 'feedback' }
+                { el: navFeedback, id: 'feedback' },
+                { el: document.getElementById('nav-activity'), id: 'activity' }
             ];
 
             navButtons.forEach(item => {
@@ -1275,7 +1341,7 @@
                 else item.el.removeAttribute('aria-current');
             });
 
-            ['roadmap', 'editor', 'feedback'].forEach(id => {
+            ['roadmap', 'editor', 'feedback', 'activity'].forEach(id => {
                 const mobBtn = document.getElementById('mob-nav-' + id);
                 if (!mobBtn) return;
                 mobBtn.classList.toggle('text-brand-700', id === viewName);
@@ -1311,6 +1377,12 @@
                     populateFeedbackCategoryOptions(active.feedback || []);
                     renderFeedbackTable();
                 }
+            } else if (viewName === 'activity') {
+                activityView?.classList.remove('hidden');
+                activityView?.classList.add('flex');
+                if (!useCloudPersistence || activityKey !== activityKeyNow() || !activityUnsub) loadActivity();
+                else renderActivity();
+                markActivitySeen();
             }
             if (!getActiveRoadmap()) renderWorkspaceEmpty();
         };
@@ -1539,7 +1611,20 @@
                 populateFeedbackCategoryOptions(activeRoadmap.feedback || []);
                 renderFeedbackTable();
             }
+            syncActivity();
         };
+
+        // Keep the Activity list in step with the selected roadmap; drop it when it's for another scope and not on screen
+        function activityKeyNow() { return `${activityScope}|${activityScope === 'this' ? getActiveRoadmap()?.id || '' : ''}`; }
+        function syncActivity() {
+            if (activityViewOpen()) {
+                if (!canEdit()) { switchView('roadmap'); return; }
+                if (activityKey !== activityKeyNow()) loadActivity(); else if (!useCloudPersistence) { activityEntries = demoActivity(); renderActivity(); } else renderActivity();
+            } else if (activityKey && activityKey !== activityKeyNow()) {
+                stopActivity();
+                activityKey = '';
+            }
+        }
 
         // Show/hide controls for the user's role and the open roadmap (Firestore rules enforce the same limits)
         function applyRoleUI() {
@@ -1547,6 +1632,8 @@
             document.body.classList.toggle('no-edit-role', !canEdit());
             document.body.classList.toggle('not-admin', !isAdmin());
             document.body.classList.toggle('can-add-feedback', canAddFeedback());
+            document.getElementById('mobile-nav')?.classList.toggle('grid-cols-4', canEdit());
+            document.getElementById('mobile-nav')?.classList.toggle('grid-cols-3', !canEdit());
 
             const badge = document.getElementById('header-role-badge');
             if (badge) {
@@ -1681,6 +1768,7 @@
             if (roadmapView) roadmapView.classList.add('hidden');
             if (editorView) editorView.classList.add('hidden');
             if (feedbackView) feedbackView.classList.add('hidden');
+            if (activityView) { activityView.classList.add('hidden'); activityView.classList.remove('flex'); }
         };
 
         window.hideLoginGate = function() {
@@ -3706,7 +3794,7 @@
                 feedbackMap[f.id] = f.title;
             });
 
-            const headers = ['"Deliverable Name"', '"Module"', '"Target Date"', '"Quarter"', '"Status"', '"Scope Inclusions"', '"Description"', '"Linked Feedback"'];
+            const headers = ['"Deliverable Name"', '"Module"', '"Target Date"', '"Quarter"', '"Status"', '"Scope Inclusions"', '"Description"', '"Linked Feedback"', '"Last Changed By"', '"Last Changed At"'];
             
             const rows = items.map(item => {
                 let quarter = 'Unscheduled';
@@ -3728,7 +3816,9 @@
                     escape(item.status),
                     escape(inclusions),
                     escape(item.description),
-                    escape(linkedFb)
+                    escape(linkedFb),
+                    escape(item.updatedBy?.email ? `${item.updatedBy.name} <${item.updatedBy.email}>` : ''),
+                    escape(item.updatedAt ? phtIso(item.updatedAt) : '')
                 ].join(',');
             });
 
@@ -3747,11 +3837,14 @@
                     try {
                         const snap = await getDocs(wsCollection('roadmaps', activeRoadmap.id, 'milestones', m.id, 'comments'));
                         m.comments = snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => toMillis(a.at) - toMillis(b.at));
+                        const log = await getDocs(query(wsCollection('auditLog'), where('target.id', '==', m.id)));
+                        m.activity = log.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => toMillis(a.at) - toMillis(b.at));
                     } catch (err) {
                         console.warn('Could not load comments for export:', err);
                     }
                 }
             }
+            if (!useCloudPersistence) milestones.forEach(m => { m.activity = demoAuditLog.filter(e => e.target?.id === m.id); });
             const payload = {
                 roadmapTitle: activeRoadmap.title,
                 exportedAt: new Date().toISOString(),
@@ -4554,7 +4647,7 @@
                 const aid = `join-${email}-${Date.now()}`;
                 const batch = writeBatch(db);
                 if (bootstrap) batch.set(doc(db, ...WORKSPACE_PATH), { defaultRole: 'viewer', createdAt: serverTimestamp(), createdBy: { name: profile.name, email }, lastAuditId: aid });
-                batch.set(ref, { email, ...profile, role, joinedAt: serverTimestamp(), lastSeenAt: serverTimestamp(), lastAuditId: aid });
+                batch.set(ref, { email, ...profile, role, joinedAt: serverTimestamp(), lastSeenAt: serverTimestamp(), activitySeenAt: serverTimestamp(), lastAuditId: aid });
                 batch.set(auditRef(aid), {
                     v: 1, roadmapId: '', roadmapTitle: '', at: serverTimestamp(), action: bootstrap ? 'workspace.created' : 'member.joined',
                     target: { type: 'member', id: email, label: clip(profile.name, 200) }, changes: [{ f: 'role', to: role }], by: { name: profile.name, email }
@@ -4563,17 +4656,20 @@
                 snap = await withTimeout(getDoc(ref));
             } else {
                 const data = snap.data();
-                if (data.role !== 'blocked' && (Date.now() - toMillis(data.lastSeenAt) > 3600e3 || data.name !== profile.name || (data.photoURL || '') !== profile.photoURL)) {
-                    updateDoc(ref, { ...profile, lastSeenAt: serverTimestamp() }).catch(e => console.warn('Could not update last seen:', e));
+                // First sign-in after 2.2.0: the unread count starts now, not from the whole history (activity-view FR-14)
+                const firstSeen = !data.activitySeenAt ? { activitySeenAt: serverTimestamp() } : {};
+                if (data.role !== 'blocked' && (Date.now() - toMillis(data.lastSeenAt) > 3600e3 || data.name !== profile.name || (data.photoURL || '') !== profile.photoURL || !data.activitySeenAt)) {
+                    updateDoc(ref, { ...profile, lastSeenAt: serverTimestamp(), ...firstSeen }).catch(e => console.warn('Could not update last seen:', e));
                 }
             }
             return snap.data();
         }
 
         function onMyMemberChanged(snap) {
-            const data = snap.data();
+            const data = snap.data({ serverTimestamps: 'estimate' });
             const newRole = data?.role || 'blocked';
             const oldRole = myRole;
+            onActivitySeenChanged(data);
             if (newRole === oldRole) return;
             myRole = newRole;
             if (newRole === 'blocked') {
@@ -4590,7 +4686,9 @@
                 }
                 if (!isAdmin()) closeUsersModal();
                 if (['admin', 'editor'].includes(oldRole) !== ['admin', 'editor'].includes(newRole)) subscribeRoadmaps().catch(onListenerError);
+                if (!canEdit() && activityViewOpen()) switchView('roadmap');
             }
+            watchUnread();
             scheduleRender();
         }
 
@@ -4717,6 +4815,8 @@
             stopEditListeners();
             stopUsersListeners();
             stopFeedbackHistory();
+            stopActivity();
+            stopUnread();
         }
 
         // ---- Users screen (admins) ----
@@ -4727,6 +4827,527 @@
         function stopUsersListeners() {
             usersUnsubs.forEach(u => u());
             usersUnsubs = [];
+        }
+
+        // =======================================================
+        // ACTIVITY VIEW (2.2.0, specs/activity-view.md): the audit log as one timeline, Editors + Admins
+        // =======================================================
+        const ACTIVITY_PAGE = 50;
+        const ACTIVITY_SCAN = 500;       // with filters on, read at most this many more entries looking for matches
+        let activityScope = 'this';      // 'this' | 'all' | 'deleted'
+        let activityEntries = [];        // loaded entries, newest first
+        let activityPendingNew = [];     // arrived live while the user was scrolled down or filtering
+        let activityCursor = null;       // last loaded document (for "Show more")
+        let activityDone = false;        // no older entries left
+        let activityShow = ACTIVITY_PAGE;
+        let activityUnsub = null;
+        let activityKey = '';            // scope + roadmap the loaded entries belong to
+        let activityLoading = false;
+        let activityError = null;
+        let activityOpenRows = new Set();
+        let mySeenAt = null;             // members/{me}.activitySeenAt
+        let unreadUnsub = null;
+        let unreadSince = null;
+
+        const ROLE_NAMES = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer', blocked: 'Blocked' };
+        const AREA_STYLE = {
+            roadmap: ['ph-map-trifold', 'bg-brand-50 text-brand-600'],
+            milestone: ['ph-pencil-simple', 'bg-brand-50 text-brand-600'],
+            feedback: ['ph-chat-centered-text', 'bg-amber-50 text-amber-700'],
+            comment: ['ph-chat-circle', 'bg-violet-50 text-violet-600'],
+            bin: ['ph-trash', 'bg-rose-50 text-rose-600'],
+            people: ['ph-users-three', 'bg-indigo-50 text-indigo-600']
+        };
+
+        function activityArea(action) {
+            const a = String(action || '');
+            if (/\.(deleted|restored|purged)$/.test(a)) return 'bin';
+            if (a.startsWith('member.') || a.startsWith('workspace.')) return 'people';
+            if (a.startsWith('comment.')) return 'comment';
+            if (a.startsWith('milestone.')) return 'milestone';
+            if (a.startsWith('feedback.')) return 'feedback';
+            return 'roadmap';
+        }
+        // Editors don't see People entries (A-2)
+        function activityVisible(e) { return isAdmin() || activityArea(e.action) !== 'people'; }
+
+        const PHT_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' });
+        const PHT_DAY_LABEL = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Manila', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+        function phtDayKey(value) { const d = toDate(value) || new Date(); return PHT_DAY.format(d); }
+        function phtDayLabel(value) {
+            const key = phtDayKey(value);
+            if (key === phtDayKey(new Date())) return 'Today';
+            if (key === phtDayKey(new Date(Date.now() - 864e5))) return 'Yesterday';
+            return PHT_DAY_LABEL.format(toDate(value) || new Date());
+        }
+
+        // One change as words: "Status: Planned → In progress"
+        function activityValue(f, v) {
+            if (v === undefined || v === null || v === '') return '—';
+            if (f === 'status') return STATUS_LABELS[v] || v;
+            if (f === 'date') return v ? formatMonthYear(v) : 'TBD';
+            if (f === 'role' || f === 'defaultRole') return ROLE_NAMES[v] || v;
+            if (Array.isArray(v)) return v.join(', ') || '—';
+            return String(v);
+        }
+        function activityChangeLine(c) {
+            const label = FIELD_LABELS[c.f] || (c.f === 'role' ? 'Role' : c.f === 'defaultRole' ? 'Default role' : c.f === 'text' ? 'Comment' : c.f);
+            if (c.f === 'feedback') return String(c.to).startsWith('+') ? `Linked feedback "${String(c.to).slice(1)}"` : `Unlinked feedback "${String(c.to).slice(1)}"`;
+            if (c.f === 'description' || c.f === 'text') return `${label}: ${activityValue(c.f, c.to)}`;
+            return c.from !== undefined ? `${label}: ${activityValue(c.f, c.from)} → ${activityValue(c.f, c.to)}` : `${label}: ${activityValue(c.f, c.to)}`;
+        }
+
+        // The entry as one sentence (HTML, all values escaped) plus the full change list for the ▸ details
+        function activitySentence(e) {
+            const who = `<b class="font-bold text-slate-900" title="${escapeHtml(e.by?.email ? `${e.by.name} (${e.by.email})` : '')}">${escapeHtml(e.by?.name || 'Member')}</b>`;
+            const q = text => `<b class="font-bold text-slate-800">"${escapeHtml(text || '')}"</b>`;
+            const label = e.target?.label || '';
+            const changes = e.changes || [];
+            const kind = String(e.action || '').split('.')[0];
+            const noun = { milestone: 'milestone', feedback: 'feedback', roadmap: 'roadmap' }[kind] || '';
+            let text;
+            switch (e.action) {
+                case 'milestone.created': text = `${who} added milestone ${q(label)}`; break;
+                case 'feedback.created': text = `${who} added feedback ${q(label)}`; break;
+                case 'roadmap.created': text = `${who} created roadmap ${q(label)}`; break;
+                case 'milestone.updated':
+                case 'feedback.updated': {
+                    const c = changes[0];
+                    if (!c) { text = `${who} updated ${noun} ${q(label)}`; break; }
+                    const field = escapeHtml(FIELD_LABELS[c.f] || c.f);
+                    if (c.f === 'feedback') text = `${who} ${String(c.to).startsWith('+') ? 'linked' : 'unlinked'} feedback ${q(String(c.to).slice(1))} ${String(c.to).startsWith('+') ? 'to' : 'from'} ${q(label)}`;
+                    else if (c.f === 'name' || c.f === 'title') text = `${who} renamed ${q(c.from ?? label)} to ${q(c.to)}`;
+                    else if (c.f === 'description' || c.f === 'inclusions' || c.from === undefined) text = `${who} changed <i>${field}</i> of ${q(label)}`;
+                    else text = `${who} changed <i>${field}</i> of ${q(label)}: ${escapeHtml(activityValue(c.f, c.from))} → ${escapeHtml(activityValue(c.f, c.to))}`;
+                    break;
+                }
+                case 'milestone.deleted': case 'feedback.deleted': case 'roadmap.deleted':
+                    text = `${who} moved ${noun} ${q(label)} to the Recycle Bin`; break;
+                case 'milestone.restored': case 'feedback.restored': case 'roadmap.restored':
+                    text = `${who} restored ${noun} ${q(label)}`; break;
+                case 'milestone.purged': case 'feedback.purged': case 'roadmap.purged':
+                    text = `${who} removed ${noun} ${q(label)} for good`; break;
+                case 'comment.added': {
+                    const t = changes.find(c => c.f === 'text')?.to || '';
+                    text = `${who} commented on ${q(label)}${t ? `: <span class="text-slate-600">"${escapeHtml(t.length > 90 ? t.slice(0, 90) + '…' : t)}"</span>` : ''}`;
+                    break;
+                }
+                case 'roadmap.moved': text = `${who} moved ${q(label)} into the shared workspace`; break;
+                case 'roadmap.items_added': text = `${who} added ${escapeHtml(pluralize(Number(changes[0]?.to) || 0, 'item'))} to ${q(label)}`; break;
+                case 'roadmap.retention_set': text = `${who} set the Recycle Bin removal date of ${q(label)}`; break;
+                case 'workspace.created': text = `${who} set up the workspace`; break;
+                case 'member.joined': text = `${who} joined the workspace as ${escapeHtml(activityValue('role', changes[0]?.to))}`; break;
+                case 'member.role_changed': text = `${who} made <b class="font-bold text-slate-800" title="${escapeHtml(e.target?.id || '')}">${escapeHtml(label || e.target?.id || '')}</b> ${escapeHtml(changes[0]?.to === 'blocked' ? 'Blocked' : (changes[0]?.to === 'admin' ? 'an Admin' : 'a' + (changes[0]?.to === 'editor' ? 'n Editor' : ' Viewer')))}`; break;
+                case 'workspace.default_role_changed': text = `${who} changed the default role for new members to ${escapeHtml(activityValue('role', changes[0]?.to))}`; break;
+                default: text = `${who} ${escapeHtml(e.action || 'changed')} ${label ? q(label) : ''}`;
+            }
+            const details = (e.action === 'milestone.updated' || e.action === 'feedback.updated' || e.action === 'feedback.created' || e.action === 'roadmap.deleted' || e.action === 'feedback.deleted')
+                ? changes.map(activityChangeLine) : [];
+            const more = (e.action === 'milestone.updated' || e.action === 'feedback.updated') ? changes.length - 1 : 0;
+            return { text, details, more };
+        }
+
+        // Where the target is now: null (live), 'bin', 'removed'
+        function activityTargetState(e) {
+            const type = e.target?.type;
+            if (!['milestone', 'feedback', 'roadmap'].includes(type)) return null;
+            const r = roadmaps.find(x => x.id === (type === 'roadmap' ? e.target.id : e.roadmapId));
+            if (!r) return 'removed';
+            if (type === 'roadmap') return r.deletedAt ? 'bin' : null;
+            if (r.deletedAt) return 'bin';
+            const live = type === 'milestone' ? r.items : r.feedback;
+            const bin = type === 'milestone' ? r.binItems : r.binFeedback;
+            if ((live || []).some(i => i.id === e.target.id)) return null;
+            if ((bin || []).some(i => i.id === e.target.id)) return 'bin';
+            // Contents of roadmaps that aren't loaded can't be checked; say nothing
+            return (live || []).length || (bin || []).length ? 'removed' : null;
+        }
+
+        // ---- Loading ----
+        function activityQueryParts() {
+            const col = wsCollection('auditLog');
+            if (activityScope === 'this') {
+                const active = getActiveRoadmap();
+                return active ? [col, where('roadmapId', '==', active.id)] : null;
+            }
+            if (activityScope === 'deleted') {
+                const ids = roadmaps.filter(r => r.deletedAt).map(r => r.id).slice(0, 30);
+                return ids.length ? [col, where('roadmapId', 'in', ids)] : null;
+            }
+            return [col];
+        }
+        function toActivityEntry(d) { return { ...d.data({ serverTimestamps: 'estimate' }), id: d.id }; }
+
+        function demoActivity() {
+            const active = getActiveRoadmap();
+            return demoAuditLog
+                .filter(e => activityScope === 'all' || (activityScope === 'this' && active && e.roadmapId === active.id))
+                .slice().sort((a, b) => toMillis(b.at) - toMillis(a.at));
+        }
+
+        function stopActivity() {
+            activityUnsub?.();
+            activityUnsub = null;
+        }
+
+        window.loadActivity = loadActivity;
+        function loadActivity() {
+            stopActivity();
+            activityEntries = [];
+            activityPendingNew = [];
+            activityCursor = null;
+            activityDone = false;
+            activityError = null;
+            activityShow = ACTIVITY_PAGE;
+            activityOpenRows = new Set();
+            activityKey = `${activityScope}|${activityScope === 'this' ? getActiveRoadmap()?.id || '' : ''}`;
+            if (!useCloudPersistence) {
+                activityEntries = demoActivity();
+                activityDone = true;
+                renderActivity();
+                return;
+            }
+            const parts = activityQueryParts();
+            if (!parts) { activityDone = true; renderActivity(); return; }
+            activityLoading = true;
+            renderActivity();
+            let first = true;
+            activityUnsub = onSnapshot(query(...parts, orderBy('at', 'desc'), limit(ACTIVITY_PAGE)), snap => {
+                const docs = snap.docs.map(toActivityEntry);
+                if (first) {
+                    first = false;
+                    activityLoading = false;
+                    activityEntries = docs;
+                    activityCursor = snap.docs[snap.docs.length - 1] || null;
+                    activityDone = snap.docs.length < ACTIVITY_PAGE;
+                    renderActivity();
+                    fillActivity();
+                    return;
+                }
+                // Later snapshots: brand-new entries (or the server time of our own pending ones)
+                const known = new Map(activityEntries.map(e => [e.id, e]));
+                const pending = new Set(activityPendingNew.map(e => e.id));
+                const fresh = [];
+                docs.forEach(e => {
+                    if (known.has(e.id)) Object.assign(known.get(e.id), e);
+                    else if (!pending.has(e.id)) fresh.push(e);
+                });
+                if (fresh.length) {
+                    const scroller = document.getElementById('activity-scroll');
+                    const atTop = !scroller || scroller.scrollTop < 40;
+                    if (atTop && !activityFiltersOn()) activityEntries = [...fresh, ...activityEntries];
+                    else activityPendingNew = [...fresh, ...activityPendingNew];
+                }
+                renderActivity();
+            }, err => {
+                activityLoading = false;
+                activityError = err;
+                console.warn('Activity could not load:', err);
+                renderActivity();
+            });
+        }
+
+        async function loadOlderActivity() {
+            if (activityDone || !activityCursor || !useCloudPersistence) return 0;
+            const parts = activityQueryParts();
+            if (!parts) return 0;
+            const snap = await getDocs(query(...parts, orderBy('at', 'desc'), startAfter(activityCursor), limit(ACTIVITY_PAGE)));
+            const known = new Set(activityEntries.map(e => e.id));
+            activityEntries = activityEntries.concat(snap.docs.map(toActivityEntry).filter(e => !known.has(e.id)));
+            activityCursor = snap.docs[snap.docs.length - 1] || activityCursor;
+            if (snap.docs.length < ACTIVITY_PAGE) activityDone = true;
+            return snap.docs.length;
+        }
+
+        // With filters on, keep reading older pages until there are enough matches (or ACTIVITY_SCAN more entries were read)
+        let activityScanned = 0;
+        async function fillActivity() {
+            if (activityLoading) return;
+            activityLoading = true;
+            let scanned = 0;
+            try {
+                while (!activityDone && activityFiltered().length < activityShow && scanned < ACTIVITY_SCAN) {
+                    const n = await loadOlderActivity();
+                    if (!n) break;
+                    scanned += n;
+                }
+            } catch (err) {
+                console.warn('Could not load older activity:', err);
+                activityError = err;
+            }
+            activityScanned = scanned;
+            activityLoading = false;
+            renderActivity();
+        }
+
+        window.loadMoreActivity = function() {
+            activityShow += ACTIVITY_PAGE;
+            renderActivity();
+            fillActivity();
+        };
+
+        window.showNewActivity = function() {
+            activityEntries = [...activityPendingNew, ...activityEntries];
+            activityPendingNew = [];
+            const scroller = document.getElementById('activity-scroll');
+            if (scroller) scroller.scrollTop = 0;
+            renderActivity();
+        };
+
+        window.setActivityScope = function(scope) {
+            if (scope === activityScope) return;
+            activityScope = scope;
+            loadActivity();
+        };
+
+        // ---- Filters ----
+        function activityFiltersOn() {
+            return (document.getElementById('activity-area')?.value || 'ALL') !== 'ALL' || (document.getElementById('activity-person')?.value || 'ALL') !== 'ALL';
+        }
+        function activityFiltered() {
+            const area = document.getElementById('activity-area')?.value || 'ALL';
+            const person = document.getElementById('activity-person')?.value || 'ALL';
+            return activityEntries.filter(e => activityVisible(e)
+                && (area === 'ALL' || activityArea(e.action) === area)
+                && (person === 'ALL' || (e.by?.email || '') === person));
+        }
+        window.applyActivityFilters = function() {
+            activityShow = ACTIVITY_PAGE;
+            renderActivity();
+            fillActivity();
+        };
+        window.clearActivityFilters = function() {
+            const area = document.getElementById('activity-area');
+            const person = document.getElementById('activity-person');
+            if (area) area.value = 'ALL';
+            if (person) person.value = 'ALL';
+            applyActivityFilters();
+        };
+
+        // ---- Rendering ----
+        function renderActivity() {
+            const list = document.getElementById('activity-list');
+            if (!list) return;
+
+            // Scope buttons: Deleted roadmaps only when there are any
+            const hasDeleted = roadmaps.some(r => r.deletedAt);
+            if (activityScope === 'deleted' && !hasDeleted) { activityScope = 'this'; loadActivity(); return; }
+            document.querySelectorAll('#activity-scope [data-scope]').forEach(b => {
+                const on = b.dataset.scope === activityScope;
+                b.className = `px-3 py-1 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${on ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`;
+                b.setAttribute('aria-pressed', String(on));
+                if (b.dataset.scope === 'deleted') b.classList.toggle('hidden', !hasDeleted);
+            });
+
+            // Area list: People for admins only; Person list from the loaded entries
+            const areaSel = document.getElementById('activity-area');
+            areaSel?.querySelector('option[value="people"]')?.toggleAttribute('hidden', !isAdmin());
+            if (areaSel && !isAdmin() && areaSel.value === 'people') areaSel.value = 'ALL';
+            const personSel = document.getElementById('activity-person');
+            if (personSel) {
+                const current = personSel.value || 'ALL';
+                const people = new Map();
+                activityEntries.filter(activityVisible).forEach(e => { if (e.by?.email && !people.has(e.by.email)) people.set(e.by.email, e.by.name || e.by.email); });
+                if (current !== 'ALL' && !people.has(current)) people.set(current, current);
+                const sorted = [...people.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+                personSel.innerHTML = '<option value="ALL">Anyone</option>' + sorted.map(([email, name]) => `<option value="${escapeHtml(email)}" title="${escapeHtml(email)}">${escapeHtml(name)}</option>`).join('');
+                personSel.value = current;
+            }
+            document.getElementById('activity-clear')?.classList.toggle('hidden', !activityFiltersOn());
+
+            // "n new" pill
+            const pill = document.getElementById('activity-new-pill');
+            const newCount = activityPendingNew.filter(activityVisible).length;
+            if (pill) {
+                pill.classList.toggle('hidden', !newCount);
+                pill.textContent = newCount ? `${newCount} new ↑` : '';
+            }
+
+            // Notice: missing index / errors
+            const notice = document.getElementById('activity-notice');
+            if (notice) {
+                let html = '';
+                if (activityError?.code === 'failed-precondition') {
+                    const link = String(activityError.message || '').match(/https:\/\/console\.firebase\.google\.com\S+/)?.[0];
+                    html = isAdmin() && link
+                        ? `<div class="p-3 rounded-xl border border-amber-200 bg-amber-50 text-xs text-amber-900"><b>One-time setup needed.</b> This view needs a Firestore index. <a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="font-bold underline">Create index</a>, wait until it shows "Enabled" (a few minutes), then reload.</div>`
+                        : `<div class="p-3 rounded-xl border border-amber-200 bg-amber-50 text-xs text-amber-900">Activity isn't available yet: the MapIt admin needs to finish a one-time setup.</div>`;
+                } else if (activityError) {
+                    html = `<div class="p-3 rounded-xl border border-rose-200 bg-rose-50 text-xs text-rose-800">Couldn't load the activity (${escapeHtml(activityError.code || 'error')}). <button type="button" onclick="loadActivity()" class="font-bold underline">Try again</button></div>`;
+                }
+                notice.innerHTML = html;
+                notice.classList.toggle('hidden', !html);
+            }
+
+            const rows = activityFiltered();
+            const shown = rows.slice(0, activityShow);
+            const more = document.getElementById('activity-more');
+            if (more) more.classList.toggle('hidden', !(rows.length > activityShow || (!activityDone && !activityError)));
+            if (more) more.disabled = activityLoading;
+            document.getElementById('activity-end-note')?.classList.toggle('hidden', !(activityDone && rows.length <= activityShow && activityEntries.length));
+
+            if (activityLoading && !activityEntries.length) {
+                list.innerHTML = '<div class="py-12 text-center text-xs text-slate-500"><i class="ph-bold ph-spinner animate-spin mr-1"></i> Loading activity…</div>';
+                return;
+            }
+            if (!shown.length) {
+                list.innerHTML = activityError ? '' : activityFiltersOn()
+                    ? `<div class="py-12 text-center text-xs text-slate-500">${activityDone ? 'No entries match these filters.' : `No matches in the latest ${activityEntries.length} entries.`} <button type="button" onclick="clearActivityFilters()" class="ml-1 font-bold text-brand-700 hover:underline">Clear filters</button></div>`
+                    : '<div class="py-12 text-center text-xs text-slate-500 italic">No activity recorded yet.</div>';
+                return;
+            }
+
+            const allScopes = activityScope !== 'this';
+            let lastDay = '';
+            let html = '';
+            shown.forEach(e => {
+                const day = phtDayKey(e.at);
+                if (day !== lastDay) {
+                    if (lastDay) html += '</ul>';
+                    html += `<h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mt-4 first:mt-0 mb-1">${escapeHtml(phtDayLabel(e.at))}</h3><ul class="divide-y divide-slate-100">`;
+                    lastDay = day;
+                }
+                const area = activityArea(e.action);
+                const [icon, tone] = AREA_STYLE[area];
+                const s = activitySentence(e);
+                const state = activityTargetState(e);
+                const open = activityOpenRows.has(e.id);
+                const tag = state === 'bin' ? '<span class="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">In the Recycle Bin</span>'
+                    : state === 'removed' ? '<span class="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">Removed</span>' : '';
+                const chip = allScopes && e.roadmapTitle ? `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 truncate max-w-[160px]">${escapeHtml(e.roadmapTitle)}</span>` : '';
+                const plain = s.text.replace(/<[^>]+>/g, '');
+                html += `
+                    <li class="activity-row group" data-id="${escapeHtml(e.id)}">
+                        <div class="flex items-start gap-3 py-2 px-2 rounded-lg hover:bg-slate-50">
+                            <span class="w-6 h-6 mt-0.5 rounded-full ${tone} flex items-center justify-center shrink-0" aria-hidden="true"><i class="ph-bold ${icon} text-xs"></i></span>
+                            <div class="flex-1 min-w-0">
+                                <div role="button" tabindex="0" onclick="openActivityTarget('${escapeHtml(e.id)}')" aria-label="${escapeHtml(`${plain}, ${formatPHT(e.at)}${e.roadmapTitle && allScopes ? ', ' + e.roadmapTitle : ''}`)}" class="text-xs text-slate-700 leading-relaxed cursor-pointer">
+                                    ${s.text}${tag}
+                                </div>
+                                ${s.more > 0 || (s.details.length && !s.more && e.action !== 'milestone.updated' && e.action !== 'feedback.updated') ? `<button type="button" onclick="toggleActivityRow('${escapeHtml(e.id)}')" aria-expanded="${open}" class="text-[11px] font-semibold text-brand-700 hover:underline">${s.more > 0 ? `and ${s.more} more` : 'Details'} ${open ? '▾' : '▸'}</button>` : ''}
+                                ${open ? `<ul class="mt-1 ml-1 pl-2 border-l-2 border-slate-100 space-y-0.5">${s.details.map(d => `<li class="text-[11px] text-slate-600 break-words">${escapeHtml(d)}</li>`).join('')}</ul>` : ''}
+                                ${chip ? `<div class="mt-0.5 sm:hidden">${chip}</div>` : ''}
+                            </div>
+                            ${chip ? `<span class="hidden sm:inline-flex shrink-0">${chip}</span>` : ''}
+                            <span class="text-[11px] text-slate-500 shrink-0 whitespace-nowrap" title="${escapeHtml(formatPHT(e.at))}">${escapeHtml(formatRelativeTime(e.at))}</span>
+                        </div>
+                    </li>`;
+            });
+            html += '</ul>';
+            if (activityFiltersOn() && !activityDone && rows.length < activityShow && activityScanned >= ACTIVITY_SCAN) {
+                html += `<p class="mt-3 text-center text-[11px] text-slate-500">Showing matches from the latest ${activityEntries.length} entries. <button type="button" onclick="loadMoreActivity()" class="font-bold text-brand-700 hover:underline">Search older</button></p>`;
+            }
+            list.innerHTML = html;
+        }
+
+        window.toggleActivityRow = function(id) {
+            if (activityOpenRows.has(id)) activityOpenRows.delete(id); else activityOpenRows.add(id);
+            renderActivity();
+        };
+
+        // Open what the entry is about (FR-9)
+        window.openActivityTarget = function(id) {
+            const e = activityEntries.find(x => x.id === id);
+            if (!e) return;
+            const type = e.target?.type;
+            const state = activityTargetState(e);
+            if (type === 'member' || type === 'workspace') { if (isAdmin()) openUsersModal(); return; }
+            const roadmap = roadmaps.find(r => r.id === (type === 'roadmap' ? e.target.id : e.roadmapId));
+            if (!roadmap || state === 'removed') { showSaveStatus('info', `"${e.target?.label || 'This item'}" was removed for good.`); return; }
+            if (roadmap.deletedAt) { openDeletedRoadmap(roadmap.id); switchView('roadmap'); return; }
+            if (state === 'bin') {
+                openRecycleBin();
+                setBinTab(type);
+                const search = document.getElementById('bin-search');
+                if (search) { search.value = e.target.label || ''; renderRecycleBin(); }
+                return;
+            }
+            if (getActiveRoadmap()?.id !== roadmap.id) selectRoadmap(roadmap.id);
+            if (type === 'roadmap') { switchView('roadmap'); return; }
+            if (type === 'milestone') { switchView('roadmap'); openItemDetails(e.target.id); return; }
+            if (type === 'feedback') { switchView('feedback'); editFeedbackItem(e.target.id); }
+        };
+
+        // ---- Audit log CSV: the whole scope, whatever the filters (FR-11) ----
+        window.exportActivityCSV = async function() {
+            let entries;
+            const btn = document.getElementById('activity-export');
+            try {
+                if (!useCloudPersistence) entries = demoActivity();
+                else {
+                    const parts = activityQueryParts();
+                    if (!parts) entries = [];
+                    else {
+                        if (btn) { btn.disabled = true; btn.lastChild.textContent = ' Exporting…'; }
+                        const snap = await getDocs(query(...parts, orderBy('at', 'desc')));
+                        entries = snap.docs.map(toActivityEntry);
+                    }
+                }
+            } catch (err) {
+                showSaveStatus('error', `Couldn't export the activity: ${firestoreErrorMessage(err, 'export the activity')}`);
+                return;
+            } finally {
+                if (btn) { btn.disabled = false; btn.lastChild.textContent = ' CSV'; }
+            }
+            entries = entries.filter(activityVisible);
+            const AREA_NAMES = { roadmap: 'Roadmap', milestone: 'Milestones', feedback: 'Feedback', comment: 'Comments', bin: 'Recycle Bin', people: 'People' };
+            const headers = ['Time (PHT)', 'Roadmap', 'Area', 'Action', 'Target', 'Changes', 'Name', 'Email'].map(h => `"${h}"`);
+            const rows = entries.map(e => [
+                csvCell(phtIso(e.at)),
+                csvCell(e.roadmapTitle),
+                csvCell(AREA_NAMES[activityArea(e.action)]),
+                csvCell(activitySentence(e).text.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')),
+                csvCell(e.target?.label),
+                csvCell((e.changes || []).map(activityChangeLine).join('; ')),
+                csvCell(e.by?.name),
+                csvCell(e.by?.email)
+            ].join(','));
+            const active = getActiveRoadmap();
+            const name = activityScope === 'this' && active ? `${sanitizeFilename(active.title)}-audit-log.csv` : 'workspace-audit-log.csv';
+            downloadFile('﻿' + [headers.join(','), ...rows].join('\r\n'), name, 'text/csv;charset=utf-8;');
+        };
+        // 2026-11-10T14:05:00+08:00
+        function phtIso(value) {
+            const d = toDate(value);
+            if (!d) return '';
+            const p = new Date(d.getTime() + 8 * 3600e3).toISOString().slice(0, 19);
+            return `${p}+08:00`;
+        }
+
+        // ---- Unread badge (FR-14): entries by other people since I last opened Activity ----
+        function setUnreadBadge(n) {
+            const text = n > 99 ? '99+' : String(n);
+            ['nav-activity-count', 'mob-nav-activity-count'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.textContent = n ? text : '';
+                el.classList.toggle('hidden', !n);
+            });
+            const nav = document.getElementById('nav-activity');
+            if (nav) nav.setAttribute('aria-label', n ? `Activity, ${text} unread` : 'Activity');
+        }
+        function stopUnread() { unreadUnsub?.(); unreadUnsub = null; unreadSince = null; setUnreadBadge(0); }
+        function watchUnread() {
+            if (!useCloudPersistence || !canEdit() || !mySeenAt) { stopUnread(); return; }
+            if (unreadUnsub && unreadSince === toMillis(mySeenAt)) return;
+            unreadUnsub?.();
+            unreadSince = toMillis(mySeenAt);
+            unreadUnsub = onSnapshot(query(wsCollection('auditLog'), where('at', '>', mySeenAt), orderBy('at', 'desc'), limit(100)), snap => {
+                const n = snap.docs.map(toActivityEntry).filter(e => activityVisible(e) && (e.by?.email || '') !== myEmail()).length;
+                setUnreadBadge(activityViewOpen() ? 0 : n);
+            }, err => console.warn('Unread activity count unavailable:', err));
+        }
+        function activityViewOpen() { return !document.getElementById('activity-view')?.classList.contains('hidden'); }
+        function markActivitySeen() {
+            setUnreadBadge(0);
+            if (!useCloudPersistence || !canEdit()) return;
+            updateDoc(wsRef('members', myEmail()), { activitySeenAt: serverTimestamp() }).catch(e => console.warn('Could not save the Activity "seen" time:', e));
+        }
+        function onActivitySeenChanged(data) {
+            const seen = data?.activitySeenAt || null;
+            if (toMillis(seen) === toMillis(mySeenAt) && seen) return;
+            mySeenAt = seen;
+            watchUnread();
         }
 
         window.openUsersModal = function() {
@@ -4978,6 +5599,11 @@
             previewRoadmap = null;
             privateRoadmaps = [];
             demoAuditLog = [];
+            activityEntries = [];
+            activityPendingNew = [];
+            activityKey = '';
+            activityScope = 'this';
+            mySeenAt = null;
             ownDeletes.clear();
             saveProblemShown = false;
             dismissSaveStatus();
