@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.1.1" data-released="2026-11-09">
+    <meta name="mapit-version" content="2.1.2" data-released="2026-11-10">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -45,6 +45,8 @@
     </script>
 
     <style>
+        /* 2.1.2 (U-8): page text is selectable; controls are not */
+        button, nav, [role="button"], [role="menuitem"] { user-select: none; }
         .custom-scrollbar::-webkit-scrollbar {
             width: 5px;
             height: 5px;
@@ -77,7 +79,7 @@
         }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased h-screen flex flex-col overflow-hidden select-none">
+<body class="bg-slate-50 text-slate-800 font-sans antialiased h-screen flex flex-col overflow-hidden">
 
     <!-- ======================================================= -->
     <!-- AUTHENTICATION GATE SCREEN (User must log in first)      -->
@@ -175,16 +177,8 @@
             </button>
         </nav>
 
-        <!-- Right Side: Roadmap Quick Select & Actions -->
+        <!-- Right Side: account and New Roadmap (the roadmap selector is in the Roadmaps bar) -->
         <div class="flex items-center gap-2">
-            <!-- Header Roadmap Dropdown -->
-            <div class="relative flex items-center min-w-0">
-                <select id="header-roadmap-select" aria-label="Active roadmap" onchange="selectRoadmap(this.value)" class="max-w-[140px] sm:max-w-[220px] truncate text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 pr-7 appearance-none cursor-pointer outline-none">
-                    <!-- Populated dynamically -->
-                </select>
-                <i class="ph-bold ph-caret-down absolute right-2 pointer-events-none text-slate-500 text-xs"></i>
-            </div>
-
             <!-- Account chip + menu: who you are, your role, Users (admins), Private roadmaps, Sign out -->
             <div class="relative" id="account-menu-wrap">
                 <button type="button" id="header-user-badge" onclick="toggleAccountMenu()" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu" title="Account"
@@ -234,35 +228,39 @@
         <!-- Read-only / preview notices and the private-roadmaps banner -->
         <div id="workspace-notices" class="hidden max-w-6xl mx-auto w-full flex flex-col gap-2 mb-3 shrink-0"></div>
 
+        <!-- Roadmaps bar (2.1.2, R-11): the one roadmap selector, shown on every tab; PDF / Add / Delete only on the Roadmap tab -->
+        <div id="roadmaps-bar" class="max-w-6xl mx-auto w-full mb-4 bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm shrink-0 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+                <label for="roadmap-select" class="hidden sm:flex text-xs font-bold uppercase tracking-wider text-slate-500 px-2 items-center gap-1 shrink-0">
+                    <i class="ph-bold ph-folder"></i> Roadmaps:
+                </label>
+                <div class="relative flex items-center min-w-0 flex-1 sm:flex-none">
+                    <select id="roadmap-select" aria-label="Active roadmap" onchange="selectRoadmap(this.value)" class="w-full sm:w-auto sm:min-w-56 sm:max-w-sm truncate text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 rounded-xl pl-3 pr-8 py-1.5 appearance-none cursor-pointer outline-none focus:border-brand-500">
+                        <!-- Populated dynamically -->
+                    </select>
+                    <i class="ph-bold ph-caret-down absolute right-3 pointer-events-none text-slate-500 text-[10px]" aria-hidden="true"></i>
+                </div>
+                <span id="roadmap-select-progress" class="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 shrink-0"></span>
+            </div>
+
+            <div id="roadmap-bar-actions" class="flex items-center gap-2 shrink-0 pl-2 border-l border-slate-100">
+                <button id="export-pdf-btn" onclick="exportRoadmapPDF()" title="Export Roadmap as PDF" aria-label="Export Roadmap as PDF" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-xs">
+                    <i class="ph-bold ph-file-pdf text-sm text-rose-600"></i> <span id="export-pdf-text" class="hidden sm:inline">Export PDF</span>
+                </button>
+                <button onclick="switchView('editor')" title="Add Deliverables" aria-label="Add Deliverables" class="editor-only flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
+                    <i class="ph-bold ph-plus"></i> <span class="hidden sm:inline">Add Deliverables</span>
+                </button>
+                <button id="delete-roadmap-btn" onclick="confirmDeleteCurrentRoadmap()" title="Delete Current Roadmap" aria-label="Delete Current Roadmap" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
+                    <i class="ph-bold ph-trash text-sm"></i>
+                </button>
+            </div>
+        </div>
+
         <!-- ======================================================= -->
         <!-- VIEW 1: ROADMAP TIMELINE (Unified with Roadmap Tabs)   -->
         <!-- ======================================================= -->
-        <div id="roadmap-view" class="max-w-6xl mx-auto w-full h-full flex flex-col gap-4 overflow-hidden">
+        <div id="roadmap-view" class="max-w-6xl mx-auto w-full flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
             
-            <!-- Roadmaps Horizontal Switcher Bar -->
-            <div class="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm shrink-0 flex items-center justify-between gap-3">
-                <div class="flex items-center gap-2 min-w-0 flex-1 overflow-x-auto custom-scrollbar">
-                    <span class="hidden sm:flex text-xs font-bold uppercase tracking-wider text-slate-500 px-2 items-center gap-1 shrink-0">
-                        <i class="ph-bold ph-folder"></i> Roadmaps:
-                    </span>
-                    <div id="roadmaps-tab-list" class="flex items-center gap-1.5 shrink-0">
-                        <!-- Populated dynamically with roadmap pills -->
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-2 shrink-0 pl-2 border-l border-slate-100">
-                    <button id="export-pdf-btn" onclick="exportRoadmapPDF()" title="Export Roadmap as PDF" aria-label="Export Roadmap as PDF" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all shadow-xs">
-                        <i class="ph-bold ph-file-pdf text-sm"></i> <span id="export-pdf-text" class="hidden sm:inline">Export PDF</span>
-                    </button>
-                    <button onclick="switchView('editor')" title="Add Deliverables" aria-label="Add Deliverables" class="editor-only flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
-                        <i class="ph-bold ph-plus"></i> <span class="hidden sm:inline">Add Deliverables</span>
-                    </button>
-                    <button id="delete-roadmap-btn" onclick="confirmDeleteCurrentRoadmap()" title="Delete Current Roadmap" aria-label="Delete Current Roadmap" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
-                        <i class="ph-bold ph-trash text-sm"></i>
-                    </button>
-                </div>
-            </div>
-
             <!-- Perspective Selector & Filter Bar (Annual, Quarterly, Monthly, Modules) -->
             <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div class="flex items-center gap-2 max-w-full overflow-x-auto custom-scrollbar">
@@ -324,7 +322,7 @@
         <!-- ======================================================= -->
         <!-- VIEW 2: EDITOR (Full-width Table + Modal Edit)         -->
         <!-- ======================================================= -->
-        <div id="editor-view" class="hidden max-w-6xl mx-auto w-full h-full overflow-hidden flex-col gap-4">
+        <div id="editor-view" class="hidden max-w-6xl mx-auto w-full flex-1 min-h-0 overflow-hidden flex-col gap-4">
             <!-- Header Controls Bar -->
             <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div class="flex items-center gap-3">
@@ -397,7 +395,7 @@
         <!-- ======================================================= -->
         <!-- VIEW 3: FEEDBACK & SUGGESTIONS                         -->
         <!-- ======================================================= -->
-        <div id="feedback-view" class="hidden max-w-6xl mx-auto w-full h-full overflow-hidden flex-col gap-4">
+        <div id="feedback-view" class="hidden max-w-6xl mx-auto w-full flex-1 min-h-0 overflow-hidden flex-col gap-4">
             <!-- Feedback Controls Bar -->
             <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
@@ -458,7 +456,7 @@
                                 <th class="py-3 px-4">Category</th>
                                 <th class="hidden md:table-cell py-3 px-4">Source</th>
                                 <th class="hidden md:table-cell py-3 px-4">Submitted By</th>
-                                <th class="py-3 px-4">Status (from Milestone)</th>
+                                <th class="py-3 px-4 whitespace-nowrap"><span class="inline-flex items-center gap-1" title="Taken from the linked milestones">Status <i class="ph-bold ph-info text-slate-400" aria-hidden="true"></i></span></th>
                                 <th class="py-3 px-4">Related Milestone(s)</th>
                                 <th class="py-3 px-4 text-right">Actions</th>
                             </tr>
@@ -1216,8 +1214,8 @@
         const navFeedback = document.getElementById('nav-feedback');
         const navFeedbackCount = document.getElementById('nav-feedback-count');
 
-        const headerRoadmapSelect = document.getElementById('header-roadmap-select');
-        const roadmapsTabList = document.getElementById('roadmaps-tab-list');
+        const roadmapSelect = document.getElementById('roadmap-select');
+        const roadmapsBar = document.getElementById('roadmaps-bar');
         const perspectiveSubfilter = document.getElementById('perspective-subfilter');
         const roadmapContainer = document.getElementById('roadmap-container');
 
@@ -1255,6 +1253,7 @@
         // CORE NAVIGATION & PERSPECTIVE HELPERS
         // =======================================================
         window.switchView = function(viewName) {
+            document.getElementById('roadmap-bar-actions')?.classList.toggle('hidden', viewName !== 'roadmap');
             if (roadmapView) roadmapView.classList.add('hidden');
             if (editorView) editorView.classList.add('hidden');
             if (feedbackView) feedbackView.classList.add('hidden');
@@ -1383,6 +1382,7 @@
 
         window.applySubfilter = function(val) {
             activeSubfilter = val;
+            if (perspectiveSubfilter) perspectiveSubfilter.value = val;
             const active = getActiveRoadmap();
             if (active) renderTimeline(active.items || []);
         };
@@ -1504,36 +1504,17 @@
             const activeRoadmap = getActiveRoadmap();
             const liveRoadmaps = roadmaps.filter(r => !r.deletedAt);
 
-            if (headerRoadmapSelect) {
-                const option = r => `<option value="${escapeHtml(r.id)}" ${activeRoadmap && r.id === activeRoadmap.id ? 'selected' : ''}>${escapeHtml(r.title)}</option>`;
-                headerRoadmapSelect.innerHTML =
+            if (roadmapSelect) {
+                const pctOf = r => { const items = r.items || []; return items.length ? Math.round(items.filter(i => i.status === 'done').length / items.length * 100) : 0; };
+                const option = r => `<option value="${escapeHtml(r.id)}" ${activeRoadmap && r.id === activeRoadmap.id ? 'selected' : ''}>${escapeHtml(r.title)} · ${pctOf(r)}%</option>`;
+                const sorted = liveRoadmaps.slice().sort((a, b) => String(a.title).localeCompare(String(b.title), undefined, { sensitivity: 'base', numeric: true }));
+                roadmapSelect.innerHTML =
                     (previewRoadmap ? `<option value="" selected>Preview: ${escapeHtml(previewRoadmap.title)}</option>` : '') +
-                    (liveRoadmaps.length ? liveRoadmaps.map(option).join('') : '<option value="">No roadmaps yet</option>') +
+                    (sorted.length ? sorted.map(option).join('') : '<option value="">No roadmaps yet</option>') +
                     (activeRoadmap?.deletedAt ? `<option value="" selected>In the Recycle Bin: ${escapeHtml(activeRoadmap.title)}</option>` : '');
-            }
-
-            if (roadmapsTabList) {
-                roadmapsTabList.innerHTML = liveRoadmaps.map(r => {
-                    const isSelected = activeRoadmap && r.id === activeRoadmap.id;
-                    const items = r.items || [];
-                    const doneCount = items.filter(i => i.status === 'done').length;
-                    const pct = items.length ? Math.round((doneCount / items.length) * 100) : 0;
-
-                    return `
-                        <div class="group relative flex items-center">
-                            <button onclick="selectRoadmap('${escapeHtml(r.id)}')" class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${isSelected ? 'bg-brand-600 text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
-                                <span>${escapeHtml(r.title)}</span>
-                                <span class="text-[10px] px-1.5 py-0.2 rounded-md ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'}">
-                                    ${pct}%
-                                </span>
-                            </button>
-                            ${canDeleteRoadmap(r) ? `
-                            <button onclick="event.stopPropagation(); promptDeleteRoadmap('${escapeHtml(r.id)}')" title="Delete roadmap" aria-label="Delete roadmap" class="sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 ml-0.5 p-1 text-slate-500 hover:text-rose-600 rounded-lg transition-all">
-                                <i class="ph-bold ph-x text-[10px]"></i>
-                            </button>` : ''}
-                        </div>
-                    `;
-                }).join('') || '<span class="text-xs text-slate-500 italic px-1">No roadmaps yet</span>';
+                const progress = document.getElementById('roadmap-select-progress');
+                if (progress) progress.innerHTML = activeRoadmap && !activeRoadmap.deletedAt && !previewRoadmap
+                    ? `${progressBar((activeRoadmap.items || []).filter(i => i.status === 'done').length, (activeRoadmap.items || []).length)}<span>${pctOf(activeRoadmap)}% done</span>` : '';
             }
 
             const feedbackCount = activeRoadmap ? (activeRoadmap.feedback || []).length : 0;
@@ -1696,6 +1677,7 @@
                 mainAppHeader.classList.remove('flex');
             }
             if (mobileNav) mobileNav.classList.add('hidden');
+            roadmapsBar?.classList.add('hidden');
             if (roadmapView) roadmapView.classList.add('hidden');
             if (editorView) editorView.classList.add('hidden');
             if (feedbackView) feedbackView.classList.add('hidden');
@@ -1709,6 +1691,7 @@
                 mainAppHeader.classList.add('flex');
             }
             if (mobileNav) mobileNav.classList.remove('hidden');
+            roadmapsBar?.classList.remove('hidden');
             switchView('roadmap');
             // Fill roadmap pills, header select and feedback counts for the signed-in data
             updateUI();
@@ -1974,6 +1957,15 @@
             } else if (activePerspective === 'module') {
                 renderModulesView(items);
             }
+
+            if (!roadmapContainer.children.length) {
+                roadmapContainer.innerHTML = `
+                    <div class="text-center py-16 text-slate-500">
+                        <i class="ph-bold ph-funnel-x text-3xl mb-2 text-slate-300" aria-hidden="true"></i>
+                        <p class="font-bold text-sm text-slate-700">No deliverables match this filter.</p>
+                        <button onclick="applySubfilter('ALL')" class="mt-3 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all">Show All</button>
+                    </div>`;
+            }
         }
 
         // 1. Annual Perspective (2.1.1): each year lists Q1–Q4 as compact rows; each quarter lists its
@@ -1997,7 +1989,7 @@
             });
             const mods = Object.keys(groups).sort(annualCollator.compare);
             return mods.map(mod => {
-                const mItems = groups[mod].slice().sort((a, b) => (a.date || '').localeCompare(b.date || '') || String(a.name).localeCompare(String(b.name)));
+                const mItems = groups[mod].slice().sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || String(a.name).localeCompare(String(b.name)));
                 const counts = { 'done': 0, 'in-progress': 0, 'planned': 0 };
                 mItems.forEach(i => { counts[i.status] = (counts[i.status] || 0) + 1; });
                 const pct = Math.round((counts.done / mItems.length) * 100);
@@ -2043,7 +2035,7 @@
             updateAnnualToggle();
         };
 
-        // "Expand all / Collapse all" in the perspective bar (Annual only, annual-view FR-7)
+        // "Expand all / Collapse all" in the perspective bar (Annual and Modules views)
         window.toggleAllAnnualModules = function() {
             const btns = [...(roadmapContainer?.querySelectorAll('[data-annual-key]') || [])];
             const expand = btns.some(b => !annualOpen.has(b.dataset.annualKey));
@@ -2055,7 +2047,7 @@
             const toggle = document.getElementById('annual-expand-toggle');
             if (!toggle) return;
             const btns = [...(roadmapContainer?.querySelectorAll('[data-annual-key]') || [])];
-            const show = activePerspective === 'year' && btns.length > 0;
+            const show = (activePerspective === 'year' || activePerspective === 'module') && btns.length > 0;
             toggle.classList.toggle('hidden', !show);
             toggle.classList.toggle('flex', show);
             const allOpen = btns.length > 0 && btns.every(b => annualOpen.has(b.dataset.annualKey));
@@ -2340,8 +2332,8 @@
                                     <div onclick="openItemDetails('${item.id}')" role="button" tabindex="0" class="p-4 rounded-xl border border-slate-200 hover:border-brand-300 hover:shadow-xs bg-slate-50/50 hover:bg-white cursor-pointer transition-all">
                                         <div class="flex items-center justify-between gap-2 mb-1.5">
                                             <span class="text-xs font-bold text-slate-900">${escapeHtml(item.name)}</span>
-                                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${item.status === 'done' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : item.status === 'in-progress' ? 'bg-brand-50 text-brand-600 border border-brand-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">
-                                                ${escapeHtml(item.status)}
+                                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${item.status === 'done' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : item.status === 'in-progress' ? 'bg-brand-50 text-brand-600 border border-brand-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">
+                                                ${escapeHtml(STATUS_LABELS[item.status] || item.status)}
                                             </span>
                                         </div>
                                         <p class="text-xs text-brand-600 font-semibold mb-2">${escapeHtml(item.module)}</p>
@@ -2364,59 +2356,24 @@
             }
         }
 
-        // 4. Modules Perspective: Fixed height cards (h-72) with internal overflow scroll
+        // 4. Modules Perspective (2.1.2, R-9): one compact list of modules (A–Z) that expand to their deliverables
         function renderModulesView(items) {
-            const moduleGroups = {};
-            items.forEach(item => {
-                const mod = item.module || 'General';
-                if (!moduleGroups[mod]) moduleGroups[mod] = [];
-                moduleGroups[mod].push(item);
-            });
-
-            const sortedModules = Object.keys(moduleGroups).sort();
-            const modulesToDisplay = activeSubfilter === 'ALL' ? sortedModules : sortedModules.filter(m => m === activeSubfilter);
-
-            const grid = document.createElement('div');
-            grid.className = "grid grid-cols-1 md:grid-cols-2 gap-6 w-full";
-
-            modulesToDisplay.forEach(mod => {
-                const mItems = moduleGroups[mod];
-                const doneCount = mItems.filter(i => i.status === 'done').length;
-                const pct = Math.round((doneCount / mItems.length) * 100);
-
-                const card = document.createElement('div');
-                card.className = "h-72 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between";
-
-                card.innerHTML = `
-                    <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 shrink-0">
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900">${escapeHtml(mod)}</h3>
-                            <p class="text-[11px] text-slate-500 font-medium">${pluralize(mItems.length, 'Deliverable')}</p>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-xs font-bold text-brand-700">${pct}% Done</span>
-                            <div class="w-20 bg-slate-100 h-1.5 rounded-full mt-1 overflow-hidden">
-                                <div class="bg-brand-600 h-full rounded-full" style="width: ${pct}%"></div>
-                            </div>
-                        </div>
+            const shown = activeSubfilter === 'ALL' ? items : items.filter(i => (i.module || 'General') === activeSubfilter);
+            // Picking one module in the filter opens it
+            if (activeSubfilter !== 'ALL') annualOpen.add(`MOD|${activeSubfilter}`);
+            const box = document.createElement('div');
+            box.className = "w-full";
+            box.innerHTML = `
+                <div class="annual-quarter bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden">
+                    <div class="flex items-center gap-2 px-3 md:px-4 py-1.5 bg-slate-50/60 border-b border-slate-100">
+                        <span class="text-xs font-black text-slate-700">Modules</span>
+                        <span class="text-[11px] font-semibold text-slate-600 ml-auto whitespace-nowrap">${pluralize(new Set(shown.map(i => i.module || 'General')).size, 'module')} · ${pluralize(shown.length, 'deliverable')}</span>
+                        ${progressBar(shown.filter(i => i.status === 'done').length, shown.length, 'w-8 sm:w-16')}
                     </div>
-
-                    <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2.5 pr-1">
-                        ${mItems.map(item => `
-                            <div onclick="openItemDetails('${item.id}')" role="button" tabindex="0" class="p-3 rounded-xl border border-slate-100 hover:border-brand-300 bg-slate-50/70 hover:bg-white cursor-pointer transition-all">
-                                <div class="flex items-center justify-between gap-2">
-                                    <span class="text-xs font-bold text-slate-800">${escapeHtml(item.name)}</span>
-                                    <span class="text-[10px] font-semibold text-slate-500 whitespace-nowrap">${escapeHtml(formatMonthYear(item.date))}</span>
-                                </div>
-                                ${item.description ? `<p class="text-[11px] text-slate-500 mt-1 line-clamp-1">${escapeHtml(item.description)}</p>` : ''}
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
-
-            roadmapContainer.appendChild(grid);
+                    <ul class="divide-y divide-slate-100">${annualModuleRows(shown, 'MOD')}</ul>
+                </div>`;
+            roadmapContainer.appendChild(box);
+            updateAnnualToggle();
         }
 
         // Render Unscheduled Backlog Section (max-h-60 with internal overflow scroll)
@@ -2559,8 +2516,8 @@
                         <span class="text-xs font-medium">${escapeHtml(formatMonthYear(item.date))}</span>
                     </td>
                     <td class="py-3 px-4 whitespace-nowrap">
-                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${statusBadge}">
-                            ${escapeHtml(item.status)}
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${statusBadge}">
+                            ${escapeHtml(STATUS_LABELS[item.status] || item.status)}
                         </span>
                     </td>
                     <td class="hidden md:table-cell py-3 px-4">
@@ -3584,16 +3541,16 @@
                 exportHeader.innerHTML = `
                     <div>
                         <div class="flex items-center gap-2 mb-1">
-                            <span class="w-3 h-3 rounded-full bg-blue-600 inline-block"></span>
+                            <span class="w-3 h-3 rounded-full bg-brand-600 inline-block"></span>
                             <h1 class="text-2xl font-black text-slate-900 leading-tight">${escapeHtml(activeRoadmap.title)}</h1>
                         </div>
                         <p class="text-xs text-slate-500">
-                            Perspective: <strong class="text-blue-600">${perspectiveNames[activePerspective]}</strong> &nbsp;|&nbsp; 
+                            Perspective: <strong class="text-brand-600">${perspectiveNames[activePerspective]}</strong> &nbsp;|&nbsp; 
                             Filter: <strong class="text-slate-700">${escapeHtml(activeSubfilter === 'ALL' ? 'All Deliverables' : activeSubfilter)}</strong>
                         </p>
                     </div>
                     <div class="text-right">
-                        <span class="text-[11px] font-black text-blue-600 uppercase tracking-wider block">Map It Workspace</span>
+                        <span class="text-[11px] font-black text-brand-600 uppercase tracking-wider block">Map It Workspace</span>
                         <span class="text-xs text-slate-500 block">${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                     </div>
                 `;
