@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.3.0" data-released="2026-11-10">
+    <meta name="mapit-version" content="2.3.1" data-released="2026-11-10">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -2153,9 +2153,8 @@
                                     ${reorder ? reorderHtml(item) : ''}
                                     ${rankChipHtml(roadmap, item, keyPrefix === 'MOD' ? 0 : placeOf.get(item.id))}
                                     ${statusDot(item.status)}
-                                    ${overFlagHtml(roadmap, item, false)}
                                     <span class="text-xs text-slate-700 truncate min-w-0 flex-1">${escapeHtml(item.name)}</span>
-                                    ${overInfo(roadmap, item) ? '<span class="over-tag hidden sm:inline text-[10px] font-bold px-1.5 rounded bg-rose-100 text-rose-700 whitespace-nowrap shrink-0">Over capacity</span>' : ''}
+                                    ${overFlagHtml(roadmap, item, true)}
                                     ${effortHtml(item)}
                                     <span class="text-[10px] text-slate-500 shrink-0">${escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD')}</span>
                                     ${reorder ? moveButtonsHtml(item) : ''}
@@ -2450,10 +2449,10 @@
                                                 ? ranked.map((item, n) => `
                                                     <div onclick="event.stopPropagation(); openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" data-rank-id="${escapeHtml(item.id)}" class="group/row p-2.5 rounded-xl border ${overTint(roadmap, item) || 'border-slate-100 hover:border-brand-200 bg-slate-50/50 hover:bg-brand-50/30'} cursor-pointer transition-all">
                                                         <div class="flex items-center justify-between gap-1">
-                                                            <span class="flex items-center gap-1.5 min-w-0">${reorder ? reorderHtml(item) : ''}${rankChipHtml(roadmap, item, n + 1)}${overFlagHtml(roadmap, item, false)}<span class="text-xs font-bold text-slate-800 line-clamp-1">${escapeHtml(item.name)}</span></span>
+                                                            <span class="flex items-center gap-1.5 min-w-0">${reorder ? reorderHtml(item) : ''}${rankChipHtml(roadmap, item, n + 1)}<span class="text-xs font-bold text-slate-800 line-clamp-1">${escapeHtml(item.name)}</span></span>
                                                             ${statusDot(item.status)}
                                                         </div>
-                                                        <div class="flex items-center gap-1.5 mt-1"><span class="text-[10px] text-brand-600 font-semibold truncate flex-1">${escapeHtml(item.module)}</span>${overInfo(roadmap, item) ? '<span class="over-tag text-[10px] font-bold px-1.5 rounded bg-rose-100 text-rose-700 whitespace-nowrap">Over capacity</span>' : ''}${effortHtml(item)}${reorder ? moveButtonsHtml(item) : ''}</div>
+                                                        <div class="flex items-center gap-1.5 mt-1"><span class="text-[10px] text-brand-600 font-semibold truncate flex-1">${escapeHtml(item.module)}</span>${overFlagHtml(roadmap, item)}${effortHtml(item)}${reorder ? moveButtonsHtml(item) : ''}</div>
                                                     </div>
                                                 `).join('')
                                                 : `<div class="h-full flex items-center justify-center text-slate-500 text-[11px] italic">No items</div>`
@@ -2521,12 +2520,12 @@
                                 ${mItems.map((item, n) => `
                                     <div onclick="openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" data-rank-id="${escapeHtml(item.id)}" class="group/row p-4 rounded-xl border ${overTint(roadmap, item) || 'border-slate-200 hover:border-brand-300 hover:shadow-xs bg-slate-50/50 hover:bg-white'} cursor-pointer transition-all">
                                         <div class="flex items-center justify-between gap-2 mb-1.5">
-                                            <span class="flex items-center gap-1.5 min-w-0 flex-wrap">${reorder ? reorderHtml(item) : ''}${rankChipHtml(roadmap, item, n + 1)}${overFlagHtml(roadmap, item)}<span class="text-xs font-bold text-slate-900">${escapeHtml(item.name)}</span></span>
+                                            <span class="flex items-center gap-1.5 min-w-0 flex-wrap">${reorder ? reorderHtml(item) : ''}${rankChipHtml(roadmap, item, n + 1)}<span class="text-xs font-bold text-slate-900">${escapeHtml(item.name)}</span></span>
                                             <span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${item.status === 'done' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : item.status === 'in-progress' ? 'bg-brand-50 text-brand-600 border border-brand-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">
                                                 ${escapeHtml(STATUS_LABELS[item.status] || item.status)}
                                             </span>
                                         </div>
-                                        <div class="flex items-center gap-2 mb-2"><p class="text-xs text-brand-600 font-semibold flex-1">${escapeHtml(item.module)}</p>${effortHtml(item)}${reorder ? moveButtonsHtml(item) : ''}</div>
+                                        <div class="flex items-center gap-2 mb-2"><p class="text-xs text-brand-600 font-semibold flex-1">${escapeHtml(item.module)}</p>${overFlagHtml(roadmap, item)}${effortHtml(item)}${reorder ? moveButtonsHtml(item) : ''}</div>
                                         ${item.inclusions && item.inclusions.length ? `
                                             <div class="flex flex-wrap gap-1">
                                                 ${item.inclusions.map(inc => `<span class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded">${escapeHtml(inc)}</span>`).join('')}
@@ -2728,7 +2727,7 @@
                     <td class="pl-3 w-6">${canReorder ? reorderHtml(item) : ''}</td>
                     <td class="py-3 px-2 whitespace-nowrap">${rankChipHtml(roadmap, item)}</td>
                     <td class="py-3 px-4 font-bold text-slate-900">
-                        <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">${overFlagHtml(roadmap, item)}<span>${escapeHtml(item.name)}</span></div>
+                        <div class="text-xs font-bold text-slate-900">${escapeHtml(item.name)}</div>
                         ${item.description ? `<p class="text-[11px] font-normal text-slate-500 mt-0.5 max-w-xs truncate">${escapeHtml(item.description)}</p>` : ''}
                     </td>
                     <td class="py-3 px-4 text-brand-600 font-semibold whitespace-nowrap">
@@ -2738,9 +2737,12 @@
                         <span class="text-xs font-medium">${escapeHtml(formatMonthYear(item.date))}</span>
                     </td>
                     <td class="effort-cell py-3 px-4 whitespace-nowrap text-xs ${effort ? 'text-slate-700' : 'text-slate-400'}" ${canEditActive() ? `onclick="event.stopPropagation(); editEffortInline('${escapeHtml(item.id)}', this)" tabindex="0" role="button" aria-label="Effort for ${escapeHtml(item.name)}: ${effort ? fmtDays(effort) : 'not estimated'}. Click to change."` : ''} title="${effort ? '' : 'Not estimated'}">${effort ? fmtDays(effort) : '—'}</td>
-                    <td class="py-3 px-4 whitespace-nowrap">
+                    <td class="py-3 px-4">
+                        <span class="flex flex-col items-start gap-1">
                         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${statusBadge}">
                             ${escapeHtml(STATUS_LABELS[item.status] || item.status)}
+                        </span>
+                        ${overFlagHtml(roadmap, item, true)}
                         </span>
                     </td>
                     <td class="hidden lg:table-cell py-3 px-4">
@@ -5163,12 +5165,13 @@
             const n = rankOf(roadmap, item.id);
             if (!n) return '';
             const total = (roadmap.items || []).length;
-            return `${place ? `<span class="rank-place text-[10px] text-slate-500 shrink-0" aria-hidden="true">${ordinal(place)}</span>` : ''}<span class="rank-chip text-[10px] font-bold tabular-nums px-1.5 rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0" title="Rank ${n} of ${total}">#${n}</span>`;
+            return `${place ? `<span class="rank-place w-7 text-[10px] text-slate-500 shrink-0" aria-hidden="true">${ordinal(place)}</span>` : ''}<span class="rank-chip min-w-[2.25rem] text-center text-[10px] font-bold tabular-nums px-1.5 rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0" title="Rank ${n} of ${total}">#${n}</span>`;
         }
-        function overFlagHtml(roadmap, item, withTag = true) {
+        // compact: the words hide on phones and only the ⚠ stays
+        function overFlagHtml(roadmap, item, compact = false) {
             const info = overInfo(roadmap, item);
             if (!info) return '';
-            return `<i class="over-icon ph-bold ph-warning text-rose-600 shrink-0" title="${escapeHtml(info)}" aria-hidden="true"></i>${withTag ? '<span class="over-tag text-[10px] font-bold px-1.5 rounded bg-rose-100 text-rose-700 whitespace-nowrap shrink-0">Over capacity</span>' : ''}<span class="sr-only">${escapeHtml(info)}</span>`;
+            return `<span class="over-tag inline-flex items-center gap-1 text-[10px] font-bold px-1.5 rounded bg-rose-100 text-rose-700 whitespace-nowrap shrink-0" title="${escapeHtml(info)}"><i class="over-icon ph-bold ph-warning" aria-hidden="true"></i><span class="${compact ? 'hidden sm:inline' : ''}" aria-hidden="true">Over capacity</span></span><span class="sr-only">${escapeHtml(info)}</span>`;
         }
         function overTint(roadmap, item) { return overInfo(roadmap, item) ? 'over-capacity !bg-rose-50/60 !border-rose-200' : ''; }
         function effortHtml(item) { return effortOf(item) ? `<span class="text-[10px] text-slate-500 whitespace-nowrap shrink-0">${fmtDays(effortOf(item))}</span>` : ''; }
