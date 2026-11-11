@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.5.1" data-released="2026-11-11">
+    <meta name="mapit-version" content="2.5.2" data-released="2026-11-11">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -159,10 +159,6 @@
                     <span class="hidden sm:inline text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200">Roadmap</span>
                     <span data-app-version class="text-[10px] font-semibold text-slate-500"></span>
                 </h1>
-                <p id="workspace-status" class="text-[11px] text-slate-500 font-medium flex items-center gap-1">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    <span id="workspace-user-label">Syncing Workspace</span>
-                </p>
             </div>
         </div>
 
@@ -195,7 +191,7 @@
                     <span class="relative shrink-0 flex items-center justify-center">
                         <img id="header-user-avatar" src="" alt="" class="hidden w-6 h-6 rounded-full object-cover border border-slate-200">
                         <span id="header-user-initials" class="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px] font-black uppercase shadow-2xs">U</span>
-                        <span class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+                        <span id="header-connection-dot" class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" title="Online"></span>
                     </span>
                     <span id="header-user-firstname" class="hidden sm:inline text-xs font-bold text-slate-800 max-w-[110px] truncate">Workspace</span>
                     <span id="header-role-badge" class="hidden"></span>
@@ -2072,8 +2068,21 @@
             if (btnText) btnText.textContent = "Sign in with Google";
         };
 
+        // The dot on the profile chip: green when connected, grey when offline (changes wait and sync later)
+        function updateConnectionDot() {
+            const dot = document.getElementById('header-connection-dot');
+            if (!dot) return;
+            const online = navigator.onLine;
+            dot.classList.toggle('bg-emerald-500', online);
+            dot.classList.toggle('bg-slate-400', !online);
+            dot.title = online ? 'Online' : 'Offline: changes will be saved when the connection is back';
+            document.getElementById('header-user-badge')?.setAttribute('aria-label', `Account${online ? '' : ' (offline)'}`);
+        }
+        window.addEventListener('online', updateConnectionDot);
+        window.addEventListener('offline', updateConnectionDot);
+
         function updateUserHeaderUI(name, photoURL) {
-            const userLabel = document.getElementById('workspace-user-label');
+            updateConnectionDot();
             const headerBadge = document.getElementById('header-user-badge');
             const headerName = document.getElementById('header-user-name');
             const headerEmail = document.getElementById('header-user-email');
@@ -2083,7 +2092,6 @@
             const displayName = name || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Workspace Member';
             const email = currentUser?.email || 'Logged in';
 
-            if (userLabel) userLabel.textContent = `Online • ${displayName.split(' ')[0]}`;
             if (headerName) headerName.textContent = displayName;
             const firstName = document.getElementById('header-user-firstname');
             if (firstName) firstName.textContent = displayName.split(' ')[0];
