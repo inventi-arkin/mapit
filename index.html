@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.4.3" data-released="2026-11-11">
+    <meta name="mapit-version" content="2.5.0" data-released="2026-11-11">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -210,6 +210,9 @@
                     <button type="button" role="menuitem" id="users-btn" onclick="closeAccountMenu(); openUsersModal()" class="admin-only w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-users-three text-base text-indigo-600" aria-hidden="true"></i> Users
                     </button>
+                    <button type="button" role="menuitem" id="workflow-btn" onclick="openWorkflowSettings()" class="hidden w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
+                        <i class="ph-bold ph-flow-arrow text-base text-indigo-600" aria-hidden="true"></i> Workflow settings
+                    </button>
                     <button type="button" role="menuitem" id="private-roadmaps-btn" onclick="closeAccountMenu(); openPrivateRoadmapsModal()" class="hidden w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-lock-simple text-base text-brand-600" aria-hidden="true"></i> Private roadmaps
                         <span id="account-private-count" class="ml-auto text-[10px] font-bold px-1.5 rounded-full bg-brand-50 text-brand-700"></span>
@@ -314,6 +317,9 @@
                     <select id="perspective-subfilter" onchange="applySubfilter(this.value)" class="text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 cursor-pointer outline-none">
                         <option value="ALL">Show All</option>
                     </select>
+                    <select id="timeline-stage-filter" aria-label="Filter by stage" onchange="applyTimelineStageFilter()" class="text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 cursor-pointer outline-none max-w-[11rem]">
+                        <option value="ALL">All stages</option>
+                    </select>
                     </div>
                 </div>
             </div>
@@ -379,6 +385,12 @@
                             <option value="in-progress">In Progress</option>
                             <option value="done">Completed</option>
                             <option value="over">Over capacity only</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center">
+                        <select id="editor-stage-filter" aria-label="Filter by stage" onchange="applyEditorFilters()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
+                            <option value="ALL">All stages</option>
                         </select>
                     </div>
 
@@ -565,7 +577,7 @@
 
     <!-- Modal: View Deliverable Details -->
     <div id="detail-modal" role="dialog" aria-modal="true" aria-labelledby="modal-feature-name" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 relative">
+        <div class="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl p-6 relative max-h-[92vh] overflow-y-auto custom-scrollbar">
             <button type="button" onclick="closeModal()" data-dialog-close aria-label="Close" class="absolute top-4 right-4 text-slate-500 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-all">
                 <i class="ph-bold ph-x text-base"></i>
             </button>
@@ -588,6 +600,7 @@
                 </div>
                 <div id="modal-linked-feedback-box"></div>
             </div>
+            <div id="modal-stage-timeline" class="mt-4 pt-3 border-t border-slate-100"></div>
             <div class="flex items-center justify-end gap-2 pt-3 mt-4 border-t border-slate-100">
                 <button type="button" onclick="closeModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
                     Close
@@ -595,6 +608,22 @@
                 <button type="button" onclick="editFromDetails()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
                     <i class="ph-bold ph-pencil-simple"></i> <span id="details-edit-label">Edit</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Workflow settings (2.5.0, Admins) -->
+    <div id="workflow-modal" role="dialog" aria-modal="true" aria-labelledby="workflow-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4">
+        <div class="bg-white sm:rounded-2xl max-w-3xl w-full h-full sm:h-auto sm:max-h-[92vh] border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
+                <h3 id="workflow-title" class="text-sm font-black text-slate-900 flex items-center gap-2"><span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center" aria-hidden="true"><i class="ph-bold ph-flow-arrow"></i></span>Workflow settings</h3>
+                <button type="button" onclick="closeWorkflowSettings()" data-dialog-close aria-label="Close" class="text-slate-500 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100"><i class="ph-bold ph-x text-base"></i></button>
+            </div>
+            <div id="workflow-body" class="p-5 space-y-2 overflow-y-auto custom-scrollbar flex-1"></div>
+            <div class="flex flex-wrap justify-between gap-2 px-5 py-3 border-t border-slate-100 shrink-0">
+                <button type="button" onclick="wfReset()" class="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">Reset to defaults</button>
+                <span class="flex gap-2"><button type="button" onclick="closeWorkflowSettings()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
+                <button type="button" id="workflow-save" onclick="saveWorkflowSettings()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold">Save</button></span>
             </div>
         </div>
     </div>
@@ -688,12 +717,17 @@
                         <p id="detail-load-note" class="hidden" role="status"></p>
 
                         <div class="space-y-1">
-                            <label for="detail-item-status" class="text-xs font-semibold text-slate-700">Status</label>
-                            <select id="detail-item-status" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
-                                <option value="planned">Planned</option>
-                                <option value="in-progress">In Progress</option>
-                                <option value="done">Completed</option>
-                            </select>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div class="space-y-1">
+                                    <label for="detail-item-stage" class="text-xs font-semibold text-slate-700">Stage</label>
+                                    <select id="detail-item-stage" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"></select>
+                                </div>
+                                <div class="space-y-1">
+                                    <span class="text-xs font-semibold text-slate-700">Status</span>
+                                    <div id="detail-item-status-label" class="px-3 py-2 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-700"></div>
+                                    <input type="hidden" id="detail-item-status">
+                                </div>
+                            </div>
                         </div>
 
                         <div class="space-y-1">
@@ -742,6 +776,9 @@
                                 <button type="button" id="tab-btn-logs" onclick="switchMilestoneSideTab('logs')" class="px-2.5 py-1 rounded-md bg-white text-brand-700 shadow-2xs transition-all">
                                     <i class="ph-bold ph-clock-counter-clockwise mr-1"></i> History
                                 </button>
+                                <button type="button" id="tab-btn-stages" onclick="switchMilestoneSideTab('stages')" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all">
+                                    <i class="ph-bold ph-flow-arrow mr-1"></i> Timeline
+                                </button>
                                 <button type="button" id="tab-btn-comments" onclick="switchMilestoneSideTab('comments')" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all">
                                     <i class="ph-bold ph-chat-teardrop-text mr-1"></i> Comments
                                     <span id="milestone-comments-count" class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-300 text-slate-700 font-bold">0</span>
@@ -754,6 +791,11 @@
                             <div id="milestone-history-list" class="space-y-2 text-xs">
                                 <!-- Populated dynamically -->
                             </div>
+                        </div>
+
+                        <!-- Panel 1b (2.5.0): the deliverable's stage timeline -->
+                        <div id="milestone-stages-panel" class="hidden max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
+                            <div id="milestone-stages-list" class="text-xs"></div>
                         </div>
 
                         <!-- Panel 2: Comments Feed -->
@@ -823,14 +865,7 @@
                 </div>
                 <p id="modal-load-note" class="hidden" role="status"></p>
 
-                <div class="space-y-1">
-                    <label for="modal-item-status" class="text-xs font-semibold text-slate-700">Initial Status</label>
-                    <select id="modal-item-status" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
-                        <option value="planned">Planned</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="done">Completed</option>
-                    </select>
-                </div>
+                <p class="text-xs text-slate-600">Starts at: <b>New</b> · Planned. Move it through the stages from its timeline.</p>
 
                 <div class="space-y-1">
                     <label for="modal-item-inclusions" class="text-xs font-semibold text-slate-700">Inclusions (comma-separated)</label>
@@ -1437,6 +1472,8 @@
                         rankInitDone.add(active.id);
                         ensureRanked(active).then(ok => { if (ok) scheduleRender(); });
                     }
+                    // Existing deliverables get their starting stage from their status (once per roadmap per session)
+                    if (canEditActive() && !stageInitDone.has(active.id)) ensureStages(active).then(() => scheduleRender());
                 }
             } else if (viewName === 'feedback') {
                 if (feedbackView) {
@@ -1543,6 +1580,11 @@
                 wrapper.addEventListener('scrollend', restore);
                 setTimeout(restore, 1200);
             }));
+        };
+
+        window.applyTimelineStageFilter = function() {
+            const active = getActiveRoadmap();
+            if (active) renderTimeline(active.items || []);
         };
 
         window.applySubfilter = function(val) {
@@ -1670,7 +1712,7 @@
             const liveRoadmaps = roadmaps.filter(r => !r.deletedAt);
 
             if (roadmapSelect) {
-                const pctOf = r => { const items = r.items || []; return items.length ? Math.round(items.filter(i => i.status === 'done').length / items.length * 100) : 0; };
+                const pctOf = r => itemsProgress(r.items || []);
                 const option = r => `<option value="${escapeHtml(r.id)}" ${activeRoadmap && r.id === activeRoadmap.id ? 'selected' : ''}>${escapeHtml(r.title)}</option>`;
                 const sorted = liveRoadmaps.slice().sort((a, b) => String(a.title).localeCompare(String(b.title), undefined, { sensitivity: 'base', numeric: true }));
                 roadmapSelect.innerHTML =
@@ -1679,7 +1721,7 @@
                     (activeRoadmap?.deletedAt ? `<option value="" selected>In the Recycle Bin: ${escapeHtml(activeRoadmap.title)}</option>` : '');
                 const progress = document.getElementById('roadmap-select-progress');
                 if (progress) progress.innerHTML = activeRoadmap && !activeRoadmap.deletedAt && !previewRoadmap
-                    ? `<span class="hidden sm:inline-flex">${progressBar((activeRoadmap.items || []).filter(i => i.status === 'done').length, (activeRoadmap.items || []).length)}</span><span>${pctOf(activeRoadmap)}%<span class="hidden sm:inline"> done</span></span>` : '';
+                    ? `<span class="hidden sm:inline-flex">${pctBar(pctOf(activeRoadmap))}</span><span>${pctOf(activeRoadmap)}%<span class="hidden sm:inline"> done</span></span>` : '';
                 // The dropdown can cut a long name: show it in full on hover
                 roadmapSelect.title = roadmapSelect.selectedOptions[0]?.textContent || '';
             }
@@ -1760,6 +1802,7 @@
                 roleLine.textContent = text || '';
                 roleLine.classList.toggle('hidden', !text);
             }
+            document.getElementById('workflow-btn')?.classList.toggle('hidden', !canEditWorkflow());
             const binCount = binEntries().length;
             const binVisible = !!myRole && (canEdit() || binCount > 0);
             document.getElementById('recycle-bin-btn')?.classList.toggle('hidden', !binVisible);
@@ -1768,7 +1811,7 @@
             // The divider above Sign out only when Users / Private roadmaps / Recycle Bin are shown
             const signOut = document.getElementById('account-signout');
             if (signOut) {
-                const tools = isAdmin() || privateRoadmaps.length > 0 || binVisible;
+                const tools = isAdmin() || privateRoadmaps.length > 0 || binVisible || canEditWorkflow();
                 signOut.classList.toggle('border-t', tools);
                 signOut.classList.toggle('border-slate-100', tools);
                 signOut.classList.toggle('mt-1', tools);
@@ -2134,6 +2177,10 @@
                 return;
             }
 
+            // 2.5.0: Stage filter in the view bar
+            const stageFilter = document.getElementById('timeline-stage-filter')?.value || 'ALL';
+            if (stageFilter !== 'ALL') items = items.filter(i => matchesStage(i, stageFilter));
+
             if (activePerspective === 'year') {
                 renderAnnualTimeline(items);
             } else if (activePerspective === 'quarter') {
@@ -2188,7 +2235,7 @@
         const quarterOf = ym => `${ym.slice(0, 4)}-Q${Math.ceil(parseInt(ym.slice(5, 7), 10) / 3)}`;
 
         // ---- Building blocks ----
-        const LIST_COLS = 'md:grid-cols-[18px_84px_minmax(0,1fr)_130px_64px_150px_80px_52px]';
+        const LIST_COLS = 'md:grid-cols-[18px_84px_minmax(0,1fr)_120px_60px_176px_76px_52px]';
         function listColumnsHtml() {
             return `<div class="list-columns hidden md:grid ${LIST_COLS} gap-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 border-t border-slate-100" aria-hidden="true">
                 <span></span><span>#</span><span>Deliverable</span><span>Module</span><span>Effort</span><span>Status</span><span>Target</span><span></span></div>`;
@@ -2209,12 +2256,12 @@
                     <span class="list-name font-bold text-slate-900 truncate min-w-0 flex-1 md:flex-none">${escapeHtml(item.name)}</span>
                     <span class="hidden md:block text-brand-600 font-semibold truncate">${escapeHtml(item.module)}</span>
                     <span class="hidden md:block ${effort ? 'text-slate-700' : 'text-slate-400'}" ${effort ? '' : 'title="Not estimated"'}>${effort ? fmtDays(effort) : '—'}</span>
-                    <span class="hidden md:flex flex-col items-start gap-1"><span class="flex items-center gap-1.5">${statusDot(item.status)}<span aria-hidden="true">${statusText(item.status)}</span></span>${badge}</span>
+                    <span class="hidden md:flex min-w-0">${statusCellHtml(roadmap, item)}</span>
                     <span class="hidden md:block text-slate-600 whitespace-nowrap">${escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD')}</span>
                     <span class="flex justify-end">${reorder ? moveButtonsHtml(item) : ''}</span>
                     <span class="md:hidden w-full pl-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-slate-500" aria-hidden="true">
                         <span class="text-brand-600 font-semibold">${escapeHtml(item.module)}</span>${effort ? `<span>· ${fmtDays(effort)}</span>` : ''}
-                        <span class="flex items-center gap-1">· <span class="w-2 h-2 rounded-full ${item.status === 'done' ? 'bg-emerald-500' : item.status === 'in-progress' ? 'bg-brand-500' : 'bg-amber-400'}"></span>${statusText(item.status)}</span>
+                        <span class="flex items-center gap-1">· ${statusShortHtml(item)}</span>
                         <span>· ${escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD')}</span>${badge ? `<span class="over-tag-phone">${badge}</span>` : ''}
                     </span>
                 </div>`;
@@ -2235,7 +2282,7 @@
                         ${sub ? `<span class="text-[10px] text-slate-500 font-medium whitespace-nowrap">${escapeHtml(sub)}</span>` : ''}
                         <span class="list-summary w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-4 sm:pl-0">
                             <span class="text-[11px] font-semibold text-slate-600 whitespace-nowrap">${summary}</span>
-                            ${loadHtml || progressBar(done, items.length, 'w-12 sm:w-16')}
+                            ${loadHtml || pctBar(itemsProgress(items), 'w-12 sm:w-16')}
                         </span>
                     </button>
                     ${drill ? `<button type="button" onclick="drillDown('${drill.perspective}', '${escapeHtml(drill.period)}')" aria-label="${escapeHtml(drill.label)}" title="${escapeHtml(drill.label)}" class="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:text-brand-600"><i class="ph-bold ph-arrow-right text-xs" aria-hidden="true"></i></button>` : ''}
@@ -2501,6 +2548,8 @@
                 filtered = filtered.filter(i => i.module === modVal);
             }
 
+            const stageVal = document.getElementById('editor-stage-filter')?.value || 'ALL';
+            if (stageVal !== 'ALL') filtered = filtered.filter(i => matchesStage(i, stageVal));
             if (statusVal === 'over') {
                 filtered = filtered.filter(i => !!overInfo(roadmap, i));
             } else if (statusVal !== 'ALL') {
@@ -2523,7 +2572,7 @@
             editorTableBody.setAttribute('data-rank-list', 'editor');
 
             if (editorFilterCountBadge) {
-                if (searchVal || modVal !== 'ALL' || statusVal !== 'ALL') {
+                if (searchVal || modVal !== 'ALL' || statusVal !== 'ALL' || stageVal !== 'ALL') {
                     editorFilterCountBadge.textContent = `${filtered.length} of ${items.length} matched`;
                     editorFilterCountBadge.classList.remove('hidden');
                 } else {
@@ -2574,7 +2623,7 @@
                             <span class="text-brand-600 font-semibold">${escapeHtml(item.module)}</span>
                             <span>· ${escapeHtml(formatMonthYear(item.date))}</span>
                             <span>· ${effort ? fmtDays(effort) : 'Not estimated'}</span>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${statusBadge}">${escapeHtml(STATUS_LABELS[item.status] || item.status)}</span>
+                            <span class="flex items-center gap-1">${statusShortHtml(item)}</span>
                             ${overFlagHtml(roadmap, item)}
                         </div>
                     </td>
@@ -2586,12 +2635,7 @@
                     </td>
                     <td class="effort-cell hidden sm:table-cell py-3 px-4 whitespace-nowrap text-xs ${effort ? 'text-slate-700' : 'text-slate-400'}" ${canEditActive() ? `onclick="event.stopPropagation(); editEffortInline('${escapeHtml(item.id)}', this)" tabindex="0" role="button" aria-label="Effort for ${escapeHtml(item.name)}: ${effort ? fmtDays(effort) : 'not estimated'}. Click to change."` : ''} title="${effort ? '' : 'Not estimated'}">${effort ? fmtDays(effort) : '—'}</td>
                     <td class="hidden sm:table-cell py-3 px-4">
-                        <span class="flex flex-col items-start gap-1">
-                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${statusBadge}">
-                            ${escapeHtml(STATUS_LABELS[item.status] || item.status)}
-                        </span>
-                        ${overFlagHtml(roadmap, item, true)}
-                        </span>
+                        <span class="block w-44" onclick="event.stopPropagation(); selectMilestoneForEdit('${escapeHtml(item.id)}'); switchMilestoneSideTab('stages')">${statusCellHtml(roadmap, item)}</span>
                     </td>
                     <td class="hidden lg:table-cell py-3 px-4">
                         <div class="flex flex-wrap gap-1 max-w-xs">
@@ -3007,16 +3051,11 @@
                 overNote.classList.toggle('hidden', !over);
             }
 
-            const badge = document.getElementById('modal-status-badge');
-            badge.textContent = STATUS_LABELS[item.status] || item.status;
-            if (item.status === 'done') {
-                badge.className = 'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200';
-            } else if (item.status === 'in-progress') {
-                badge.className = 'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-50 text-brand-600 border border-brand-200';
-            } else {
-                badge.className = 'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200';
-            }
+            pendingStageAction = null;
+            const timelineBox = document.getElementById('modal-stage-timeline');
+            if (timelineBox) timelineBox.innerHTML = stageTimelineHtml(item, canEditActive());
 
+            setDetailStatusBadge(statusForStage(currentStageId(item)));
             document.getElementById('modal-description').textContent = item.description || 'No additional context provided.';
 
             const incContainer = document.getElementById('modal-inclusions-list');
@@ -3076,29 +3115,19 @@
 
         window.switchMilestoneSideTab = function(tab) {
             activeMilestoneSideTab = tab;
-            const btnLogs = document.getElementById('tab-btn-logs');
-            const btnComments = document.getElementById('tab-btn-comments');
-            const panelLogs = document.getElementById('milestone-logs-panel');
-            const panelComments = document.getElementById('milestone-comments-panel');
-            const commentInputBox = document.getElementById('milestone-comment-input-box');
-
-            if (tab === 'logs') {
-                btnLogs.className = "px-2.5 py-1 rounded-md bg-white text-brand-700 shadow-2xs transition-all";
-                btnComments.className = "px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all";
-                panelLogs.classList.remove('hidden');
-                panelComments.classList.add('hidden');
-                commentInputBox.classList.add('hidden');
-            } else {
-                btnComments.className = "px-2.5 py-1 rounded-md bg-white text-brand-700 shadow-2xs transition-all";
-                btnLogs.className = "px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all";
-                panelComments.classList.remove('hidden');
-                panelLogs.classList.add('hidden');
-                commentInputBox.classList.remove('hidden');
-            }
+            const on = 'px-2.5 py-1 rounded-md bg-white text-brand-700 shadow-2xs transition-all';
+            const off = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all';
+            [['logs', 'tab-btn-logs', 'milestone-logs-panel'], ['stages', 'tab-btn-stages', 'milestone-stages-panel'], ['comments', 'tab-btn-comments', 'milestone-comments-panel']].forEach(([id, btn, panel]) => {
+                const b = document.getElementById(btn);
+                if (b) b.className = id === tab ? on : off;
+                document.getElementById(panel)?.classList.toggle('hidden', id !== tab);
+            });
+            document.getElementById('milestone-comment-input-box')?.classList.toggle('hidden', tab !== 'comments');
+            if (tab === 'stages') renderOpenTimelines();
         };
 
         // Audit entry -> lines of text for the activity list (first line is the headline)
-        const FIELD_LABELS = { name: 'Name', module: 'Module', date: 'Target date', status: 'Status', inclusions: 'Scope', description: 'Description', feedbackIds: 'Linked feedback', title: 'Title', category: 'Category', source: 'Source', rank: 'Rank', effortDays: 'Effort', defaultDays: 'Default capacity' };
+        const FIELD_LABELS = { name: 'Name', module: 'Module', date: 'Target date', status: 'Status', inclusions: 'Scope', description: 'Description', feedbackIds: 'Linked feedback', title: 'Title', category: 'Category', source: 'Source', rank: 'Rank', effortDays: 'Effort', defaultDays: 'Default capacity', stage: 'Stage', skipped: 'Skipped stages', stageRedeemed: 'Completed later', note: 'Note' };
         function describeAudit(entry) {
             const changes = entry.changes || [];
             const line = c => {
@@ -3113,6 +3142,11 @@
                 if (c.f === 'source') return c.to ? `Source changed to "${c.to}"` : 'Source removed';
                 if (c.f === 'feedback') return String(c.to).startsWith('+') ? `Linked feedback "${String(c.to).slice(1)}"` : `Unlinked feedback "${String(c.to).slice(1)}"`;
                 if (c.f === 'rank') return `Rank changed from #${c.from} to #${c.to}`;
+                if (c.f === 'stage') return `Stage: ${c.from || '—'} → ${c.to}`;
+                if (c.f === 'skipped') return `${pluralize(Number(c.to) || 0, 'stage')} skipped`;
+                if (c.f === 'stageRedeemed') return `Completed the skipped stage ${c.to}`;
+                if (c.f === 'note') return `Note: ${c.to}`;
+                if (c.f === 'undo') return 'Undid the skip';
                 if (c.f === 'effortDays') return `Effort changed from ${c.from === '—' ? 'not estimated' : c.from + ' pd'} to ${c.to === '—' ? 'not estimated' : c.to + ' pd'}`;
                 return `${FIELD_LABELS[c.f] || c.f} changed`;
             };
@@ -3315,6 +3349,8 @@
             setEditReadOnly(!canEditActive());
             const moveTo = document.getElementById('detail-item-moveto');
             if (moveTo) { moveTo.value = ''; moveTo.max = String((activeRoadmap.items || []).length); }
+            pendingStageAction = null;
+            fillEditStage(item);
             const rankLabel = document.getElementById('detail-rank-label');
             if (rankLabel) rankLabel.textContent = rankOf(activeRoadmap, item.id) ? `#${rankOf(activeRoadmap, item.id)} of ${(activeRoadmap.items || []).length}` : '';
             updateLoadNote('detail');
@@ -3343,6 +3379,35 @@
 
             if (editMilestoneModal) editMilestoneModal.classList.remove('hidden');
         };
+
+        // Stage picker in the Edit window (grouped by phase); a move happens on Save only if the user changed it
+        let editStageBaseline = null;
+        function fillEditStage(item) {
+            const sel = document.getElementById('detail-item-stage');
+            if (!sel) return;
+            sel.innerHTML = stageFilterOptionsHtml().replace(/<option value="ALL">All stages<\/option><option value="APPROVAL">Waiting for approval<\/option>/, '');
+            sel.value = currentStageId(item);
+            editStageBaseline = sel.value;
+            sel.disabled = !canEditActive();
+            updateEditStatusLabel();
+        }
+        function updateEditStatusLabel() {
+            const sel = document.getElementById('detail-item-stage');
+            const label = document.getElementById('detail-item-status-label');
+            if (!sel || !label) return;
+            const st = statusForStage(sel.value);
+            label.innerHTML = `<span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${STATUS_DOT[st]}"></span>${escapeHtml(STATUS_LABELS[st])} <span class="text-slate-400 text-xs">(from stage)</span></span>`;
+        }
+        document.getElementById('detail-item-stage')?.addEventListener('change', updateEditStatusLabel);
+        // A colleague's stage change reaches the picker when the user hasn't touched it
+        function syncEditStage() {
+            const sel = document.getElementById('detail-item-stage');
+            if (!sel || !selectedMilestoneId || document.getElementById('edit-milestone-modal')?.classList.contains('hidden')) return;
+            const item = getActiveRoadmap()?.items.find(i => i.id === selectedMilestoneId);
+            if (!item) return;
+            const cur = currentStageId(item);
+            if (sel.value === editStageBaseline && cur !== editStageBaseline) { sel.value = cur; editStageBaseline = cur; updateEditStatusLabel(); }
+        }
 
         window.closeEditMilestoneModal = function() {
             selectedMilestoneId = null;
@@ -3411,8 +3476,17 @@
                     }
                 }
 
+                // Stage changed in the picker: same as "Move to…" (skipped stages can be undone from the banner)
+                const stageSel = document.getElementById('detail-item-stage');
+                let stageMove = null;
+                if (stageSel && stageSel.value && stageSel.value !== editStageBaseline) {
+                    stageMove = stageMoveUpdates(item, stageSel.value);
+                    if (stageMove) { Object.assign(updates, stageMove.updates); changes.push(...stageMove.changes); }
+                }
+
                 closeEditMilestoneModal();
-                await updateMilestone(activeRoadmap, item, updates, changes);
+                const saved = await updateMilestone(activeRoadmap, item, updates, changes);
+                if (saved && stageMove?.skippedNow.length) offerStageUndo(activeRoadmap, item.id, stageMove);
             });
         }
 
@@ -3458,7 +3532,10 @@
                     name: document.getElementById('modal-item-name')?.value.trim() || '',
                     module: canonicalModule(document.getElementById('modal-item-module')?.value),
                     date: document.getElementById('modal-item-date')?.value || '',
-                    status: document.getElementById('modal-item-status')?.value || 'planned',
+                    status: 'planned',
+                    stageId: 'new',
+                    stageHistory: [],
+                    skipped: [],
                     inclusions: (document.getElementById('modal-item-inclusions')?.value || '').split(',').map(s => s.trim()).filter(Boolean),
                     description: document.getElementById('modal-item-description')?.value.trim() || '',
                     feedbackIds: getCheckedFeedbackIds('add-milestone-feedback-list')
@@ -3850,7 +3927,7 @@
                 feedbackMap[f.id] = f.title;
             });
 
-            const headers = ['"Rank"', '"Deliverable Name"', '"Module"', '"Target Date"', '"Quarter"', '"Status"', '"Effort (person-days)"', '"Scope Inclusions"', '"Description"', '"Linked Feedback"', '"Last Changed By"', '"Last Changed At"'];
+            const headers = ['"Rank"', '"Deliverable Name"', '"Module"', '"Target Date"', '"Quarter"', '"Status"', '"Phase"', '"Stage"', '"Progress %"', '"Stage since"', '"Effort (person-days)"', '"Scope Inclusions"', '"Description"', '"Linked Feedback"', '"Last Changed By"', '"Last Changed At"'];
             
             const rows = items.map(item => {
                 let quarter = 'Unscheduled';
@@ -3870,7 +3947,11 @@
                     escape(item.module),
                     escape(item.date),
                     escape(quarter),
-                    escape(item.status),
+                    escape(statusForStage(currentStageId(item))),
+                    escape(phaseName(stageById(currentStageId(item))?.phaseId)),
+                    escape(stageName(currentStageId(item))),
+                    escape(stageProgress(item)),
+                    escape(item.stageSince ? phtIso(item.stageSince) : ''),
                     escape(effortOf(item) || ''),
                     escape(inclusions),
                     escape(item.description),
@@ -3907,6 +3988,7 @@
                 roadmapTitle: activeRoadmap.title,
                 exportedAt: new Date().toISOString(),
                 capacity: activeRoadmap.capacity || null,
+                workflow,
                 milestones: plainData(milestones)
             };
 
@@ -4167,7 +4249,7 @@
             renderQueued = true;
             requestAnimationFrame(() => {
                 renderQueued = false;
-                if (isAuthenticated) updateUI();
+                if (isAuthenticated) { updateUI(); renderOpenTimelines(); syncEditStage(); }
                 if (!document.getElementById('recycle-bin-modal')?.classList.contains('hidden')) renderRecycleBin();
             });
         }
@@ -4189,7 +4271,8 @@
         function stamp(auditId) { return { updatedBy: actor(), updatedAt: serverTimestamp(), lastAuditId: auditId }; }
         function milestoneFields(m) {
             return { name: m.name || '', module: m.module || '', date: m.date || '', status: m.status || 'planned', inclusions: m.inclusions || [], description: m.description || '', feedbackIds: m.feedbackIds || [],
-                ...(typeof m.rankKey === 'number' ? { rankKey: m.rankKey } : {}), ...(effortOf(m) ? { effortDays: effortOf(m) } : {}) };
+                ...(typeof m.rankKey === 'number' ? { rankKey: m.rankKey } : {}), ...(effortOf(m) ? { effortDays: effortOf(m) } : {}),
+                ...(m.stageId ? { stageId: m.stageId, stageHistory: m.stageHistory || [], skipped: m.skipped || [] } : {}) };
         }
         function feedbackFields(f) {
             return { title: f.title || '', category: f.category || '', source: f.source || '', description: f.description || '' };
@@ -4782,6 +4865,7 @@
         function startWorkspaceListeners() {
             stopAllListeners();
             sessionUnsubs.push(onSnapshot(wsRef('members', myEmail()), onMyMemberChanged, onListenerError));
+            sessionUnsubs.push(onSnapshot(wsRef('settings', 'workflow'), onWorkflowSnapshot, err => console.warn('Workflow settings unavailable, using the default workflow:', err)));
             return subscribeRoadmaps();
         }
 
@@ -5474,6 +5558,583 @@
         };
 
         // =======================================================
+        // 2.5.0 DELIVERABLE STAGES (specs/deliverable-stages.md, design/deliverable-stages.md)
+        // One workspace-wide workflow: New -> phases with stages -> Done. Status follows the stage.
+        // =======================================================
+        const DEFAULT_WORKFLOW = {
+            phases: [
+                { id: 'solutioning', name: 'Solutioning' }, { id: 'design', name: 'Design' },
+                { id: 'pre-sprint', name: 'Pre-Sprint Activities' }, { id: 'sprint', name: 'Sprint Activities' }
+            ],
+            stages: [
+                { id: 'new', name: 'New', phaseId: null, weight: 0 },
+                { id: 'requirements', name: 'Requirements', phaseId: 'solutioning', weight: 4 },
+                { id: 'solutioning', name: 'Solutioning', phaseId: 'solutioning', weight: 5 },
+                { id: 'po-approval', name: 'PO Approval', phaseId: 'solutioning', weight: 3 },
+                { id: 'c-level-solution', name: 'C-Level Approval', phaseId: 'solutioning', weight: 3 },
+                { id: 'designing', name: 'Designing', phaseId: 'design', weight: 10 },
+                { id: 'design-critique', name: 'Design Critique', phaseId: 'design', weight: 5 },
+                { id: 'c-level-design', name: 'C-Level Approval', phaseId: 'design', weight: 5 },
+                { id: 'presentation', name: 'Presentation to Team', phaseId: 'pre-sprint', weight: 3 },
+                { id: 'work-breakdown', name: 'Work Breakdown', phaseId: 'pre-sprint', weight: 4 },
+                { id: 'product-backlog', name: 'Product Backlog', phaseId: 'pre-sprint', weight: 3 },
+                { id: 'estimations', name: 'Estimations', phaseId: 'pre-sprint', weight: 5 },
+                { id: 'sprint-backlog', name: 'Sprint Backlog', phaseId: 'sprint', weight: 3 },
+                { id: 'development', name: 'Development', phaseId: 'sprint', weight: 32 },
+                { id: 'implementation', name: 'Implementation', phaseId: 'sprint', weight: 15 },
+                { id: 'done', name: 'Done', phaseId: null, weight: 0 }
+            ],
+            progressMethod: 'weighted'
+        };
+        let workflow = structuredClone(DEFAULT_WORKFLOW);
+        // Phase colours by position: violet, pink, amber, brand, then teal, indigo, orange, cyan
+        const PHASE_COLORS = [
+            ['bg-violet-50 text-violet-700 border-violet-200', 'bg-violet-500'], ['bg-pink-50 text-pink-700 border-pink-200', 'bg-pink-500'],
+            ['bg-amber-50 text-amber-800 border-amber-200', 'bg-amber-500'], ['bg-brand-50 text-brand-700 border-brand-200', 'bg-brand-500'],
+            ['bg-teal-50 text-teal-700 border-teal-200', 'bg-teal-500'], ['bg-indigo-50 text-indigo-700 border-indigo-200', 'bg-indigo-500'],
+            ['bg-orange-50 text-orange-700 border-orange-200', 'bg-orange-500'], ['bg-cyan-50 text-cyan-700 border-cyan-200', 'bg-cyan-500']
+        ];
+
+        // Keep a saved workflow usable: New first, Done last, every stage named, phases that exist
+        function normalizeWorkflow(data) {
+            if (!data || !Array.isArray(data.stages) || !Array.isArray(data.phases)) return structuredClone(DEFAULT_WORKFLOW);
+            const phases = data.phases.filter(p => p && p.id && p.name).map(p => ({ id: String(p.id), name: String(p.name).slice(0, 60) }));
+            const phaseIds = new Set(phases.map(p => p.id));
+            const byId = id => data.stages.find(s => s && s.id === id);
+            const middle = data.stages.filter(s => s && s.id && s.name && s.id !== 'new' && s.id !== 'done' && phaseIds.has(s.phaseId))
+                .map(s => ({ id: String(s.id), name: String(s.name).slice(0, 60), phaseId: s.phaseId, weight: Math.max(0, Math.min(100, Number(s.weight) || 0)) }));
+            if (!middle.length) return structuredClone(DEFAULT_WORKFLOW);
+            return {
+                phases,
+                stages: [{ id: 'new', name: String(byId('new')?.name || 'New').slice(0, 60), phaseId: null, weight: 0 }, ...middle, { id: 'done', name: String(byId('done')?.name || 'Done').slice(0, 60), phaseId: null, weight: 0 }],
+                progressMethod: data.progressMethod === 'doneCount' ? 'doneCount' : 'weighted'
+            };
+        }
+        const stageIdx = id => workflow.stages.findIndex(s => s.id === id);
+        const stageById = id => workflow.stages.find(s => s.id === id);
+        const stageName = id => stageById(id)?.name || '';
+        const phaseName = phaseId => workflow.phases.find(p => p.id === phaseId)?.name || '';
+        function phaseColor(phaseIdOrStage) {
+            if (phaseIdOrStage === 'new') return ['bg-slate-100 text-slate-600 border-slate-200', 'bg-slate-400'];
+            if (phaseIdOrStage === 'done') return ['bg-emerald-50 text-emerald-700 border-emerald-200', 'bg-emerald-500'];
+            const i = workflow.phases.findIndex(p => p.id === phaseIdOrStage);
+            return PHASE_COLORS[(i < 0 ? 0 : i) % PHASE_COLORS.length];
+        }
+        const stageColor = id => (id === 'new' || id === 'done') ? phaseColor(id) : phaseColor(stageById(id)?.phaseId);
+        // The deliverable's stage; deliverables from before 2.5.0 (or at a removed stage) map from their status (A-1)
+        function currentStageId(item) {
+            if (item?.stageId && stageIdx(item.stageId) >= 0) return item.stageId;
+            if (item?.status === 'done') return 'done';
+            if (item?.status === 'in-progress') return workflow.stages[1]?.id || 'done';
+            return 'new';
+        }
+        function statusForStage(id) { return id === 'new' ? 'planned' : id === 'done' ? 'done' : 'in-progress'; }
+        function stageLabel(id) {
+            if (id === 'new' || id === 'done') return stageName(id);
+            const p = phaseName(stageById(id)?.phaseId);
+            return p ? `${p.replace(/ Activities$/, '')} · ${stageName(id)}` : stageName(id);
+        }
+        const isApprovalStage = id => /approval/i.test(stageName(id));
+        // Weighted progress: completed and skipped stages (all before the current one) ÷ total weight (A-2)
+        function stageProgress(item) {
+            const id = currentStageId(item);
+            if (id === 'done') return 100;
+            const i = stageIdx(id);
+            const total = workflow.stages.reduce((s, x) => s + (Number(x.weight) || 0), 0);
+            if (total <= 0) return Math.round(i / Math.max(1, workflow.stages.length - 1) * 100);
+            const passed = workflow.stages.slice(0, i).reduce((s, x) => s + (Number(x.weight) || 0), 0);
+            return Math.round(passed / total * 100);
+        }
+        // Progress of a set of deliverables (a roadmap, a card): average weighted progress, or Done ÷ all (admin setting)
+        function itemsProgress(items) {
+            if (!items?.length) return 0;
+            if (workflow.progressMethod === 'doneCount') return Math.round(items.filter(i => currentStageId(i) === 'done').length / items.length * 100);
+            return Math.round(items.reduce((s, i) => s + stageProgress(i), 0) / items.length);
+        }
+        function pctBar(pct, width = 'w-16') {
+            return `<span class="${width} bg-slate-100 h-1.5 rounded-full overflow-hidden shrink-0" aria-hidden="true"><span class="block h-full rounded-full ${pct >= 100 ? 'bg-emerald-500' : 'bg-brand-600'}" style="width: ${pct}%"></span></span>`;
+        }
+        const STATUS_DOT = { planned: 'bg-amber-400', 'in-progress': 'bg-brand-500', done: 'bg-emerald-500' };
+        // The "Status" cell: status + %, the bar in the phase colour, the stage as a small line, the over-capacity badge
+        function statusCellHtml(roadmap, item) {
+            const id = currentStageId(item);
+            const status = statusForStage(id);
+            const pct = stageProgress(item);
+            const stageText = id === 'done' ? 'All stages complete' : stageLabel(id);
+            const full = `Status: ${STATUS_LABELS[status]} · Stage: ${stageName(id)} · ${pct}%`;
+            return `<span class="status-cell flex flex-col gap-1 items-start w-full" title="${escapeHtml(full)}">
+                <span class="flex items-center gap-1.5 w-full text-xs font-medium text-slate-700"><span class="w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[status]}" aria-hidden="true"></span><span class="status-text">${escapeHtml(STATUS_LABELS[status])}</span><span class="status-pct ml-auto font-semibold tabular-nums ${pct >= 100 ? 'text-emerald-600' : 'text-slate-700'}">${pct}%</span></span>
+                <span class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden" aria-hidden="true"><span class="block h-full rounded-full ${stageColor(id)[1]}" style="width:${pct}%"></span></span>
+                <span class="stage-line flex items-center gap-1 text-[11px] text-slate-500 min-w-0"><span class="w-1.5 h-1.5 rounded-full shrink-0 ${stageColor(id)[1]}" aria-hidden="true"></span><span class="truncate">${escapeHtml(stageText)}</span></span>
+                <span class="sr-only">${escapeHtml(full)}</span>
+                ${overFlagHtml(roadmap, item)}
+            </span>`;
+        }
+        // Short form for phone lines and compact places
+        function statusShortHtml(item) {
+            const id = currentStageId(item);
+            const status = statusForStage(id);
+            return `<span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full ${STATUS_DOT[status]}"></span>${escapeHtml(STATUS_LABELS[status])} ${stageProgress(item)}%</span><span class="text-slate-400">· ${escapeHtml(id === 'done' ? 'All stages complete' : stageName(id))}</span>`;
+        }
+
+        // ---- Stage filter (Editor and the timeline view bar) ----
+        function stageFilterOptionsHtml() {
+            const groups = workflow.phases.map(p => {
+                const stages = workflow.stages.filter(s => s.phaseId === p.id);
+                return stages.length ? `<optgroup label="${escapeHtml(p.name)}">${stages.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('')}</optgroup>` : '';
+            }).join('');
+            return `<option value="ALL">All stages</option><option value="APPROVAL">Waiting for approval</option><option value="new">${escapeHtml(stageName('new'))}</option>${groups}<option value="done">${escapeHtml(stageName('done'))}</option>`;
+        }
+        function refreshStageFilters() {
+            ['editor-stage-filter', 'timeline-stage-filter'].forEach(id => {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                const v = sel.value || 'ALL';
+                sel.innerHTML = stageFilterOptionsHtml();
+                sel.value = [...sel.options].some(o => o.value === v) ? v : 'ALL';
+            });
+        }
+        function matchesStage(item, v) {
+            if (!v || v === 'ALL') return true;
+            const id = currentStageId(item);
+            return v === 'APPROVAL' ? isApprovalStage(id) : id === v;
+        }
+
+        // ---- Moving between stages ----
+        const stageDay = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Manila', day: 'numeric', month: 'short' });
+        function shortDay(v) { const d = toDate(v); return d ? stageDay.format(d) : ''; }
+        // The write for a move (no save yet): stage, history, skipped stages, status
+        function stageMoveUpdates(item, targetId, note = '', reopen = false) {
+            const from = currentStageId(item);
+            const fi = stageIdx(from), ti = stageIdx(targetId);
+            if (ti < 0 || ti === fi) return null;
+            const at = new Date().toISOString();
+            const by = actor();
+            const history = (item.stageHistory || []).slice();
+            let skipped = (item.skipped || []).filter(id => stageIdx(id) >= 0);
+            const skippedNow = [];
+            const withNote = entry => (note && !history.some(h => h.__noted) ? Object.assign(entry, { note: clip(note, 500), __noted: true }) : entry);
+            if (ti > fi) {
+                history.push(withNote({ stageId: from, stageName: stageName(from), action: 'completed', at, by }));
+                for (let i = fi + 1; i < ti; i++) {
+                    const s = workflow.stages[i];
+                    if (!skipped.includes(s.id)) skippedNow.push(s.id);
+                    history.push({ stageId: s.id, stageName: s.name, action: 'skipped', at, by });
+                }
+                skipped = [...new Set([...skipped, ...skippedNow])];
+            } else {
+                skipped = skipped.filter(id => stageIdx(id) < ti);
+                history.push(withNote({ stageId: targetId, stageName: stageName(targetId), action: reopen ? 'reopened' : 'back', at, by }));
+            }
+            history.forEach(h => delete h.__noted);
+            const updates = {
+                stageId: targetId,
+                stageSince: useCloudPersistence ? serverTimestamp() : at,
+                stageHistory: history.slice(-200),
+                skipped,
+                status: statusForStage(targetId)
+            };
+            const changes = [{ f: 'stage', from: stageName(from), to: stageName(targetId) }];
+            if (skippedNow.length) changes.push({ f: 'skipped', to: skippedNow.length });
+            if (statusForStage(from) !== statusForStage(targetId)) changes.push({ f: 'status', from: statusForStage(from), to: statusForStage(targetId) });
+            if (note) changes.push({ f: 'note', to: clip(note, 500) });
+            const previous = { stageId: from, stageSince: item.stageSince || (useCloudPersistence ? serverTimestamp() : at), stageHistory: item.stageHistory || [], skipped: item.skipped || [], status: item.status || statusForStage(from) };
+            return { updates, changes, skippedNow, previous, from };
+        }
+        async function moveStage(roadmap, item, targetId, note = '', reopen = false) {
+            if (!roadmap || !item || !canEditActive()) return false;
+            const move = stageMoveUpdates(item, targetId, note, reopen);
+            if (!move) return false;
+            const ok = await updateMilestone(roadmap, item, move.updates, move.changes);
+            if (ok) {
+                Object.assign(item, move.updates, useCloudPersistence ? { stageSince: new Date().toISOString() } : {});
+                if (move.skippedNow.length) offerStageUndo(roadmap, item.id, move);
+                scheduleRender();
+            }
+            return ok;
+        }
+        // Undo a move that skipped stages (10 s, in the banner)
+        function offerStageUndo(roadmap, itemId, move) {
+            showUndo(`"${roadmap.items.find(i => i.id === itemId)?.name || 'Deliverable'}" moved to ${stageName(move.updates.stageId)} (${pluralize(move.skippedNow.length, 'stage')} skipped).`, async () => {
+                const item = getActiveRoadmap()?.items.find(i => i.id === itemId);
+                if (!item) return;
+                const ok = await updateMilestone(roadmap, item, move.previous, [{ f: 'stage', from: stageName(move.updates.stageId), to: stageName(move.from) }, { f: 'undo', to: 'skip' }]);
+                if (ok) { Object.assign(item, move.previous); scheduleRender(); }
+            });
+        }
+        // Complete a skipped stage later (the current stage doesn't change)
+        async function redeemStage(roadmap, item, stageId, note = '') {
+            if (!canEditActive() || !(item.skipped || []).includes(stageId)) return false;
+            const history = (item.stageHistory || []).concat([{ stageId, stageName: stageName(stageId), action: 'redeemed', at: new Date().toISOString(), by: actor(), ...(note ? { note: clip(note, 500) } : {}) }]).slice(-200);
+            const updates = { stageHistory: history, skipped: (item.skipped || []).filter(id => id !== stageId) };
+            const changes = [{ f: 'stageRedeemed', to: stageName(stageId) }, ...(note ? [{ f: 'note', to: clip(note, 500) }] : [])];
+            const ok = await updateMilestone(roadmap, item, updates, changes);
+            if (ok) { Object.assign(item, updates); scheduleRender(); }
+            return ok;
+        }
+
+        // ---- Existing deliverables get a stage from their status (once per roadmap per session, batches of 6) ----
+        const stageInitDone = new Set();
+        async function ensureStages(roadmap) {
+            if (!roadmap || !canEditActive() || stageInitDone.has(roadmap.id)) return;
+            const todo = (roadmap.items || []).filter(i => !i.stageId);
+            stageInitDone.add(roadmap.id);
+            if (!todo.length) return;
+            const at = new Date().toISOString();
+            const fields = item => {
+                const id = currentStageId(item);
+                return { stageId: id, stageSince: useCloudPersistence ? serverTimestamp() : at, skipped: [],
+                    stageHistory: [{ stageId: id, stageName: stageName(id), action: 'set', at, by: { name: `System (via ${actor().name})`, email: actor().email }, note: 'Stage set from the old status' }] };
+            };
+            if (!useCloudPersistence) { todo.forEach(i => Object.assign(i, fields(i))); return; }
+            for (let i = 0; i < todo.length; i += 6) {
+                const part = todo.slice(i, i + 6);
+                const aid = newId('a');
+                const ok = await commitBatch(batch => {
+                    part.forEach(item => batch.update(itemRef(roadmap.id, 'milestones', item.id), { ...fields(item), ...stamp(aid) }));
+                    batch.set(auditRef(aid), auditEntry(roadmap, 'roadmap.stages_initialized', { type: 'roadmap', id: roadmap.id, label: roadmap.title }, [{ f: 'items', to: part.length }]));
+                }, 'set the starting stages');
+                if (!ok) return;
+            }
+        }
+
+        // ---- Timeline (details window and the Edit window's Timeline tab) ----
+        let pendingStageAction = null;   // { itemId, kind, target }
+        function stageMeta(item, stageId) {
+            const h = (item.stageHistory || []).filter(e => e.stageId === stageId);
+            const done = [...h].reverse().find(e => ['completed', 'redeemed', 'set'].includes(e.action));
+            const notes = h.filter(e => e.note).slice(-2);
+            return { done, notes, later: h.some(e => e.action === 'redeemed') };
+        }
+        function stageTimelineHtml(item, editable) {
+            const cur = currentStageId(item);
+            const ci = stageIdx(cur);
+            const skipped = new Set(item.skipped || []);
+            const pct = stageProgress(item);
+            const who = e => e ? `<span title="${escapeHtml(`${e.by?.email || ''} · ${formatPHT(e.at)}`)}">by ${escapeHtml(e.by?.name || 'Member')} · ${escapeHtml(shortDay(e.at))}</span>` : '';
+            const since = toDate(item.stageSince);
+            const days = since ? Math.max(0, Math.floor((Date.now() - since.getTime()) / 864e5)) : null;
+            const row = (s, i) => {
+                const state = i < ci ? (skipped.has(s.id) ? 'skipped' : 'done') : i === ci ? 'current' : 'upcoming';
+                const meta = stageMeta(item, s.id);
+                const [, dot] = stageColor(s.id);
+                const icon = state === 'done' ? `<span class="w-5 h-5 rounded-full ${dot} text-white flex items-center justify-center shrink-0"><i class="ph-bold ph-check text-[10px]"></i></span>`
+                    : state === 'current' ? `<span class="w-5 h-5 rounded-full bg-white border-[3px] border-brand-600 ring-4 ring-brand-100 shrink-0"></span>`
+                    : state === 'skipped' ? `<span class="w-5 h-5 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center shrink-0"><i class="ph-bold ph-prohibit text-[11px]"></i></span>`
+                    : `<span class="w-5 h-5 rounded-full bg-white border-2 border-slate-300 shrink-0"></span>`;
+                const stateText = { done: 'completed', current: 'current stage', skipped: 'skipped', upcoming: 'upcoming' }[state];
+                const id = escapeHtml(item.id), sid = escapeHtml(s.id);
+                return `<li class="group/stage relative flex items-start gap-2.5 py-1.5 pl-1 pr-1 ${state === 'current' ? 'bg-brand-50/60 rounded-lg' : ''}" data-stage-id="${sid}" data-stage-state="${state}" aria-label="${escapeHtml(`${s.name}, ${stateText}`)}">
+                    ${icon}
+                    <div class="flex-1 min-w-0">
+                        <div class="flex flex-wrap items-center gap-x-2 text-xs">
+                            <span class="${state === 'current' ? 'font-black text-brand-800' : state === 'skipped' ? 'text-slate-500 italic' : state === 'upcoming' ? 'text-slate-500' : 'font-semibold text-slate-800'}">${escapeHtml(s.name)}</span>
+                            <span class="text-[11px] text-slate-500 ${state === 'skipped' ? 'italic' : ''}">${state === 'done' ? who(meta.done) : state === 'current' ? `current${since ? ` · since ${escapeHtml(shortDay(since))}${days !== null ? ` (${pluralize(days, 'day')})` : ''}` : ''}` : state === 'skipped' ? 'Skipped' : ''}</span>
+                            ${state === 'done' && meta.later ? '<span class="text-[10px] font-bold px-1.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">completed later</span>' : ''}
+                        </div>
+                        ${meta.notes.map(n => `<p class="text-[11px] text-slate-500 italic mt-0.5 break-words">“${escapeHtml(n.note)}” <span class="not-italic text-slate-400">· ${escapeHtml(n.by?.name || '')}</span></p>`).join('')}
+                        ${state === 'skipped' && editable ? `<div class="mt-1 flex flex-wrap gap-2"><button type="button" onclick="stageAction('${id}', 'redeem', '${sid}')" class="px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">✓ Mark as completed</button><button type="button" onclick="stageAction('${id}', 'reopen', '${sid}')" class="px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-[11px] font-semibold">↺ Reopen</button></div>` : ''}
+                    </div>
+                    ${editable && state !== 'current' && state !== 'skipped' ? `<button type="button" onclick="stageAction('${id}', 'move', '${sid}')" class="stage-move-here sm:opacity-0 sm:group-hover/stage:opacity-100 focus:opacity-100 text-[11px] font-semibold text-brand-700 px-2 shrink-0">Move here</button>` : ''}
+                </li>`;
+            };
+            const stages = workflow.stages;
+            const curPhase = stageById(cur)?.phaseId;
+            let list = row(stages[0], 0);
+            workflow.phases.forEach(p => {
+                const ps = stages.map((s, i) => [s, i]).filter(([s]) => s.phaseId === p.id);
+                if (!ps.length) return;
+                const passed = ps.filter(([, i]) => i < ci).length;
+                list += `<li class="mt-1"><details ${p.id === curPhase || (!curPhase && ps.some(([, i]) => i < ci && skipped.has(stages[i].id))) ? 'open' : ''} class="group/phase">
+                    <summary class="cursor-pointer list-none flex items-center gap-2 pl-7 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700"><i class="ph-bold ph-caret-right group-open/phase:rotate-90 transition-transform"></i>${escapeHtml(p.name)}<span class="font-semibold normal-case tracking-normal">${passed}/${ps.length}${p.id === curPhase ? ' · current' : ''}</span></summary>
+                    <ol class="ml-0">${ps.map(([s, i]) => row(s, i)).join('')}</ol></details></li>`;
+            });
+            list += row(stages[stages.length - 1], stages.length - 1);
+            const next = stages[ci + 1];
+            const prev = stages[ci - 1];
+            const buttons = editable ? `<div class="flex flex-wrap gap-2 mb-2">
+                ${prev ? `<button type="button" onclick="stageAction('${escapeHtml(item.id)}', 'back')" class="stage-back px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700">${cur === 'done' ? `Reopen (back to ${escapeHtml(prev.name)})` : '← Back'}</button>` : ''}
+                ${next ? `<button type="button" onclick="stageAction('${escapeHtml(item.id)}', 'next')" class="stage-next px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold">Next stage → ${escapeHtml(next.name)}</button>` : ''}
+            </div>` : '';
+            const pending = pendingStageAction && pendingStageAction.itemId === item.id ? stageConfirmHtml(item) : '';
+            return `<div class="stage-timeline">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <h4 class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Timeline</h4>
+                    <span class="flex items-center gap-2 text-[11px] font-semibold text-slate-600">${pctBar(pct, 'w-32')}<span class="stage-progress">${pct}%</span> · <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded border ${stageColor(cur)[0]}">${escapeHtml(stageLabel(cur))}</span></span>
+                </div>
+                ${buttons}${pending}
+                <ol class="relative ml-1 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">${list}</ol>
+            </div>`;
+        }
+        // The small confirmation box: what will happen, an optional note, Confirm / Cancel
+        function stageConfirmHtml(item) {
+            const a = pendingStageAction;
+            const cur = currentStageId(item);
+            const ci = stageIdx(cur);
+            let text = '', skipList = [], label = 'Confirm';
+            if (a.kind === 'redeem') { text = `Mark ${stageName(a.target)} as completed (the current stage stays ${stageName(cur)}).`; }
+            else {
+                const ti = stageIdx(a.target);
+                text = `Moving "${item.name}" from ${stageName(cur)} to ${stageName(a.target)}.`;
+                if (ti > ci + 1) { skipList = workflow.stages.slice(ci + 1, ti).filter(s => !(item.skipped || []).includes(s.id)).map(s => s.name); }
+                if (skipList.length) label = 'Skip and move';
+                if (ti < ci) text += ' Later stages will no longer count as completed.';
+            }
+            return `<div class="stage-confirm mb-2 p-3 rounded-xl border ${skipList.length ? 'border-amber-300 bg-amber-50/70' : 'border-brand-200 bg-brand-50/50'} text-xs space-y-2" role="group" aria-label="Confirm stage change">
+                <p class="text-slate-700">${skipList.length ? `<b>Skip ${pluralize(skipList.length, 'stage')}?</b> ` : ''}${escapeHtml(text)}</p>
+                ${skipList.length ? `<p class="flex flex-wrap gap-1">${skipList.map(s => `<span class="px-1.5 py-0.5 rounded bg-white text-slate-600 border border-slate-200 italic">${escapeHtml(s)}</span>`).join('')}</p><p class="text-slate-500">You can complete or reopen a skipped stage later.</p>` : ''}
+                <div class="flex flex-wrap items-center gap-2"><input id="stage-note-input" maxlength="500" placeholder="Add a note (optional)" class="flex-1 min-w-[10rem] px-2 py-1.5 border border-slate-200 rounded-lg text-xs" onkeydown="if (event.key === 'Enter') { event.preventDefault(); confirmStageAction(); } if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancelStageAction(); }">
+                <button type="button" onclick="cancelStageAction()" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 font-semibold text-slate-700">Cancel</button>
+                <button type="button" id="stage-confirm-btn" onclick="confirmStageAction()" class="px-3 py-1.5 rounded-lg ${skipList.length ? 'bg-amber-500 hover:bg-amber-600' : 'bg-brand-600 hover:bg-brand-700'} text-white font-semibold">${escapeHtml(label)}</button></div>
+            </div>`;
+        }
+        function setDetailStatusBadge(status) {
+            const badge = document.getElementById('modal-status-badge');
+            if (!badge) return;
+            badge.textContent = STATUS_LABELS[status] || status;
+            badge.className = 'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ' + (status === 'done' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : status === 'in-progress' ? 'bg-brand-50 text-brand-600 border-brand-200' : 'bg-amber-50 text-amber-700 border-amber-200');
+        }
+        function renderOpenTimelines() {
+            const roadmap = getActiveRoadmap();
+            [['modal-stage-timeline', detailItemId, () => !document.getElementById('detail-modal')?.classList.contains('hidden')],
+             ['milestone-stages-list', selectedMilestoneId, () => !document.getElementById('edit-milestone-modal')?.classList.contains('hidden')]].forEach(([elId, itemId, open]) => {
+                const el = document.getElementById(elId);
+                if (!el || !itemId || !open()) return;
+                const item = roadmap?.items.find(i => i.id === itemId);
+                if (!item) return;
+                el.innerHTML = stageTimelineHtml(item, canEditActive());
+                // The details header badge follows the stage too
+                if (elId === 'modal-stage-timeline') setDetailStatusBadge(statusForStage(currentStageId(item)));
+            });
+            const input = document.getElementById('stage-note-input');
+            if (input && pendingStageAction?.focus) { input.focus(); pendingStageAction.focus = false; }
+        }
+        window.stageAction = function(itemId, kind, target) {
+            const item = getActiveRoadmap()?.items.find(i => i.id === itemId);
+            if (!item || !canEditActive()) return;
+            const ci = stageIdx(currentStageId(item));
+            if (kind === 'next') target = workflow.stages[ci + 1]?.id;
+            if (kind === 'back') target = workflow.stages[ci - 1]?.id;
+            if (!target) return;
+            pendingStageAction = { itemId, kind, target, focus: true };
+            renderOpenTimelines();
+        };
+        window.cancelStageAction = function() { pendingStageAction = null; renderOpenTimelines(); };
+        window.confirmStageAction = async function() {
+            const a = pendingStageAction;
+            if (!a) return;
+            const note = (document.getElementById('stage-note-input')?.value || '').trim();
+            pendingStageAction = null;
+            const roadmap = getActiveRoadmap();
+            const item = roadmap?.items.find(i => i.id === a.itemId);
+            if (!item) return;
+            if (a.kind === 'redeem') await redeemStage(roadmap, item, a.target, note);
+            else await moveStage(roadmap, item, a.target, note, a.kind === 'reopen');
+            renderOpenTimelines();
+        };
+
+        // ---- Workflow settings (Admins; demo can try it) ----
+        function canEditWorkflow() { return isAdmin() || (!useCloudPersistence && !!currentUser); }
+        let wfDraft = null;              // the workflow being edited
+        let wfMoves = {};                // removed stage id -> stage id its deliverables move to
+        const wfOpen = new Set();        // open phases in the settings window
+        function deliverablesAt(stageId) {
+            return roadmaps.filter(r => !r.deletedAt).flatMap(r => (r.items || []).map(i => ({ r, i }))).filter(({ i }) => currentStageId(i) === stageId);
+        }
+        window.openWorkflowSettings = function() {
+            if (!canEditWorkflow()) return;
+            closeAccountMenu();
+            wfDraft = structuredClone(workflow);
+            wfMoves = {};
+            wfOpen.clear();
+            renderWorkflowSettings();
+            document.getElementById('workflow-modal')?.classList.remove('hidden');
+        };
+        window.closeWorkflowSettings = function() { document.getElementById('workflow-modal')?.classList.add('hidden'); wfDraft = null; };
+        function wfTotal() { return wfDraft.stages.reduce((s, x) => s + (Number(x.weight) || 0), 0); }
+        function renderWorkflowSettings() {
+            const box = document.getElementById('workflow-body');
+            if (!box || !wfDraft) return;
+            const total = wfTotal();
+            const share = w => total > 0 ? Math.round((Number(w) || 0) / total * 100) : 0;
+            const input = 'px-2 py-1 border border-slate-200 rounded-lg text-xs focus:border-brand-500 outline-none';
+            const fixed = s => `<div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-xs">
+                <span class="w-2.5 h-2.5 rounded-full ${s.id === 'new' ? 'bg-slate-400' : 'bg-emerald-500'}"></span>
+                <input value="${escapeHtml(s.name)}" maxlength="60" aria-label="Name of the ${s.id === 'new' ? 'first' : 'last'} stage" oninput="wfSetName('${s.id}', this.value)" class="${input} w-40 font-bold">
+                <span class="text-slate-400">(fixed ${s.id === 'new' ? 'first stage · Planned' : 'last stage · Done'})</span><span class="ml-auto text-slate-500">0 · 0%</span></div>`;
+            const phases = wfDraft.phases.map((p, pi) => {
+                const st = wfDraft.stages.filter(s => s.phaseId === p.id);
+                const w = st.reduce((a, s) => a + (Number(s.weight) || 0), 0);
+                const open = wfOpen.has(p.id);
+                return `<div class="border border-slate-200 rounded-xl overflow-hidden" data-wf-phase="${escapeHtml(p.id)}">
+                    <div class="flex flex-wrap items-center gap-2 px-3 py-2 bg-slate-50 text-xs">
+                        <button type="button" onclick="wfTogglePhase('${escapeHtml(p.id)}')" aria-expanded="${open}" aria-label="Show stages of ${escapeHtml(p.name)}" class="text-slate-500"><i class="ph-bold ${open ? 'ph-caret-down' : 'ph-caret-right'} text-[10px]"></i></button>
+                        <span class="w-2.5 h-2.5 rounded-full ${PHASE_COLORS[pi % PHASE_COLORS.length][1]}"></span>
+                        <input value="${escapeHtml(p.name)}" maxlength="60" aria-label="Phase name" oninput="wfSetPhaseName('${escapeHtml(p.id)}', this.value)" class="${input} font-bold w-48">
+                        <button type="button" onclick="wfMovePhase('${escapeHtml(p.id)}', -1)" aria-label="Move phase up" class="px-1 text-slate-500 hover:text-brand-700">↑</button><button type="button" onclick="wfMovePhase('${escapeHtml(p.id)}', 1)" aria-label="Move phase down" class="px-1 text-slate-500 hover:text-brand-700">↓</button>
+                        <button type="button" onclick="wfRemovePhase('${escapeHtml(p.id)}')" ${st.length ? 'disabled title="Remove its stages first"' : ''} aria-label="Remove phase" class="px-1 text-slate-500 hover:text-rose-600 disabled:opacity-30"><i class="ph-bold ph-trash"></i></button>
+                        <span class="ml-auto font-semibold text-slate-600">${w} · ${share(w)}%</span>
+                    </div>
+                    ${open ? st.map(s => `<div class="flex flex-wrap items-center gap-2 px-3 py-1.5 border-t border-slate-100 text-xs" data-wf-stage="${escapeHtml(s.id)}">
+                        <input value="${escapeHtml(s.name)}" maxlength="60" aria-label="Stage name" oninput="wfSetName('${escapeHtml(s.id)}', this.value)" class="${input} w-56 ml-5">
+                        <button type="button" onclick="wfMoveStage('${escapeHtml(s.id)}', -1)" aria-label="Move stage up" class="px-1 text-slate-500 hover:text-brand-700">↑</button><button type="button" onclick="wfMoveStage('${escapeHtml(s.id)}', 1)" aria-label="Move stage down" class="px-1 text-slate-500 hover:text-brand-700">↓</button>
+                        <button type="button" onclick="wfRemoveStage('${escapeHtml(s.id)}')" aria-label="Remove stage" class="px-1 text-slate-500 hover:text-rose-600"><i class="ph-bold ph-trash"></i></button>
+                        <label class="ml-auto flex items-center gap-2"><span class="sr-only">Weight of ${escapeHtml(s.name)}</span><input type="number" min="0" max="100" step="1" value="${Number(s.weight) || 0}" oninput="wfSetWeight('${escapeHtml(s.id)}', this.value)" class="${input} w-16 text-right"></label>
+                        <span class="w-10 text-right text-slate-500 wf-share" data-wf-share="${escapeHtml(s.id)}">${share(s.weight)}%</span>
+                    </div>`).join('') + `<div class="px-3 py-1.5 border-t border-slate-100"><button type="button" onclick="wfAddStage('${escapeHtml(p.id)}')" class="text-[11px] font-semibold text-brand-700 ml-5">+ Add stage</button></div>` : ''}
+                </div>`;
+            }).join('');
+            const moves = Object.entries(wfMoves).map(([removedId, target]) => {
+                const n = deliverablesAt(removedId).length;
+                const removedName = workflow.stages.find(s => s.id === removedId)?.name || removedId;
+                const options = wfDraft.stages.map(s => `<option value="${escapeHtml(s.id)}" ${s.id === target ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('');
+                return `<div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-wrap items-center gap-2 text-xs"><i class="ph-bold ph-warning"></i>${pluralize(n, 'deliverable')} ${n === 1 ? 'is' : 'are'} at <b>${escapeHtml(removedName)}</b> (removed). Move ${n === 1 ? 'it' : 'them'} to: <select onchange="wfMoves['${escapeHtml(removedId)}'] = this.value" aria-label="Move deliverables to" class="px-2 py-1 border border-amber-300 rounded-lg bg-white">${options}</select></div>`;
+            }).join('');
+            box.innerHTML = `
+                <p class="text-xs text-slate-500">One delivery workflow for all roadmaps. Weights set how much each stage counts toward progress.</p>
+                ${fixed(wfDraft.stages[0])}
+                ${phases}
+                <button type="button" onclick="wfAddPhase()" class="text-[11px] font-semibold text-brand-700">+ Add phase</button>
+                ${fixed(wfDraft.stages[wfDraft.stages.length - 1])}
+                ${moves}
+                <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs">
+                    <span class="font-bold">Total weight: <span id="wf-total">${total}</span></span>
+                    <span class="flex flex-wrap items-center gap-3"><span class="text-slate-600">Roadmap progress:</span>
+                        <label class="flex items-center gap-1"><input type="radio" name="wf-method" value="weighted" ${wfDraft.progressMethod !== 'doneCount' ? 'checked' : ''} onchange="wfDraft.progressMethod = 'weighted'"> Average weighted progress</label>
+                        <label class="flex items-center gap-1"><input type="radio" name="wf-method" value="doneCount" ${wfDraft.progressMethod === 'doneCount' ? 'checked' : ''} onchange="wfDraft.progressMethod = 'doneCount'"> Done ÷ all</label></span>
+                </div>
+                <p id="wf-error" class="hidden text-xs text-rose-700 font-semibold"></p>`;
+        }
+        window.wfTogglePhase = id => { if (wfOpen.has(id)) wfOpen.delete(id); else wfOpen.add(id); renderWorkflowSettings(); };
+        window.wfSetName = (id, v) => { const s = wfDraft.stages.find(x => x.id === id); if (s) s.name = v.slice(0, 60); };
+        window.wfSetPhaseName = (id, v) => { const p = wfDraft.phases.find(x => x.id === id); if (p) p.name = v.slice(0, 60); };
+        window.wfSetWeight = (id, v) => {
+            const s = wfDraft.stages.find(x => x.id === id);
+            if (!s) return;
+            s.weight = Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+            const total = wfTotal();
+            document.getElementById('wf-total').textContent = total;
+            document.querySelectorAll('[data-wf-share]').forEach(el => { const st = wfDraft.stages.find(x => x.id === el.dataset.wfShare); el.textContent = `${total > 0 ? Math.round((st?.weight || 0) / total * 100) : 0}%`; });
+        };
+        // Stages move within the list; at a phase edge they move into the neighbouring phase
+        window.wfMoveStage = (id, dir) => {
+            const list = wfDraft.stages;
+            const i = list.findIndex(s => s.id === id);
+            const s = list[i];
+            const phaseOrder = wfDraft.phases.map(p => p.id);
+            const sameBefore = list.slice(1, i).filter(x => x.phaseId === s.phaseId).length;
+            const sameAfter = list.slice(i + 1, -1).filter(x => x.phaseId === s.phaseId).length;
+            const pi = phaseOrder.indexOf(s.phaseId);
+            if (dir < 0 && sameBefore === 0 && pi > 0) s.phaseId = phaseOrder[pi - 1];
+            else if (dir > 0 && sameAfter === 0 && pi < phaseOrder.length - 1) s.phaseId = phaseOrder[pi + 1];
+            else {
+                const j = dir < 0 ? list.slice(0, i).map((x, k) => [x, k]).filter(([x]) => x.phaseId === s.phaseId).pop()?.[1] : list.map((x, k) => [x, k]).find(([x, k]) => k > i && x.phaseId === s.phaseId)?.[1];
+                if (j === undefined) return;
+                [list[i], list[j]] = [list[j], list[i]];
+            }
+            wfSortStages();
+            wfOpen.add(s.phaseId);
+            renderWorkflowSettings();
+        };
+        // Keep stages grouped in phase order (New first, Done last)
+        function wfSortStages() {
+            const order = wfDraft.phases.map(p => p.id);
+            const first = wfDraft.stages[0], last = wfDraft.stages[wfDraft.stages.length - 1];
+            const middle = wfDraft.stages.slice(1, -1);
+            const sorted = order.flatMap(pid => middle.filter(s => s.phaseId === pid));
+            wfDraft.stages = [first, ...sorted, last];
+        }
+        window.wfMovePhase = (id, dir) => {
+            const i = wfDraft.phases.findIndex(p => p.id === id);
+            const j = i + dir;
+            if (j < 0 || j >= wfDraft.phases.length) return;
+            [wfDraft.phases[i], wfDraft.phases[j]] = [wfDraft.phases[j], wfDraft.phases[i]];
+            wfSortStages();
+            renderWorkflowSettings();
+        };
+        window.wfAddStage = phaseId => {
+            const id = newId('s');
+            const last = wfDraft.stages.map((s, k) => [s, k]).filter(([s]) => s.phaseId === phaseId).pop();
+            const at = last ? last[1] + 1 : wfDraft.stages.length - 1;
+            wfDraft.stages.splice(at, 0, { id, name: 'New stage', phaseId, weight: 0 });
+            wfSortStages();
+            wfOpen.add(phaseId);
+            renderWorkflowSettings();
+            document.querySelector(`[data-wf-stage="${id}"] input`)?.select();
+        };
+        window.wfAddPhase = () => {
+            const id = newId('p');
+            wfDraft.phases.push({ id, name: 'New phase' });
+            wfOpen.add(id);
+            renderWorkflowSettings();
+        };
+        window.wfRemovePhase = id => {
+            if (wfDraft.stages.some(s => s.phaseId === id)) return;
+            wfDraft.phases = wfDraft.phases.filter(p => p.id !== id);
+            renderWorkflowSettings();
+        };
+        window.wfRemoveStage = id => {
+            const i = wfDraft.stages.findIndex(s => s.id === id);
+            if (i <= 0 || i >= wfDraft.stages.length - 1) return;
+            wfDraft.stages.splice(i, 1);
+            // Deliverables at a removed stage need a new one (default: the stage that took its place)
+            if (deliverablesAt(id).length) wfMoves[id] = wfDraft.stages[Math.min(i, wfDraft.stages.length - 1)].id;
+            renderWorkflowSettings();
+        };
+        window.wfReset = () => { wfDraft = structuredClone(DEFAULT_WORKFLOW); wfMoves = {}; renderWorkflowSettings(); };
+        window.saveWorkflowSettings = async function() {
+            if (!wfDraft || !canEditWorkflow()) return;
+            const err = document.getElementById('wf-error');
+            const problem = wfDraft.stages.some(s => !s.name.trim()) || wfDraft.phases.some(p => !p.name.trim()) ? 'Every phase and stage needs a name.'
+                : wfDraft.stages.length < 3 ? 'Keep at least one working stage.'
+                : wfTotal() <= 0 ? 'The total weight must be above 0.' : '';
+            if (problem) { err.textContent = problem; err.classList.remove('hidden'); return; }
+            const next = normalizeWorkflow({ ...wfDraft, stages: wfDraft.stages.map(s => ({ ...s, name: s.name.trim() })), phases: wfDraft.phases.map(p => ({ ...p, name: p.name.trim() })) });
+            // A short summary of what changed, for the audit log
+            const before = new Map(workflow.stages.map(s => [s.id, s]));
+            const after = new Map(next.stages.map(s => [s.id, s]));
+            const changes = [];
+            next.stages.forEach(s => { const b = before.get(s.id); if (!b) changes.push({ f: 'stage added', to: s.name }); else { if (b.name !== s.name) changes.push({ f: 'stage renamed', from: b.name, to: s.name }); if ((b.weight || 0) !== (s.weight || 0)) changes.push({ f: `weight ${s.name}`, from: b.weight || 0, to: s.weight || 0 }); } });
+            workflow.stages.forEach(s => { if (!after.has(s.id)) changes.push({ f: 'stage removed', to: s.name }); });
+            if (JSON.stringify(workflow.phases) !== JSON.stringify(next.phases)) changes.push({ f: 'phases', to: next.phases.map(p => p.name).join(' › ') });
+            if (JSON.stringify(workflow.stages.map(s => s.id)) !== JSON.stringify(next.stages.map(s => s.id)) && !changes.some(c => /added|removed/.test(c.f))) changes.push({ f: 'order', to: 'stages reordered' });
+            if (workflow.progressMethod !== next.progressMethod) changes.push({ f: 'progress method', from: workflow.progressMethod, to: next.progressMethod });
+            const moves = { ...wfMoves };
+            const affected = Object.keys(moves).flatMap(id => deliverablesAt(id).map(x => ({ ...x, to: moves[id], fromName: workflow.stages.find(s => s.id === id)?.name || id })));
+            closeWorkflowSettings();
+            if (!changes.length && !affected.length) return;
+            const entry = auditEntry(null, 'workspace.workflow_changed', { type: 'workspace', id: 'workflow', label: 'Delivery workflow' }, changes.slice(0, 60));
+            if (!useCloudPersistence) {
+                workflow = next;
+                logDemo(entry);
+            } else {
+                const aid = newId('a');
+                const ok = await commitBatch(batch => {
+                    batch.set(wsRef('settings', 'workflow'), { phases: next.phases, stages: next.stages, progressMethod: next.progressMethod, ...stamp(aid) });
+                    batch.set(auditRef(aid), entry);
+                }, 'save the workflow');
+                if (!ok) return;
+                workflow = next;
+            }
+            // Deliverables at removed stages move to the chosen stage
+            for (const { r, i, to, fromName } of affected) {
+                const history = (i.stageHistory || []).concat([{ stageId: to, stageName: stageName(to), action: 'set', at: new Date().toISOString(), by: actor(), note: `Stage "${fromName}" was removed from the workflow` }]).slice(-200);
+                const updates = { stageId: to, stageHistory: history, skipped: (i.skipped || []).filter(id => stageIdx(id) >= 0), status: statusForStage(to), stageSince: useCloudPersistence ? serverTimestamp() : new Date().toISOString() };
+                await updateMilestone(r, i, updates, [{ f: 'stage', from: fromName, to: stageName(to) }]);
+                if (useCloudPersistence) Object.assign(i, updates, { stageSince: new Date().toISOString() });
+            }
+            refreshStageFilters();
+            scheduleRender();
+        };
+        function onWorkflowSnapshot(snap) {
+            workflow = snap.exists() ? normalizeWorkflow(snap.data()) : structuredClone(DEFAULT_WORKFLOW);
+            refreshStageFilters();
+            scheduleRender();
+        }
+
+        refreshStageFilters();
+
+        // =======================================================
         // ACTIVITY VIEW (2.2.0, specs/activity-view.md): the audit log as one timeline, Editors + Admins
         // =======================================================
         const ACTIVITY_PAGE = 50;
@@ -5561,7 +6222,12 @@
                     const c = changes[0];
                     if (!c) { text = `${who} updated ${noun} ${q(label)}`; break; }
                     const field = escapeHtml(FIELD_LABELS[c.f] || c.f);
-                    if (c.f === 'feedback') text = `${who} ${String(c.to).startsWith('+') ? 'linked' : 'unlinked'} feedback ${q(String(c.to).slice(1))} ${String(c.to).startsWith('+') ? 'to' : 'from'} ${q(label)}`;
+                    if (c.f === 'stage') {
+                        const skippedN = Number(changes.find(x => x.f === 'skipped')?.to) || 0;
+                        text = changes.some(x => x.f === 'undo') ? `${who} undid a skip on ${q(label)}, back to ${escapeHtml(c.to)}` : `${who} moved ${q(label)} to ${escapeHtml(c.to)}${skippedN ? ` (${escapeHtml(pluralize(skippedN, 'stage'))} skipped)` : ''}`;
+                    }
+                    else if (c.f === 'stageRedeemed') text = `${who} completed the skipped stage ${escapeHtml(c.to)} of ${q(label)}`;
+                    else if (c.f === 'feedback') text = `${who} ${String(c.to).startsWith('+') ? 'linked' : 'unlinked'} feedback ${q(String(c.to).slice(1))} ${String(c.to).startsWith('+') ? 'to' : 'from'} ${q(label)}`;
                     else if (c.f === 'name' || c.f === 'title') text = `${who} renamed ${q(c.from ?? label)} to ${q(c.to)}`;
                     else if (c.f === 'description' || c.f === 'inclusions' || c.from === undefined) text = `${who} changed <i>${field}</i> of ${q(label)}`;
                     else text = `${who} changed <i>${field}</i> of ${q(label)}: ${escapeHtml(activityValue(c.f, c.from))} → ${escapeHtml(activityValue(c.f, c.to))}`;
@@ -5582,6 +6248,8 @@
                 case 'roadmap.items_added': text = `${who} added ${escapeHtml(pluralize(Number(changes[0]?.to) || 0, 'item'))} to ${q(label)}`; break;
                 case 'roadmap.retention_set': text = `${who} set the Recycle Bin removal date of ${q(label)}`; break;
                 case 'roadmap.capacity_changed': text = `${who} changed the monthly capacity of ${q(label)}`; break;
+                case 'roadmap.stages_initialized': text = `${who} set the starting stages of ${q(label)} (${escapeHtml(pluralize(Number(changes[0]?.to) || 0, 'deliverable'))})`; break;
+                case 'workspace.workflow_changed': text = `${who} changed the delivery workflow`; break;
                 case 'roadmap.ranking_initialized': text = `${who} ${changes.some(c => c.f === 'reason') ? 're-spaced' : 'saved'} the ranking of ${q(label)} (${escapeHtml(pluralize(Number(changes[0]?.to) || 0, 'deliverable'))})`; break;
                 case 'workspace.created': text = `${who} set up the workspace`; break;
                 case 'member.joined': text = `${who} joined the workspace as ${escapeHtml(activityValue('role', changes[0]?.to))}`; break;
@@ -5589,7 +6257,7 @@
                 case 'workspace.default_role_changed': text = `${who} changed the default role for new members to ${escapeHtml(activityValue('role', changes[0]?.to))}`; break;
                 default: text = `${who} ${escapeHtml(e.action || 'changed')} ${label ? q(label) : ''}`;
             }
-            const details = (e.action === 'milestone.updated' || e.action === 'feedback.updated' || e.action === 'feedback.created' || e.action === 'roadmap.deleted' || e.action === 'feedback.deleted' || e.action === 'roadmap.capacity_changed')
+            const details = (e.action === 'milestone.updated' || e.action === 'feedback.updated' || e.action === 'feedback.created' || e.action === 'roadmap.deleted' || e.action === 'feedback.deleted' || e.action === 'roadmap.capacity_changed' || e.action === 'workspace.workflow_changed')
                 ? changes.map(activityChangeLine) : [];
             const more = (e.action === 'milestone.updated' || e.action === 'feedback.updated') ? changes.length - 1 : 0;
             return { text, details, more };
@@ -6249,6 +6917,9 @@
             previewRoadmap = null;
             privateRoadmaps = [];
             demoAuditLog = [];
+            workflow = structuredClone(DEFAULT_WORKFLOW);
+            stageInitDone.clear();
+            pendingStageAction = null;
             activityEntries = [];
             activityPendingNew = [];
             activityKey = '';
