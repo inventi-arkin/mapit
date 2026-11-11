@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.5.0" data-released="2026-11-11">
+    <meta name="mapit-version" content="2.5.1" data-released="2026-11-11">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -5831,11 +5831,11 @@
                             <span class="${state === 'current' ? 'font-black text-brand-800' : state === 'skipped' ? 'text-slate-500 italic' : state === 'upcoming' ? 'text-slate-500' : 'font-semibold text-slate-800'}">${escapeHtml(s.name)}</span>
                             <span class="text-[11px] text-slate-500 ${state === 'skipped' ? 'italic' : ''}">${state === 'done' ? who(meta.done) : state === 'current' ? `current${since ? ` · since ${escapeHtml(shortDay(since))}${days !== null ? ` (${pluralize(days, 'day')})` : ''}` : ''}` : state === 'skipped' ? 'Skipped' : ''}</span>
                             ${state === 'done' && meta.later ? '<span class="text-[10px] font-bold px-1.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">completed later</span>' : ''}
+                            ${editable && state !== 'current' && state !== 'skipped' ? `<button type="button" onclick="stageAction('${id}', 'move', '${sid}')" class="stage-move-here sm:opacity-0 sm:group-hover/stage:opacity-100 focus:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-brand-200 bg-white text-[11px] font-semibold text-brand-700 hover:bg-brand-50"><i class="ph-bold ph-arrow-bend-down-right text-[10px]" aria-hidden="true"></i>Move here</button>` : ''}
                         </div>
                         ${meta.notes.map(n => `<p class="text-[11px] text-slate-500 italic mt-0.5 break-words">“${escapeHtml(n.note)}” <span class="not-italic text-slate-400">· ${escapeHtml(n.by?.name || '')}</span></p>`).join('')}
                         ${state === 'skipped' && editable ? `<div class="mt-1 flex flex-wrap gap-2"><button type="button" onclick="stageAction('${id}', 'redeem', '${sid}')" class="px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">✓ Mark as completed</button><button type="button" onclick="stageAction('${id}', 'reopen', '${sid}')" class="px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-[11px] font-semibold">↺ Reopen</button></div>` : ''}
                     </div>
-                    ${editable && state !== 'current' && state !== 'skipped' ? `<button type="button" onclick="stageAction('${id}', 'move', '${sid}')" class="stage-move-here sm:opacity-0 sm:group-hover/stage:opacity-100 focus:opacity-100 text-[11px] font-semibold text-brand-700 px-2 shrink-0">Move here</button>` : ''}
                 </li>`;
             };
             const stages = workflow.stages;
