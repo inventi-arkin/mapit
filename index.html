@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.4.2" data-released="2026-11-10">
+    <meta name="mapit-version" content="2.4.3" data-released="2026-11-11">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -82,7 +82,7 @@
         }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased h-screen flex flex-col overflow-hidden">
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen sm:h-screen flex flex-col sm:overflow-hidden">
 
     <!-- ======================================================= -->
     <!-- AUTHENTICATION GATE SCREEN (User must log in first)      -->
@@ -147,7 +147,7 @@
     </div>
 
     <!-- Global App Header (Hidden until authenticated) -->
-    <header id="main-app-header" class="hidden bg-white border-b border-slate-200 px-3 sm:px-4 md:px-6 py-2.5 flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0 z-30 shadow-xs">
+    <header id="main-app-header" class="hidden sticky top-0 bg-white border-b border-slate-200 px-3 sm:px-4 md:px-6 py-2.5 flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0 z-30 shadow-xs">
         <!-- Logo & Title -->
         <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
@@ -233,7 +233,7 @@
     </header>
 
     <!-- Main Content Canvas -->
-    <main class="flex-1 overflow-hidden relative p-3 pb-20 sm:pb-3 md:p-6 flex flex-col">
+    <main class="flex-1 sm:overflow-hidden relative p-3 pb-20 sm:pb-3 md:p-6 flex flex-col">
         <!-- Read-only / preview notices and the private-roadmaps banner -->
         <div id="workspace-notices" class="hidden max-w-6xl mx-auto w-full flex flex-col gap-2 mb-3 shrink-0"></div>
 
@@ -271,7 +271,7 @@
         <!-- ======================================================= -->
         <!-- VIEW 1: ROADMAP TIMELINE (Unified with Roadmap Tabs)   -->
         <!-- ======================================================= -->
-        <div id="roadmap-view" class="max-w-6xl mx-auto w-full flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
+        <div id="roadmap-view" class="max-w-6xl mx-auto w-full sm:flex-1 sm:min-h-0 flex flex-col gap-4 sm:overflow-hidden">
             
             <!-- Perspective Selector & Filter Bar (Annual, Quarterly, Monthly, Modules) -->
             <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -320,7 +320,7 @@
 
             <!-- Scrollable Timeline Canvas -->
             <!-- scroll-pt keeps the top space when scroll-snap aligns a section (must match pt) -->
-            <div id="roadmap-scroll-wrapper" class="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-y-auto custom-scrollbar snap-container relative p-4 pt-6 md:p-8 md:pt-10 scroll-pt-6 md:scroll-pt-10">
+            <div id="roadmap-scroll-wrapper" class="sm:flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm sm:overflow-y-auto custom-scrollbar snap-container relative p-4 pt-6 md:p-8 md:pt-10 scroll-pt-6 md:scroll-pt-10">
                 <!-- Positioning box that grows with the content, so the guide line spans all sections when scrolled -->
                 <div class="relative">
                     <!-- Timeline guide line: centred on the section markers (label w-20 + gap-3 + half of the w-5 marker) -->
@@ -337,7 +337,7 @@
         <!-- ======================================================= -->
         <!-- VIEW 2: EDITOR (Full-width Table + Modal Edit)         -->
         <!-- ======================================================= -->
-        <div id="editor-view" class="hidden max-w-6xl mx-auto w-full flex-1 min-h-0 overflow-hidden flex-col gap-4">
+        <div id="editor-view" class="hidden max-w-6xl mx-auto w-full sm:flex-1 sm:min-h-0 sm:overflow-hidden flex-col gap-4">
             <!-- Header Controls Bar -->
             <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div class="flex items-center gap-3">
@@ -358,7 +358,7 @@
             </div>
 
             <!-- Editor Table Container -->
-            <div class="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="sm:flex-1 sm:min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                 <!-- Search and Filters Bar -->
                 <div class="px-4 py-2.5 bg-white border-b border-slate-100 flex flex-wrap items-center gap-2.5 text-xs shrink-0">
                     <div class="relative flex-1 min-w-[180px]">
@@ -390,17 +390,17 @@
                 </div>
 
                 <!-- Table Content -->
-                <div class="flex-1 overflow-auto custom-scrollbar">
+                <div class="overflow-x-auto sm:flex-1 sm:overflow-auto custom-scrollbar">
                     <table class="w-full text-left border-collapse">
                         <thead class="bg-slate-50 sticky top-0 z-10 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                             <tr>
-                                <th class="w-6 pl-3" aria-label="Drag to reorder"></th>
+                                <th class="hidden sm:table-cell w-6 pl-3" aria-label="Drag to reorder"></th>
                                 <th class="py-3 px-2"><button type="button" onclick="setEditorSort('rank')" data-sort="rank" class="uppercase tracking-wider font-bold hover:text-slate-800">Rank</button></th>
                                 <th class="py-3 px-4">Deliverable / Feature</th>
-                                <th class="py-3 px-4">Module</th>
-                                <th class="py-3 px-4"><button type="button" onclick="setEditorSort('date')" data-sort="date" class="uppercase tracking-wider font-bold hover:text-slate-800">Target Date</button></th>
-                                <th class="py-3 px-4"><button type="button" onclick="setEditorSort('effort')" data-sort="effort" class="uppercase tracking-wider font-bold hover:text-slate-800">Effort</button></th>
-                                <th class="py-3 px-4">Status</th>
+                                <th class="hidden sm:table-cell py-3 px-4">Module</th>
+                                <th class="hidden sm:table-cell py-3 px-4"><button type="button" onclick="setEditorSort('date')" data-sort="date" class="uppercase tracking-wider font-bold hover:text-slate-800">Target Date</button></th>
+                                <th class="hidden sm:table-cell py-3 px-4"><button type="button" onclick="setEditorSort('effort')" data-sort="effort" class="uppercase tracking-wider font-bold hover:text-slate-800">Effort</button></th>
+                                <th class="hidden sm:table-cell py-3 px-4">Status</th>
                                 <th class="hidden lg:table-cell py-3 px-4">Scope / Inclusions</th>
                                 <th class="py-3 px-4 text-right">Actions</th>
                             </tr>
@@ -416,7 +416,7 @@
         <!-- ======================================================= -->
         <!-- VIEW 3: FEEDBACK & SUGGESTIONS                         -->
         <!-- ======================================================= -->
-        <div id="feedback-view" class="hidden max-w-6xl mx-auto w-full flex-1 min-h-0 overflow-hidden flex-col gap-4">
+        <div id="feedback-view" class="hidden max-w-6xl mx-auto w-full sm:flex-1 sm:min-h-0 sm:overflow-hidden flex-col gap-4">
             <!-- Feedback Controls Bar -->
             <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
@@ -438,7 +438,7 @@
             </div>
 
             <!-- Feedback Table Container -->
-            <div class="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="sm:flex-1 sm:min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                 <!-- Search and Filtering -->
                 <div class="px-4 py-2.5 bg-white border-b border-slate-100 flex flex-wrap items-center gap-2.5 text-xs shrink-0">
                     <div class="relative flex-1 min-w-[180px]">
@@ -469,16 +469,16 @@
                 </div>
 
                 <!-- Table Content -->
-                <div class="flex-1 overflow-auto custom-scrollbar">
+                <div class="overflow-x-auto sm:flex-1 sm:overflow-auto custom-scrollbar">
                     <table class="w-full text-left border-collapse">
                         <thead class="bg-slate-50 sticky top-0 z-10 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                             <tr>
                                 <th class="py-3 px-4">Suggestion / Feedback</th>
-                                <th class="py-3 px-4">Category</th>
+                                <th class="hidden sm:table-cell py-3 px-4">Category</th>
                                 <th class="hidden md:table-cell py-3 px-4">Source</th>
                                 <th class="hidden md:table-cell py-3 px-4">Submitted By</th>
-                                <th class="py-3 px-4 whitespace-nowrap"><span class="inline-flex items-center gap-1" title="Taken from the linked milestones">Status <i class="ph-bold ph-info text-slate-400" aria-hidden="true"></i></span></th>
-                                <th class="py-3 px-4">Related Milestone(s)</th>
+                                <th class="hidden sm:table-cell py-3 px-4 whitespace-nowrap"><span class="inline-flex items-center gap-1" title="Taken from the linked milestones">Status <i class="ph-bold ph-info text-slate-400" aria-hidden="true"></i></span></th>
+                                <th class="hidden sm:table-cell py-3 px-4">Related Milestone(s)</th>
                                 <th class="py-3 px-4 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -493,7 +493,7 @@
         <!-- ======================================================= -->
         <!-- VIEW 4: ACTIVITY (2.2.0, Editors + Admins)              -->
         <!-- ======================================================= -->
-        <div id="activity-view" class="hidden max-w-6xl mx-auto w-full flex-1 min-h-0 overflow-hidden flex-col gap-4">
+        <div id="activity-view" class="hidden max-w-6xl mx-auto w-full sm:flex-1 sm:min-h-0 sm:overflow-hidden flex-col gap-4">
             <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm shrink-0 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
                 <div id="activity-scope" role="group" aria-label="Activity scope" class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0 max-w-full overflow-x-auto">
                     <button type="button" data-scope="this" onclick="setActivityScope('this')" class="px-3 py-1 rounded-lg text-xs font-semibold transition-all">This<span class="hidden sm:inline"> roadmap</span></button>
@@ -522,7 +522,7 @@
                 </div>
             </div>
 
-            <div id="activity-scroll" class="flex-1 min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-y-auto custom-scrollbar relative">
+            <div id="activity-scroll" class="sm:flex-1 sm:min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm sm:overflow-y-auto custom-scrollbar relative">
                 <div class="sticky top-0 z-10 flex justify-center h-0">
                     <button type="button" id="activity-new-pill" onclick="showNewActivity()" aria-live="polite" class="hidden mt-3 px-3 py-1 rounded-full bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-bold shadow-md"></button>
                 </div>
@@ -1501,6 +1501,14 @@
 
             const wrapper = document.getElementById('roadmap-scroll-wrapper');
             if (!wrapper) return;
+            if (window.matchMedia('(max-width: 639px)').matches) {
+                // Phone layout (below sm): the page scrolls, leaving room for the sticky header
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    const headerH = document.getElementById('main-app-header')?.getBoundingClientRect().height || 0;
+                    window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - headerH - 8, behavior: 'smooth' });
+                }));
+                return;
+            }
             // Measure after the new view has its final layout (Tailwind styles new classes a moment later)
             requestAnimationFrame(() => requestAnimationFrame(() => {
                 if (!target.isConnected) return;
@@ -2557,20 +2565,27 @@
                 const effort = effortOf(item);
 
                 tr.innerHTML = `
-                    <td class="pl-3 w-6">${canReorder ? reorderHtml(item) : ''}</td>
+                    <td class="hidden sm:table-cell pl-3 w-6">${canReorder ? reorderHtml(item) : ''}</td>
                     <td class="py-3 px-2 whitespace-nowrap">${rankChipHtml(roadmap, item)}</td>
                     <td class="py-3 px-4 font-bold text-slate-900">
                         <div class="text-xs font-bold text-slate-900">${escapeHtml(item.name)}</div>
-                        ${item.description ? `<p class="text-[11px] font-normal text-slate-500 mt-0.5 max-w-xs truncate">${escapeHtml(item.description)}</p>` : ''}
+                        ${item.description ? `<p class="text-[11px] font-normal text-slate-500 mt-0.5 max-w-[9rem] sm:max-w-xs truncate">${escapeHtml(item.description)}</p>` : ''}
+                        <div class="sm:hidden mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] font-normal text-slate-500">
+                            <span class="text-brand-600 font-semibold">${escapeHtml(item.module)}</span>
+                            <span>· ${escapeHtml(formatMonthYear(item.date))}</span>
+                            <span>· ${effort ? fmtDays(effort) : 'Not estimated'}</span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${statusBadge}">${escapeHtml(STATUS_LABELS[item.status] || item.status)}</span>
+                            ${overFlagHtml(roadmap, item)}
+                        </div>
                     </td>
-                    <td class="py-3 px-4 text-brand-600 font-semibold whitespace-nowrap">
+                    <td class="hidden sm:table-cell py-3 px-4 text-brand-600 font-semibold whitespace-nowrap">
                         <span class="text-xs">${escapeHtml(item.module)}</span>
                     </td>
-                    <td class="py-3 px-4 text-slate-600 whitespace-nowrap">
+                    <td class="hidden sm:table-cell py-3 px-4 text-slate-600 whitespace-nowrap">
                         <span class="text-xs font-medium">${escapeHtml(formatMonthYear(item.date))}</span>
                     </td>
-                    <td class="effort-cell py-3 px-4 whitespace-nowrap text-xs ${effort ? 'text-slate-700' : 'text-slate-400'}" ${canEditActive() ? `onclick="event.stopPropagation(); editEffortInline('${escapeHtml(item.id)}', this)" tabindex="0" role="button" aria-label="Effort for ${escapeHtml(item.name)}: ${effort ? fmtDays(effort) : 'not estimated'}. Click to change."` : ''} title="${effort ? '' : 'Not estimated'}">${effort ? fmtDays(effort) : '—'}</td>
-                    <td class="py-3 px-4">
+                    <td class="effort-cell hidden sm:table-cell py-3 px-4 whitespace-nowrap text-xs ${effort ? 'text-slate-700' : 'text-slate-400'}" ${canEditActive() ? `onclick="event.stopPropagation(); editEffortInline('${escapeHtml(item.id)}', this)" tabindex="0" role="button" aria-label="Effort for ${escapeHtml(item.name)}: ${effort ? fmtDays(effort) : 'not estimated'}. Click to change."` : ''} title="${effort ? '' : 'Not estimated'}">${effort ? fmtDays(effort) : '—'}</td>
+                    <td class="hidden sm:table-cell py-3 px-4">
                         <span class="flex flex-col items-start gap-1">
                         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${statusBadge}">
                             ${escapeHtml(STATUS_LABELS[item.status] || item.status)}
@@ -2735,20 +2750,25 @@
                     <td class="py-3 px-4 font-bold text-slate-800">
                         <div class="text-xs font-bold text-slate-900">${escapeHtml(item.title)}</div>
                         ${item.description ? `<p class="text-[11px] font-normal text-slate-500 mt-0.5 max-w-sm line-clamp-1">${escapeHtml(item.description)}</p>` : ''}
+                        <div class="sm:hidden mt-1.5 flex flex-wrap items-center gap-1.5 font-normal">
+                            <span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700">${escapeHtml(item.category)}</span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${statusBadge}">${escapeHtml(item.statusLabel)}</span>
+                            ${milestonesHtml}
+                        </div>
                     </td>
-                    <td class="py-3 px-4 text-slate-600 font-medium">
+                    <td class="hidden sm:table-cell py-3 px-4 text-slate-600 font-medium">
                         <span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700">${escapeHtml(item.category)}</span>
                     </td>
                     <td class="hidden md:table-cell py-3 px-4 text-slate-600 whitespace-nowrap">
                         <span class="text-xs">${item.source ? escapeHtml(item.source) : '<span class="text-slate-500">—</span>'}</span>
                     </td>
                     <td class="hidden md:table-cell py-3 px-4 text-slate-600 whitespace-nowrap">${submitterHtml}</td>
-                    <td class="py-3 px-4 whitespace-nowrap">
+                    <td class="hidden sm:table-cell py-3 px-4 whitespace-nowrap">
                         <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${statusBadge}">
                             ${escapeHtml(item.statusLabel)}
                         </span>
                     </td>
-                    <td class="py-3 px-4">
+                    <td class="hidden sm:table-cell py-3 px-4">
                         <div class="flex flex-wrap gap-1.5 items-center">
                             ${milestonesHtml}
                         </div>
@@ -5043,7 +5063,7 @@
                 near: ['bg-amber-500', 'text-amber-700', 'Near full'],
                 over: ['bg-rose-500', 'text-rose-700', `Over by ${fmtDays(m.load - m.cap)}`]
             }[m.level];
-            return `<span class="load-line load-${m.level} flex items-center gap-1.5 text-[11px] font-semibold ${text} whitespace-nowrap" title="${escapeHtml(`${formatMonthYear(ym)}: ${Math.round(m.load * 10) / 10} of ${m.cap} pd (${pct}%) · ${word}`)}">
+            return `<span class="load-line load-${m.level} flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-semibold ${text}" title="${escapeHtml(`${formatMonthYear(ym)}: ${Math.round(m.load * 10) / 10} of ${m.cap} pd (${pct}%) · ${word}`)}">
                 ${compact ? '' : 'Load '}${Math.round(m.load * 10) / 10} / ${m.cap} pd
                 <span class="${compact ? 'w-10' : 'w-20'} h-1.5 bg-slate-100 rounded-full overflow-hidden" aria-hidden="true"><span class="block h-full ${bar}" style="width:${Math.min(pct, 100)}%"></span></span>
                 ${compact ? '' : `${pct}% · ${escapeHtml(word)}`}
@@ -5662,7 +5682,8 @@
                 });
                 if (fresh.length) {
                     const scroller = document.getElementById('activity-scroll');
-                    const atTop = !scroller || scroller.scrollTop < 40;
+                    const ownScroll = scroller && scroller.scrollHeight > scroller.clientHeight + 1;
+                    const atTop = !scroller || (ownScroll ? scroller.scrollTop < 40 : window.scrollY < 200);
                     if (atTop && !activityFiltersOn()) activityEntries = [...fresh, ...activityEntries];
                     else activityPendingNew = [...fresh, ...activityPendingNew];
                 }
@@ -5719,6 +5740,7 @@
             activityPendingNew = [];
             const scroller = document.getElementById('activity-scroll');
             if (scroller) scroller.scrollTop = 0;
+            if (window.scrollY > 0) window.scrollTo({ top: 0 });
             renderActivity();
         };
 
