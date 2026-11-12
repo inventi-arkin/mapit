@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.5.3" data-released="2026-11-12">
+    <meta name="mapit-version" content="2.5.4" data-released="2026-11-12">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -482,11 +482,10 @@
                         <thead class="bg-slate-50 sticky top-0 z-10 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                             <tr>
                                 <th class="py-3 px-4">Suggestion / Feedback</th>
-                                <th class="hidden sm:table-cell py-3 px-4">Category</th>
-                                <th class="hidden md:table-cell py-3 px-4">Source</th>
-                                <th class="hidden md:table-cell py-3 px-4">Submitted By</th>
-                                <th class="hidden sm:table-cell py-3 px-4 whitespace-nowrap"><span class="inline-flex items-center gap-1" title="Taken from the linked milestones">Status <i class="ph-bold ph-info text-slate-400" aria-hidden="true"></i></span></th>
-                                <th class="hidden sm:table-cell py-3 px-4">Related Milestone(s)</th>
+                                <th class="hidden lg:table-cell py-3 px-3">Category</th>
+                                <th class="hidden xl:table-cell py-3 px-3">Submitted By</th>
+                                <th class="hidden lg:table-cell py-3 px-3 whitespace-nowrap"><span class="inline-flex items-center gap-1" title="Taken from the linked milestones">Status <i class="ph-bold ph-info text-slate-400" aria-hidden="true"></i></span></th>
+                                <th class="hidden lg:table-cell py-3 px-3">Related Milestone(s)</th>
                                 <th class="py-3 px-4 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -2754,7 +2753,7 @@
             if (filtered.length === 0) {
                 feedbackTableBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="text-center py-12 text-slate-500">
+                        <td colspan="6" class="text-center py-12 text-slate-500">
                             <i class="ph ph-chat-centered-text text-3xl mb-1 text-slate-300"></i>
                             <p class="font-medium text-xs">No feedback or suggestions found.</p>
                             <button onclick="openAddFeedbackModal()" class="feedback-add-only mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
@@ -2775,17 +2774,19 @@
                 else if (item.derivedStatus === 'in-progress') statusBadge = 'bg-brand-50 text-brand-600 border border-brand-200';
                 else if (item.derivedStatus === 'planned') statusBadge = 'bg-amber-50 text-amber-700 border border-amber-200';
 
+                const firstMilestones = item.linkedMilestones.slice(0, 1);
+                const moreMilestones = item.linkedMilestones.slice(1);
                 const milestonesHtml = item.linkedMilestones.length > 0
-                    ? item.linkedMilestones.map(m => `
-                        <button type="button" onclick="event.stopPropagation(); jumpToMilestone('${escapeHtml(m.id)}')" title="Target: ${escapeHtml(formatMonthYear(m.date))}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-[11px] font-semibold cursor-pointer border border-brand-200 transition-colors">
-                            <i class="ph-bold ph-git-commit rotate-90 text-[10px]"></i> ${escapeHtml(m.name)}
+                    ? firstMilestones.map(m => `
+                        <button type="button" onclick="event.stopPropagation(); jumpToMilestone('${escapeHtml(m.id)}')" title="${escapeHtml(`${m.name} · Target: ${formatMonthYear(m.date)}`)}" class="inline-flex items-center gap-1 min-w-0 max-w-[9rem] px-2 py-0.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-[11px] font-semibold cursor-pointer border border-brand-200 transition-colors">
+                            <i class="ph-bold ph-git-commit rotate-90 text-[10px] shrink-0"></i><span class="truncate">${escapeHtml(m.name)}</span>
                         </button>
-                      `).join(' ')
-                    : `<span class="text-slate-500 italic text-[11px]">Unlinked (Not in any milestone)</span>`;
+                      `).join(' ') + (moreMilestones.length ? `<span class="shrink-0 px-1.5 py-0.5 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-semibold border border-slate-200 cursor-default" title="${escapeHtml('Also linked: ' + moreMilestones.map(m => m.name).join(', '))}" aria-label="${escapeHtml(`and ${moreMilestones.length} more: ${moreMilestones.map(m => m.name).join(', ')}`)}">+${moreMilestones.length}</span>` : '')
+                    : `<span class="text-slate-500 italic text-[11px] whitespace-nowrap" title="Not linked to any milestone">Unlinked</span>`;
 
                 const submitter = feedbackSubmitter(item);
                 const submitterHtml = submitter
-                    ? `<span class="text-xs" title="${escapeHtml(`${submitter.name} (${submitter.email})`)}">${escapeHtml(submitter.name)}</span>`
+                    ? `<span class="block text-xs max-w-[8rem] truncate" title="${escapeHtml(`${submitter.name} (${submitter.email})`)}">${escapeHtml(submitter.name)}</span>`
                     : '<span class="text-xs text-slate-500" title="Added before 2.0.3">—</span>';
                 const id = escapeHtml(item.id);
                 const actionsHtml = canEditFeedback(item)
@@ -2801,28 +2802,28 @@
 
                 tr.innerHTML = `
                     <td class="py-3 px-4 font-bold text-slate-800">
-                        <div class="text-xs font-bold text-slate-900">${escapeHtml(item.title)}</div>
-                        ${item.description ? `<p class="text-[11px] font-normal text-slate-500 mt-0.5 max-w-sm line-clamp-1">${escapeHtml(item.description)}</p>` : ''}
-                        <div class="sm:hidden mt-1.5 flex flex-wrap items-center gap-1.5 font-normal">
-                            <span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700">${escapeHtml(item.category)}</span>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${statusBadge}">${escapeHtml(item.statusLabel)}</span>
-                            ${milestonesHtml}
+                        <div class="feedback-title text-xs font-bold text-slate-900 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem] lg:max-w-[15rem] xl:max-w-[18rem]">${escapeHtml(item.title)}</div>
+                        <p class="feedback-desc text-[11px] font-normal text-slate-500 mt-0.5 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem] lg:max-w-[15rem] xl:max-w-[18rem]">${item.description ? escapeHtml(item.description) : '&nbsp;'}</p>
+                        <div class="fb-subline lg:hidden mt-1.5 flex flex-nowrap items-center gap-1.5 font-normal max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem]">
+                            <span class="hidden min-[400px]:inline-block min-w-0 max-w-[6rem] truncate align-middle px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700">${escapeHtml(item.category)}</span>
+                            <span class="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap ${statusBadge}">${escapeHtml(item.statusLabel)}</span>
+                            ${item.linkedMilestones.length ? `<span class="shrink-0 text-[11px] text-brand-700 font-semibold" title="${escapeHtml(item.linkedMilestones.map(m => m.name).join(', '))}"><i class="ph-bold ph-git-commit rotate-90 text-[10px]" aria-hidden="true"></i> ${item.linkedMilestones.length}</span>` : ''}
                         </div>
                     </td>
-                    <td class="hidden sm:table-cell py-3 px-4 text-slate-600 font-medium">
-                        <span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700">${escapeHtml(item.category)}</span>
+                    <td class="hidden lg:table-cell py-3 px-3 text-slate-600 font-medium">
+                        <span class="inline-block max-w-[7.5rem] truncate align-middle px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700">${escapeHtml(item.category)}</span>
                     </td>
-                    <td class="hidden md:table-cell py-3 px-4 text-slate-600 whitespace-nowrap">
-                        <span class="text-xs">${item.source ? escapeHtml(item.source) : '<span class="text-slate-500">—</span>'}</span>
+                    <td class="hidden xl:table-cell py-3 px-3 text-slate-600 whitespace-nowrap">
+                        ${submitterHtml}
+                        <span class="block text-[11px] text-slate-500 mt-0.5 max-w-[8rem] truncate">${item.source ? 'via ' + escapeHtml(item.source) : '&nbsp;'}</span>
                     </td>
-                    <td class="hidden md:table-cell py-3 px-4 text-slate-600 whitespace-nowrap">${submitterHtml}</td>
-                    <td class="hidden sm:table-cell py-3 px-4 whitespace-nowrap">
+                    <td class="hidden lg:table-cell py-3 px-3 whitespace-nowrap">
                         <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${statusBadge}">
                             ${escapeHtml(item.statusLabel)}
                         </span>
                     </td>
-                    <td class="hidden sm:table-cell py-3 px-4">
-                        <div class="flex flex-wrap gap-1.5 items-center">
+                    <td class="hidden lg:table-cell py-3 px-3">
+                        <div class="flex flex-nowrap gap-1.5 items-center max-w-[12rem]">
                             ${milestonesHtml}
                         </div>
                     </td>
