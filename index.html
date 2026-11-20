@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.5.4" data-released="2026-11-12">
+    <meta name="mapit-version" content="2.6.0" data-released="2026-11-20">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -80,6 +80,21 @@
         body:not(.can-add-feedback) .feedback-add-only {
             display: none !important;
         }
+        /* Feedback table: Edit / Delete show on row hover or focus (always on touch screens and phones) */
+        .fb-row-actions { opacity: 0; transition: opacity .15s; }
+        #feedback-table-body tr:hover .fb-row-actions,
+        #feedback-table-body tr:focus-within .fb-row-actions,
+        #feedback-table-body tr.fb-selected .fb-row-actions { opacity: 1; }
+        @media (hover: none), (max-width: 639px) { .fb-row-actions { opacity: 1; } }
+        #feedback-table-body tr.fb-selected td { background: #f0f7ff; }
+        #feedback-table-body tr.fb-selected td:first-child { box-shadow: inset 3px 0 0 #0270c7; }
+        .fb-sort .fb-sort-idle { opacity: 0; }
+        .fb-sort:hover .fb-sort-idle, .fb-sort:focus-visible .fb-sort-idle { opacity: 1; }
+        /* Details panel open: the table drops Submitted By, then Related if it would still scroll sideways */
+        #feedback-table.fb-panel-open .fb-col-sub,
+        #feedback-table.fb-panel-open.fb-tight .fb-col-rel { display: none; }
+        #feedback-table.fb-panel-open .feedback-title,
+        #feedback-table.fb-panel-open .feedback-desc { max-width: 13rem; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen sm:h-screen flex flex-col sm:overflow-hidden">
@@ -474,25 +489,24 @@
                             <option value="ALL">All submitters</option>
                         </select>
                     </div>
+                    <label class="lg:hidden flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">Sort
+                        <select id="feedback-sort-select" onchange="setFeedbackSortFromSelect(this.value)" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer"></select>
+                    </label>
                 </div>
 
-                <!-- Table Content -->
-                <div class="overflow-x-auto sm:flex-1 sm:overflow-auto custom-scrollbar">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-slate-50 sticky top-0 z-10 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                            <tr>
-                                <th class="py-3 px-4">Suggestion / Feedback</th>
-                                <th class="hidden lg:table-cell py-3 px-3">Category</th>
-                                <th class="hidden xl:table-cell py-3 px-3">Submitted By</th>
-                                <th class="hidden lg:table-cell py-3 px-3 whitespace-nowrap"><span class="inline-flex items-center gap-1" title="Taken from the linked milestones">Status <i class="ph-bold ph-info text-slate-400" aria-hidden="true"></i></span></th>
-                                <th class="hidden lg:table-cell py-3 px-3">Related Milestone(s)</th>
-                                <th class="py-3 px-4 text-right">Actions</th>
-                            </tr>
+                <!-- Table Content + details panel (feedback-details-panel) -->
+                <div class="sm:flex-1 sm:min-h-0 flex relative">
+                <div id="feedback-table-wrap" class="flex-1 min-w-0 overflow-x-auto sm:overflow-auto custom-scrollbar">
+                    <table id="feedback-table" class="w-full text-left border-collapse">
+                        <thead id="feedback-table-head" class="bg-slate-50 sticky top-0 z-10 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                            <!-- Sortable headers: renderFeedbackHead() -->
                         </thead>
                         <tbody id="feedback-table-body" class="divide-y divide-slate-100 text-xs">
                             <!-- Populated dynamically -->
                         </tbody>
                     </table>
+                </div>
+                <aside id="feedback-panel" role="complementary" aria-label="Feedback details" class="hidden fixed inset-0 z-[45] sm:absolute sm:z-20 lg:left-auto lg:w-[26rem] lg:border-l xl:static xl:inset-auto xl:shrink-0 border-slate-200 bg-white flex-col min-h-0 lg:shadow-[-8px_0_24px_-16px_rgba(15,23,42,0.25)]"></aside>
                 </div>
             </div>
         </div>
@@ -1213,6 +1227,12 @@
         let auth = null;
         let db = null;
         let useCloudPersistence = false;
+        // Feedback table + details panel (2.6.0): sort kept until reload, the open item, the rows in on-screen order, a pending #feedback= link
+        let feedbackSort = { key: 'date', dir: 'desc' };
+        let feedbackPanel = null;       // { id, roadmapId, index, prevId, nextId }
+        let feedbackOrder = [];
+        let pendingFeedbackLink = readFeedbackLink();
+        let roadmapsReady = false;      // the workspace roadmaps listener has delivered its first snapshot
         let isAuthenticated = false;
 
         const defaultAppId = typeof __app_id !== 'undefined' ? __app_id : 'map-it-roadmap-app';
@@ -1410,6 +1430,7 @@
         window.switchView = function(viewName) {
             // Activity is for Editors and Admins (activity-view FR-1)
             if (viewName === 'activity' && !canEdit()) viewName = 'roadmap';
+            if (viewName !== 'feedback') closeFeedbackPanel(false);
             const leavingActivity = activityViewOpen() && viewName !== 'activity';
             document.getElementById('roadmap-bar-actions')?.classList.toggle('hidden', viewName !== 'roadmap');
             if (roadmapView) roadmapView.classList.add('hidden');
@@ -1729,6 +1750,7 @@
 
             if (!activeRoadmap) {
                 renderWorkspaceEmpty();
+                if (pendingFeedbackLink) setTimeout(tryOpenFeedbackLink, 0);
                 return;
             }
 
@@ -1744,6 +1766,7 @@
                 renderFeedbackTable();
             }
             syncActivity();
+            if (pendingFeedbackLink) setTimeout(tryOpenFeedbackLink, 0);
         };
 
         // Keep the Activity list in step with the selected roadmap; drop it when it's for another scope and not on screen
@@ -1959,6 +1982,7 @@
                 if (member.role === 'blocked') {
                     useCloudPersistence = false;
                     await signOut(auth).catch(e => console.warn(e));
+                    dropFeedbackLink();
                     showGoogleAuthError(BLOCKED_MESSAGE, DOMAIN_DENIED_OPTIONS);
                     return;
                 }
@@ -2704,10 +2728,103 @@
             select.value = people.has(current) ? current : 'ALL';
         }
 
+        // ---- Sorting (feedback-details-panel FR-10…FR-13); kept until reload ----
+        const FEEDBACK_SORT_DEFAULT = { key: 'date', dir: 'desc' };
+        const FEEDBACK_STATUS_ORDER = { backlog: 0, planned: 1, 'in-progress': 2, done: 3 };
+        const FEEDBACK_COLUMNS = [
+            { key: 'title', label: 'Suggestion / Feedback', cls: 'py-3 px-4' },
+            { key: 'category', label: 'Category', cls: 'hidden lg:table-cell py-3 px-3' },
+            { key: 'sub', label: 'Submitted By', cls: 'fb-col-sub hidden xl:table-cell py-3 px-3' },
+            { key: 'date', label: 'Date', cls: 'hidden lg:table-cell py-3 px-3' },
+            { key: 'status', label: 'Status', cls: 'hidden lg:table-cell py-3 px-3', title: 'Status is taken from the linked milestones' },
+            { key: 'rel', label: 'Related Milestone(s)', cls: 'fb-col-rel hidden lg:table-cell py-3 px-3' }
+        ];
+        const FEEDBACK_SORT_OPTIONS = [
+            ['date|desc', 'Newest first'], ['date|asc', 'Oldest first'], ['title|asc', 'Title A–Z'], ['title|desc', 'Title Z–A'],
+            ['category|asc', 'Category A–Z'], ['category|desc', 'Category Z–A'], ['sub|asc', 'Submitted by A–Z'], ['sub|desc', 'Submitted by Z–A'],
+            ['status|asc', 'Status: Backlog → Done'], ['status|desc', 'Status: Done → Backlog'], ['rel|desc', 'Most milestones'], ['rel|asc', 'Fewest milestones']
+        ];
+
+        // Submission date in PHT: "Nov 17, 2026", or "Nov 17" for this year (short)
+        function feedbackDate(value, short = false) {
+            const d = toDate(value);
+            if (!d) return '';
+            const f = feedbackDate.formats ||= {
+                long: new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric' }),
+                short: new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' }),
+                year: new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', year: 'numeric' })
+            };
+            return short && f.year.format(d) === f.year.format(new Date()) ? f.short.format(d) : f.long.format(d);
+        }
+
+        // Sort value of a feedback row; null = no value (listed last in both directions)
+        function feedbackSortValue(f, key, roadmap) {
+            if (key === 'title') return (f.title || '').toLowerCase();
+            if (key === 'category') return (f.category || '').toLowerCase();
+            if (key === 'sub') { const s = feedbackSubmitter(f); return s ? s.name.toLowerCase() : null; }
+            if (key === 'date') return toMillis(f.createdAt) || null;
+            if (key === 'status') return FEEDBACK_STATUS_ORDER[f.derivedStatus] ?? 0;
+            const first = f.linkedMilestones[0];
+            return f.linkedMilestones.length * 100000 + (first ? rankOf(roadmap, first.id) || 99999 : 0);
+        }
+
+        function sortFeedback(list, roadmap) {
+            const newest = (a, b) => ((toMillis(b.createdAt) || -Infinity) - (toMillis(a.createdAt) || -Infinity)) || String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+            const { key, dir } = feedbackSort;
+            const values = new Map(list.map(f => [f.id, feedbackSortValue(f, key, roadmap)]));
+            return list.sort((a, b) => {
+                const x = values.get(a.id), y = values.get(b.id);
+                if (x === null || y === null) return x === y ? newest(a, b) : x === null ? 1 : -1;
+                const c = typeof x === 'string' ? x.localeCompare(y, undefined, { numeric: true }) : x - y;
+                return (dir === 'asc' ? c : -c) || newest(a, b);
+            });
+        }
+
+        function renderFeedbackHead() {
+            const head = document.getElementById('feedback-table-head');
+            if (!head) return;
+            const { key, dir } = feedbackSort;
+            const label = FEEDBACK_SORT_OPTIONS.find(([v]) => v === `${key}|${dir}`)?.[1] || '';
+            head.innerHTML = '<tr>' + FEEDBACK_COLUMNS.map(c => {
+                const on = c.key === key;
+                const icon = on
+                    ? `<i class="ph-bold ${dir === 'asc' ? 'ph-caret-up' : 'ph-caret-down'} text-brand-600" aria-hidden="true"></i>`
+                    : '<i class="fb-sort-idle ph ph-caret-up-down text-slate-400" aria-hidden="true"></i>';
+                // The active sort's column can be hidden at this width: say so next to the first header (FR-12)
+                const chip = c.key === 'title' ? `<span id="feedback-sort-chip" class="hidden items-center gap-1 ml-2 px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200 normal-case tracking-normal font-semibold text-[10px]">Sorted by ${escapeHtml(label)}<button type="button" onclick="setFeedbackSort('default')" aria-label="Clear the sort" class="hover:text-brand-900"><i class="ph-bold ph-x" aria-hidden="true"></i></button></span>` : '';
+                return `<th data-col="${c.key}" class="${c.cls} whitespace-nowrap" aria-sort="${on ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}"><button type="button" onclick="setFeedbackSort('${c.key}')"${c.title ? ` title="${c.title}"` : ''} class="fb-sort inline-flex items-center gap-1 uppercase tracking-wider font-bold ${on ? 'text-slate-800' : ''} hover:text-slate-800 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40">${c.label}${icon}</button>${chip}</th>`;
+            }).join('') + '<th class="py-3 px-4 w-[5.5rem]"><span class="sr-only">Actions</span></th></tr>';
+            const select = document.getElementById('feedback-sort-select');
+            if (select) {
+                if (!select.options.length) select.innerHTML = FEEDBACK_SORT_OPTIONS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+                select.value = `${key}|${dir}`;
+            }
+        }
+
+        // Header clicks: ascending → descending → default; Date toggles newest / oldest (FR-11)
+        window.setFeedbackSort = function(key) {
+            const { key: current, dir } = feedbackSort;
+            if (key === 'default') feedbackSort = { ...FEEDBACK_SORT_DEFAULT };
+            else if (key === 'date') feedbackSort = { key, dir: current === 'date' && dir === 'desc' ? 'asc' : 'desc' };
+            else if (current !== key) feedbackSort = { key, dir: 'asc' };
+            else if (dir === 'asc') feedbackSort = { key, dir: 'desc' };
+            else feedbackSort = { ...FEEDBACK_SORT_DEFAULT };
+            renderFeedbackTable();
+            document.querySelector(`#feedback-table-head th[data-col="${key === 'default' ? 'title' : key}"] button`)?.focus();
+        };
+
+        window.setFeedbackSortFromSelect = function(value) {
+            const [key, dir] = String(value).split('|');
+            if (!FEEDBACK_COLUMNS.some(c => c.key === key)) return;
+            feedbackSort = { key, dir: dir === 'asc' ? 'asc' : 'desc' };
+            renderFeedbackTable();
+        };
+
         window.renderFeedbackTable = function() {
             if (!feedbackTableBody) return;
             const activeRoadmap = getActiveRoadmap();
             if (!activeRoadmap) return;
+            renderFeedbackHead();
 
             const allFeedback = activeRoadmap.feedback || [];
             const query = (feedbackSearchInput ? feedbackSearchInput.value : '').trim().toLowerCase();
@@ -2750,10 +2867,13 @@
                 filtered = filtered.filter(f => feedbackSubmitter(f)?.email === submitterFilter);
             }
 
+            sortFeedback(filtered, activeRoadmap);
+            feedbackOrder = filtered.map(f => f.id);
+
             if (filtered.length === 0) {
                 feedbackTableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="text-center py-12 text-slate-500">
+                        <td colspan="7" class="text-center py-12 text-slate-500">
                             <i class="ph ph-chat-centered-text text-3xl mb-1 text-slate-300"></i>
                             <p class="font-medium text-xs">No feedback or suggestions found.</p>
                             <button onclick="openAddFeedbackModal()" class="feedback-add-only mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
@@ -2762,12 +2882,17 @@
                         </td>
                     </tr>
                 `;
+                renderFeedbackPanel();
                 return;
             }
 
             filtered.forEach(item => {
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 transition-colors";
+                const selected = feedbackPanel?.id === item.id;
+                tr.className = `cursor-pointer hover:bg-slate-50 transition-colors focus:outline-none focus-visible:bg-brand-50/60${selected ? ' fb-selected' : ''}`;
+                tr.dataset.fbId = item.id;
+                tr.tabIndex = 0;
+                tr.setAttribute('aria-selected', String(selected));
 
                 let statusBadge = 'bg-slate-100 text-slate-500 border border-slate-200';
                 if (item.derivedStatus === 'done') statusBadge = 'bg-emerald-50 text-emerald-600 border border-emerald-200';
@@ -2788,51 +2913,55 @@
                 const submitterHtml = submitter
                     ? `<span class="block text-xs max-w-[8rem] truncate" title="${escapeHtml(`${submitter.name} (${submitter.email})`)}">${escapeHtml(submitter.name)}</span>`
                     : '<span class="text-xs text-slate-500" title="Added before 2.0.3">—</span>';
+                const dateHtml = toMillis(item.createdAt)
+                    ? `<span title="${escapeHtml(formatPHT(item.createdAt))}">${escapeHtml(feedbackDate(item.createdAt))}</span>`
+                    : '<span class="text-slate-400" title="Added before 2.0.3">—</span>';
                 const id = escapeHtml(item.id);
+                // Edit / Delete show on hover or focus (FR-8); clicking the row opens the details panel instead of a View icon
                 const actionsHtml = canEditFeedback(item)
-                    ? `<button onclick="editFeedbackItem('${id}')" title="Edit Feedback" aria-label="Edit Feedback" class="p-1.5 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all">
+                    ? `<div class="fb-row-actions flex items-center justify-end gap-1">
+                       <button onclick="editFeedbackItem('${id}')" title="Edit" aria-label="Edit feedback" class="p-1.5 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all">
                             <i class="ph ph-pencil-simple text-base"></i>
                        </button>
-                       <button onclick="deleteFeedbackItem('${id}')" title="Delete Feedback" aria-label="Delete Feedback" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
+                       <button onclick="deleteFeedbackItem('${id}')" title="Delete" aria-label="Delete feedback" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
                             <i class="ph ph-trash text-base"></i>
-                       </button>`
-                    : `<button onclick="editFeedbackItem('${id}')" title="View feedback and its history" aria-label="View Feedback" class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all">
-                            <i class="ph ph-eye text-base"></i>
-                       </button>`;
+                       </button></div>`
+                    : '';
 
                 tr.innerHTML = `
                     <td class="py-3 px-4 font-bold text-slate-800">
-                        <div class="feedback-title text-xs font-bold text-slate-900 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem] lg:max-w-[15rem] xl:max-w-[18rem]">${escapeHtml(item.title)}</div>
-                        <p class="feedback-desc text-[11px] font-normal text-slate-500 mt-0.5 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem] lg:max-w-[15rem] xl:max-w-[18rem]">${item.description ? escapeHtml(item.description) : '&nbsp;'}</p>
+                        <div class="feedback-title text-xs font-bold text-slate-900 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem] lg:max-w-[13rem] xl:max-w-[16rem]">${escapeHtml(item.title)}</div>
+                        <p class="feedback-desc text-[11px] font-normal text-slate-500 mt-0.5 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem] lg:max-w-[13rem] xl:max-w-[16rem]">${item.description ? escapeHtml(item.description) : '&nbsp;'}</p>
                         <div class="fb-subline lg:hidden mt-1.5 flex flex-nowrap items-center gap-1.5 font-normal max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem]">
                             <span class="hidden min-[400px]:inline-block min-w-0 max-w-[6rem] truncate align-middle px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700">${escapeHtml(item.category)}</span>
                             <span class="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap ${statusBadge}">${escapeHtml(item.statusLabel)}</span>
                             ${item.linkedMilestones.length ? `<span class="shrink-0 text-[11px] text-brand-700 font-semibold" title="${escapeHtml(item.linkedMilestones.map(m => m.name).join(', '))}"><i class="ph-bold ph-git-commit rotate-90 text-[10px]" aria-hidden="true"></i> ${item.linkedMilestones.length}</span>` : ''}
+                            ${toMillis(item.createdAt) ? `<span class="fb-subline-date min-w-0 truncate text-[11px] text-slate-500">· ${escapeHtml(feedbackDate(item.createdAt, true))}</span>` : ''}
                         </div>
                     </td>
                     <td class="hidden lg:table-cell py-3 px-3 text-slate-600 font-medium">
                         <span class="inline-block max-w-[7.5rem] truncate align-middle px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700">${escapeHtml(item.category)}</span>
                     </td>
-                    <td class="hidden xl:table-cell py-3 px-3 text-slate-600 whitespace-nowrap">
+                    <td class="fb-col-sub hidden xl:table-cell py-3 px-3 text-slate-600 whitespace-nowrap">
                         ${submitterHtml}
                         <span class="block text-[11px] text-slate-500 mt-0.5 max-w-[8rem] truncate">${item.source ? 'via ' + escapeHtml(item.source) : '&nbsp;'}</span>
                     </td>
+                    <td class="fb-date hidden lg:table-cell py-3 px-3 text-slate-600 whitespace-nowrap">${dateHtml}</td>
                     <td class="hidden lg:table-cell py-3 px-3 whitespace-nowrap">
                         <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${statusBadge}">
                             ${escapeHtml(item.statusLabel)}
                         </span>
                     </td>
-                    <td class="hidden lg:table-cell py-3 px-3">
+                    <td class="fb-col-rel hidden lg:table-cell py-3 px-3">
                         <div class="flex flex-nowrap gap-1.5 items-center max-w-[12rem]">
                             ${milestonesHtml}
                         </div>
                     </td>
-                    <td class="py-3 px-4 text-right whitespace-nowrap">
-                        <div class="flex items-center justify-end gap-1">${actionsHtml}</div>
-                    </td>
+                    <td class="py-3 px-4 text-right whitespace-nowrap w-[5.5rem]">${actionsHtml}</td>
                 `;
                 feedbackTableBody.appendChild(tr);
             });
+            renderFeedbackPanel();
         };
 
         window.jumpToMilestone = function(milestoneId) {
@@ -2877,9 +3006,12 @@
                     : 'Submitted by: unknown (before 2.0.3)';
             }
             if (!list) return;
-            const entries = (useCloudPersistence ? openFeedbackActivity : demoAuditLog.filter(e => e.target?.id === fb.id))
-                .slice().sort((a, b) => toMillis(b.at) - toMillis(a.at));
-            list.innerHTML = entries.map(e => {
+            list.innerHTML = feedbackHistoryHtml(useCloudPersistence ? openFeedbackActivity : demoAuditLog.filter(e => e.target?.id === fb.id));
+        }
+
+        // History entries (newest first), as cards; used by the edit window and the details panel
+        function feedbackHistoryHtml(entries) {
+            return entries.slice().sort((a, b) => toMillis(b.at) - toMillis(a.at)).map(e => {
                 const lines = describeAudit(e);
                 return `
                     <div class="flex items-start gap-2.5 p-2 rounded-lg bg-white border border-slate-100 shadow-2xs">
@@ -2895,6 +3027,312 @@
                     </div>`;
             }).join('') || '<div class="py-8 text-center text-slate-500 text-xs italic">No activity recorded yet.</div>';
         }
+
+        // =======================================================
+        // FEEDBACK DETAILS PANEL (feedback-details-panel FR-1…FR-9, FR-15, FR-16, FR-19…FR-24)
+        // =======================================================
+        let feedbackPanelHtml = '';
+        let feedbackPanelHistoryUnsub = null;
+        let feedbackPanelHistory = { entries: [], state: 'loading' };
+
+        function stopFeedbackPanelHistory() {
+            feedbackPanelHistoryUnsub?.();
+            feedbackPanelHistoryUnsub = null;
+            feedbackPanelHistory = { entries: [], state: 'loading' };
+        }
+
+        function startFeedbackPanelHistory(roadmap, id) {
+            stopFeedbackPanelHistory();
+            if (!useCloudPersistence || roadmap.isPreview) { feedbackPanelHistory.state = 'ok'; return; }
+            feedbackPanelHistoryUnsub = onSnapshot(query(wsCollection('auditLog'), where('target.id', '==', id)), snap => {
+                feedbackPanelHistory = { entries: snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id })).filter(e => e.roadmapId === roadmap.id), state: 'ok' };
+                renderFeedbackPanelHistory();
+            }, err => {
+                console.warn('Feedback panel history error:', err);
+                feedbackPanelHistory = { entries: [], state: navigator.onLine ? 'denied' : 'offline' };
+                renderFeedbackPanelHistory();
+            });
+        }
+
+        function renderFeedbackPanelHistory() {
+            const box = document.getElementById('feedback-panel-history');
+            if (!box || !feedbackPanel) return;
+            const { state } = feedbackPanelHistory;
+            if (state !== 'ok') {
+                box.innerHTML = `<p class="text-xs text-slate-500 italic">${state === 'offline' ? 'History is not available offline.' : state === 'denied' ? 'History is not available.' : 'Loading history…'}</p>`;
+                return;
+            }
+            const entries = useCloudPersistence && !getActiveRoadmap()?.isPreview ? feedbackPanelHistory.entries : demoAuditLog.filter(e => e.target?.id === feedbackPanel.id);
+            box.innerHTML = feedbackHistoryHtml(entries);
+        }
+
+        function canCopyFeedbackLink(roadmap) {
+            return useCloudPersistence && !!roadmap && !roadmap.isPreview && !roadmap.deletedAt;
+        }
+
+        // Table selection + panel visibility follow feedbackPanel
+        function syncFeedbackSelection() {
+            feedbackTableBody?.querySelectorAll('tr[data-fb-id]').forEach(tr => {
+                const on = tr.dataset.fbId === feedbackPanel?.id;
+                tr.classList.toggle('fb-selected', on);
+                tr.setAttribute('aria-selected', String(on));
+            });
+        }
+
+        // Narrow the table while the panel sits beside it; drop Related too if it would still scroll sideways (FR-16)
+        function fitFeedbackTable() {
+            const table = document.getElementById('feedback-table');
+            const wrap = document.getElementById('feedback-table-wrap');
+            if (!table || !wrap || feedbackView?.classList.contains('hidden')) return;
+            // Beside the table from xl; below that the panel floats over the table, which keeps its full width
+            table.classList.toggle('fb-panel-open', !!feedbackPanel && window.innerWidth >= 1280);
+            table.classList.remove('fb-tight');
+            if (feedbackPanel && wrap.scrollWidth > wrap.clientWidth + 1) table.classList.add('fb-tight');
+            // The active sort's column is hidden at this width (the Sort select shows it below lg)
+            const chip = document.getElementById('feedback-sort-chip');
+            if (chip) {
+                const th = document.querySelector(`#feedback-table-head th[data-col="${feedbackSort.key}"]`);
+                const show = window.innerWidth >= 1024 && !!th && th.offsetWidth === 0;
+                chip.classList.toggle('hidden', !show);
+                chip.classList.toggle('inline-flex', show);
+            }
+        }
+
+        function feedbackPanelSection(title, body) {
+            return `<section class="px-5 py-4 border-t border-slate-100"><h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">${title}</h4>${body}</section>`;
+        }
+
+        function renderFeedbackPanel() {
+            const panel = document.getElementById('feedback-panel');
+            if (!panel) return;
+            const roadmap = getActiveRoadmap();
+            // Another roadmap or view: the panel closes (FR-6)
+            if (feedbackPanel && (!roadmap || roadmap.id !== feedbackPanel.roadmapId || feedbackView?.classList.contains('hidden'))) {
+                closeFeedbackPanel(false);
+                return;
+            }
+            const open = !!feedbackPanel;
+            panel.classList.toggle('hidden', !open);
+            panel.classList.toggle('flex', open);
+            document.body.classList.toggle('overflow-hidden', open && window.innerWidth < 640);
+            if (!open) { panel.innerHTML = ''; feedbackPanelHtml = ''; fitFeedbackTable(); return; }
+
+            const item = (roadmap.feedback || []).find(f => f.id === feedbackPanel.id);
+            // Deleted from this session (row or panel Delete): just close
+            if (!item && ownDeletes.has(feedbackPanel.id)) { closeFeedbackPanel(); return; }
+            let html;
+            if (!item) {
+                // Removed by someone else while open (FR-5)
+                html = `<div class="flex-1 flex flex-col items-center justify-center text-center p-8 gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl"><i class="ph-bold ph-trash" aria-hidden="true"></i></div>
+                    <p id="feedback-panel-title" tabindex="-1" class="text-sm font-bold text-slate-800 outline-none">This feedback was deleted</p>
+                    <p class="text-xs text-slate-500">Someone removed it while you were looking at it.</p>
+                    <button type="button" onclick="closeFeedbackPanel()" class="mt-1 px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl">Close</button></div>`;
+                panel.setAttribute('aria-label', 'Feedback details');
+            } else {
+                const idx = feedbackOrder.indexOf(item.id);
+                if (idx >= 0) feedbackPanel.index = idx;
+                // Out of the current filter: Previous / Next continue from where it was (FR-5)
+                const prevId = idx >= 0 ? feedbackOrder[idx - 1] : feedbackOrder[feedbackPanel.index - 1];
+                const nextId = idx >= 0 ? feedbackOrder[idx + 1] : feedbackOrder[feedbackPanel.index];
+                feedbackPanel.prevId = prevId || null;
+                feedbackPanel.nextId = nextId || null;
+
+                const derived = getFeedbackDerivedStatus(item.id, roadmap);
+                const badge = derived.status === 'done' ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                    : derived.status === 'in-progress' ? 'bg-brand-50 text-brand-600 border-brand-200'
+                    : derived.status === 'planned' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-500 border-slate-200';
+                const s = feedbackSubmitter(item);
+                const milestones = derived.milestones.map(m => {
+                    const rank = rankOf(roadmap, m.id);
+                    return `<button type="button" onclick="jumpToMilestone('${escapeHtml(m.id)}')" title="Open in the Editor" class="fb-panel-milestone w-full flex items-center gap-2 px-2.5 py-2 rounded-xl border border-slate-200 hover:border-brand-300 hover:bg-brand-50/50 text-left transition-colors">
+                        ${rank ? `<span class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">#${rank}</span>` : ''}
+                        <span class="flex-1 min-w-0 truncate text-xs font-semibold text-slate-800">${escapeHtml(m.name)}</span>
+                        <span class="shrink-0 flex items-center gap-1 text-[11px] text-slate-500">${statusDot(m.status)}<span aria-hidden="true">${escapeHtml(STATUS_LABELS[m.status] || m.status)}</span></span>
+                        <span class="shrink-0 text-[11px] text-slate-500 w-16 text-right">${escapeHtml(formatMonthYear(m.date))}</span>
+                        <i class="ph ph-arrow-up-right text-slate-400 shrink-0" aria-hidden="true"></i></button>`;
+                }).join('');
+                const navBtn = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-white border border-transparent hover:border-slate-200 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1';
+                html = `
+                    <header class="px-5 pt-4 pb-3 flex items-start gap-2 shrink-0">
+                        <button type="button" onclick="closeFeedbackPanel()" class="lg:hidden -ml-1.5 p-1.5 rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Back to the list"><i class="ph-bold ph-arrow-left text-lg" aria-hidden="true"></i></button>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-[11px] font-semibold text-slate-500 mb-1">Feedback details${idx >= 0 ? ` · ${idx + 1} of ${feedbackOrder.length}` : ' · not in the current filter'}</p>
+                            <h3 id="feedback-panel-title" tabindex="-1" class="text-base font-bold text-slate-900 leading-snug break-words outline-none">${escapeHtml(item.title)}</h3>
+                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                <span class="px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700 break-all">${escapeHtml(item.category)}</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${badge}">${escapeHtml(derived.label)}</span>
+                            </div>
+                        </div>
+                        ${canCopyFeedbackLink(roadmap) ? `<div class="relative shrink-0">
+                            <button type="button" id="feedback-copy-link" onclick="copyFeedbackLink()" class="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-brand-50" title="Copy link to this feedback" aria-label="Copy link"><i class="ph-bold ph-link text-base" aria-hidden="true"></i></button>
+                            <div id="feedback-link-fallback" class="hidden absolute right-0 top-full mt-1 z-30 w-72 p-2.5 bg-white border border-slate-200 rounded-xl shadow-lg">
+                                <input id="feedback-link-input" readonly aria-label="Link to this feedback" class="w-full px-2 py-1.5 text-[11px] border border-slate-200 rounded-lg bg-slate-50 text-slate-700">
+                                <p class="text-[11px] text-slate-500 mt-1.5">Press Ctrl+C to copy</p>
+                            </div></div>` : ''}
+                        <button type="button" onclick="closeFeedbackPanel()" class="hidden lg:inline-flex shrink-0 p-1.5 rounded-lg text-slate-500 hover:bg-slate-100" title="Close (Esc)" aria-label="Close details"><i class="ph-bold ph-x text-base" aria-hidden="true"></i></button>
+                    </header>
+                    <div class="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
+                        <dl class="px-5 pb-4 grid grid-cols-[6.5rem_1fr] gap-y-1.5 text-xs">
+                            <dt class="text-slate-500">Source</dt><dd class="text-slate-800 font-medium break-words min-w-0">${item.source ? escapeHtml(item.source) : '<span class="text-slate-400">—</span>'}</dd>
+                            <dt class="text-slate-500">Submitted by</dt><dd class="text-slate-800 font-medium min-w-0">${s ? `<span title="${escapeHtml(s.email)}">${escapeHtml(s.name)}</span>` : '<span class="text-slate-500 font-normal">unknown (before 2.1)</span>'}</dd>
+                            <dt class="text-slate-500">Date</dt><dd class="text-slate-800">${toMillis(item.createdAt) ? escapeHtml(formatPHT(item.createdAt)) : '<span class="text-slate-400">—</span>'}</dd>
+                        </dl>
+                        ${feedbackPanelSection('Description', item.description ? `<p class="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap break-words">${escapeHtml(item.description)}</p>` : '<p class="text-xs text-slate-400 italic">No description</p>')}
+                        ${feedbackPanelSection(`Linked milestones (${derived.milestones.length})`, derived.milestones.length ? `<div class="space-y-1.5">${milestones}</div>` : '<p class="text-xs text-slate-500 italic">Not linked to any milestone</p>')}
+                        ${feedbackPanelSection('History', '<div id="feedback-panel-history" class="space-y-2"></div>')}
+                    </div>
+                    <footer class="px-4 py-3 border-t border-slate-200 bg-slate-50/70 flex items-center gap-2 shrink-0">
+                        <div class="flex items-center gap-1">
+                            <button type="button" id="feedback-panel-prev" onclick="stepFeedbackPanel(-1)" ${prevId ? '' : 'disabled'} class="${navBtn}" title="Previous (↑)"><i class="ph-bold ph-caret-left" aria-hidden="true"></i> Previous</button>
+                            <button type="button" id="feedback-panel-next" onclick="stepFeedbackPanel(1)" ${nextId ? '' : 'disabled'} class="${navBtn}" title="Next (↓)">Next <i class="ph-bold ph-caret-right" aria-hidden="true"></i></button>
+                        </div>
+                        ${canEditFeedback(item) ? `<div class="ml-auto flex items-center gap-1.5">
+                            <button type="button" onclick="deleteFeedbackItem('${escapeHtml(item.id)}')" class="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50" title="Delete" aria-label="Delete feedback"><i class="ph ph-trash text-base" aria-hidden="true"></i></button>
+                            <button type="button" onclick="editFeedbackItem('${escapeHtml(item.id)}')" class="px-3.5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5"><i class="ph-bold ph-pencil-simple" aria-hidden="true"></i> Edit</button></div>`
+                            : '<span class="ml-auto text-[11px] text-slate-500 flex items-center gap-1"><i class="ph ph-eye" aria-hidden="true"></i> View only</span>'}
+                    </footer>`;
+                panel.setAttribute('aria-label', `Feedback details: ${item.title}`);
+            }
+            // Only redraw when something changed, so focus and scroll inside the panel stay put
+            if (html !== feedbackPanelHtml) {
+                const focusedId = panel.contains(document.activeElement) ? document.activeElement.id : '';
+                const scroller = panel.querySelector('.overflow-y-auto');
+                const scrollTop = scroller?.scrollTop || 0;
+                panel.innerHTML = html;
+                feedbackPanelHtml = html;
+                const newScroller = panel.querySelector('.overflow-y-auto');
+                if (newScroller) newScroller.scrollTop = scrollTop;
+                if (focusedId) document.getElementById(focusedId)?.focus();
+                renderFeedbackPanelHistory();
+            }
+            fitFeedbackTable();
+        }
+
+        // Row click / Enter opens the panel; clicking the open row again closes it (FR-1, FR-2)
+        window.openFeedbackPanel = function(id, { focus = true } = {}) {
+            const roadmap = getActiveRoadmap();
+            if (!roadmap || !(roadmap.feedback || []).some(f => f.id === id)) return;
+            const changed = feedbackPanel?.id !== id;
+            feedbackPanel = { id, roadmapId: roadmap.id, index: Math.max(0, feedbackOrder.indexOf(id)) };
+            if (changed) { startFeedbackPanelHistory(roadmap, id); feedbackPanelHtml = ''; }
+            syncFeedbackSelection();
+            renderFeedbackPanel();
+            if (changed) document.getElementById('feedback-panel')?.querySelector('.overflow-y-auto')?.scrollTo(0, 0);
+            feedbackTableBody?.querySelector(`tr[data-fb-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest' });
+            if (focus) document.getElementById('feedback-panel-title')?.focus();
+        };
+
+        window.closeFeedbackPanel = function(returnFocus = true) {
+            if (!feedbackPanel) return;
+            const id = feedbackPanel.id;
+            feedbackPanel = null;
+            stopFeedbackPanelHistory();
+            syncFeedbackSelection();
+            renderFeedbackPanel();
+            if (returnFocus) feedbackTableBody?.querySelector(`tr[data-fb-id="${CSS.escape(id)}"]`)?.focus();
+        };
+
+        window.stepFeedbackPanel = function(direction) {
+            const id = direction < 0 ? feedbackPanel?.prevId : feedbackPanel?.nextId;
+            if (id) openFeedbackPanel(id);
+        };
+
+        window.copyFeedbackLink = async function() {
+            if (!feedbackPanel) return;
+            const link = `${location.origin}${location.pathname}#feedback=${encodeURIComponent(feedbackPanel.roadmapId)}/${encodeURIComponent(feedbackPanel.id)}`;
+            try {
+                await navigator.clipboard.writeText(link);
+                showSaveStatus('saved', 'Link copied');
+            } catch (e) {
+                // Clipboard blocked: show the link selected (FR-20)
+                const box = document.getElementById('feedback-link-fallback');
+                const input = document.getElementById('feedback-link-input');
+                if (!box || !input) return;
+                input.value = link;
+                box.classList.remove('hidden');
+                input.focus();
+                input.select();
+            }
+        };
+
+        feedbackTableBody?.addEventListener('click', e => {
+            if (e.target.closest('button, a, input, select, textarea')) return;
+            const tr = e.target.closest('tr[data-fb-id]');
+            if (!tr) return;
+            if (String(window.getSelection?.() || '').trim() && tr.contains(window.getSelection().anchorNode)) return;   // selecting text, not opening
+            if (feedbackPanel?.id === tr.dataset.fbId) closeFeedbackPanel();
+            else openFeedbackPanel(tr.dataset.fbId);
+        });
+        feedbackTableBody?.addEventListener('keydown', e => {
+            const tr = e.target.closest?.('tr[data-fb-id]');
+            if (!tr || e.target !== tr || (e.key !== 'Enter' && e.key !== ' ')) return;
+            e.preventDefault();
+            openFeedbackPanel(tr.dataset.fbId);
+        });
+        // Esc closes; ↑ / ↓ step through items while focus is in the panel (FR-2, FR-4)
+        document.addEventListener('keydown', e => {
+            if (!feedbackPanel || visibleDialogs().length) return;
+            const panel = document.getElementById('feedback-panel');
+            if (e.key === 'Escape') {
+                const fallback = document.getElementById('feedback-link-fallback');
+                if (fallback && !fallback.classList.contains('hidden')) { fallback.classList.add('hidden'); document.getElementById('feedback-copy-link')?.focus(); return; }
+                e.preventDefault();
+                closeFeedbackPanel();
+            } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && panel?.contains(e.target) && !e.target.matches('input, textarea, select')) {
+                e.preventDefault();
+                stepFeedbackPanel(e.key === 'ArrowDown' ? 1 : -1);
+            }
+        });
+        window.addEventListener('resize', () => {
+            if (!feedbackPanel) return;
+            document.body.classList.toggle('overflow-hidden', window.innerWidth < 640);
+            fitFeedbackTable();
+        });
+
+        // ---- Links to a feedback item: #feedback=<roadmapId>/<feedbackId> (FR-21…FR-23) ----
+        function readFeedbackLink() {
+            const m = location.hash.match(/^#feedback=(.*)$/);
+            if (!m) return null;
+            const parts = m[1].split('/');
+            if (parts.length !== 2 || !parts[0] || !parts[1]) return { invalid: true };
+            try { return { roadmapId: decodeURIComponent(parts[0]), feedbackId: decodeURIComponent(parts[1]) }; }
+            catch (e) { return { invalid: true }; }
+        }
+
+        function dropFeedbackLink() {
+            pendingFeedbackLink = null;
+            if (location.hash.startsWith('#feedback=')) history.replaceState(null, '', location.pathname + location.search);
+        }
+
+        // Runs after each render; waits for sign-in, the roadmaps and that roadmap's feedback
+        function tryOpenFeedbackLink() {
+            const link = pendingFeedbackLink;
+            if (!link || !useCloudPersistence || !roadmapsReady) return;
+            if (link.invalid) { dropFeedbackLink(); showSaveStatus('info', "That link isn't valid."); return; }
+            const roadmap = roadmaps.find(r => r.id === link.roadmapId);
+            if (!roadmap || roadmap.deletedAt) { dropFeedbackLink(); showSaveStatus('info', 'That roadmap is no longer available.'); return; }
+            if (!roadmap.feedbackLoaded) return;
+            dropFeedbackLink();
+            previewRoadmap = null;
+            currentRoadmapId = roadmap.id;
+            rememberRoadmap(roadmap.id);
+            // Clear search, filters and sort so the item is in the list
+            if (feedbackSearchInput) feedbackSearchInput.value = '';
+            ['feedback-status-filter', 'feedback-category-filter', 'feedback-submitter-filter'].forEach(id => { const el = document.getElementById(id); if (el) el.value = 'ALL'; });
+            feedbackSort = { ...FEEDBACK_SORT_DEFAULT };
+            closeFeedbackPanel(false);
+            switchView('feedback');
+            if ((roadmap.feedback || []).some(f => f.id === link.feedbackId)) openFeedbackPanel(link.feedbackId);
+            else showSaveStatus('info', 'That feedback item is no longer available.');
+        }
+
+        window.addEventListener('hashchange', () => {
+            const link = readFeedbackLink();
+            if (!link) return;
+            pendingFeedbackLink = link;
+            tryOpenFeedbackLink();
+        });
 
         window.openAddFeedbackModal = function() {
             if (!canAddFeedback()) return;
@@ -3003,7 +3441,8 @@
                 detail: (linkedCount ? `It will be unlinked from ${pluralize(linkedCount, 'milestone')}. ` : '') + 'It moves to the Recycle Bin for 30 days.'
             });
             if (!confirmed) return;
-            await deleteFeedback(activeRoadmap, feedbackItem);
+            const ok = await deleteFeedback(activeRoadmap, feedbackItem);
+            if (ok && feedbackPanel?.id === id) closeFeedbackPanel();
         };
 
         function populateFeedbackCheckboxes(containerId, selectedIds = []) {
@@ -4852,6 +5291,7 @@
 
         // Signed out by the app (blocked, or the workspace became unreadable)
         async function endSessionWithMessage(message) {
+            if (message === BLOCKED_MESSAGE) dropFeedbackLink();
             cleanUpSession();
             showLoginGate();
             await signOut(auth).catch(e => console.warn(e));
@@ -4895,12 +5335,13 @@
         }
 
         function onRoadmapsSnapshot(snap) {
+            roadmapsReady = true;
             const previous = new Map(roadmaps.map(r => [r.id, r]));
             const wasViewing = previewRoadmap ? null : roadmaps.find(r => r.id === currentRoadmapId);
             const all = snap.docs.map(d => {
                 const old = previous.get(d.id);
                 return { ...d.data({ serverTimestamps: 'estimate' }), id: d.id, items: old?.items || [], feedback: old?.feedback || [],
-                    binItems: old?.binItems || [], binFeedback: old?.binFeedback || [] };
+                    binItems: old?.binItems || [], binFeedback: old?.binFeedback || [], feedbackLoaded: old?.feedbackLoaded || false };
             }).sort(byCreated);
             // Past their 30 days: treated as gone (TTL or an admin session removes them)
             expiredRoadmaps = all.filter(r => r.deletedAt && isExpired(r));
@@ -4958,6 +5399,7 @@
                     const all = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id })).sort(byCreated);
                     roadmap.feedback = all.filter(f => !f.deletedAt);
                     roadmap.binFeedback = all.filter(f => f.deletedAt);
+                    roadmap.feedbackLoaded = true;
                     scheduleRender();
                 }, onError)
             ];
@@ -4974,6 +5416,8 @@
             stopEditListeners();
             stopUsersListeners();
             stopFeedbackHistory();
+            closeFeedbackPanel(false);
+            roadmapsReady = false;
             stopActivity();
             stopUnread();
         }
