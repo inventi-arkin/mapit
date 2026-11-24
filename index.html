@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.6.0" data-released="2026-11-20">
+    <meta name="mapit-version" content="2.7.0" data-released="2026-11-24">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -80,6 +80,17 @@
         body:not(.can-add-feedback) .feedback-add-only {
             display: none !important;
         }
+        /* Milestone windows (2.7.0): one-line segmented tabs with a count / % badge */
+        .milestone-tabs [role="tab"] { display: flex; align-items: center; justify-content: center; gap: .375rem; padding: .375rem .5rem; border-radius: .5rem; color: #475569; white-space: nowrap; min-width: 0; }
+        .milestone-tabs [role="tab"]:hover { color: #0f172a; }
+        .milestone-tabs [role="tab"][aria-selected="true"] { background: #fff; color: #0359a1; box-shadow: 0 1px 2px rgba(15, 23, 42, .08); }
+        .milestone-tabs .tab-badge { font-size: 10px; font-weight: 700; padding: 0 .375rem; border-radius: 9999px; background: rgba(203, 213, 225, .8); color: #334155; }
+        .milestone-tabs [aria-selected="true"] .tab-badge { background: #e0effe; color: #0359a1; }
+        .milestone-tabs .tab-badge:empty { display: none; }
+        /* Edit window labels: block with a 16 px line (inline labels took the 24 px body line and cost the 600 px fit) */
+        #edit-detail-fields .space-y-1 > label, #edit-detail-fields .space-y-1 > span:first-child { display: block; line-height: 1rem; }
+        /* No gap above the first row when the remote-change notice is hidden */
+        #edit-remote-notice.hidden ~ #detail-item-id + div { margin-top: 0; }
         /* Feedback table: Edit / Delete show on row hover or focus (always on touch screens and phones) */
         .fb-row-actions { opacity: 0; transition: opacity .15s; }
         #feedback-table-body tr:hover .fb-row-actions,
@@ -584,40 +595,56 @@
     <!-- MODALS SECTION                                          -->
     <!-- ======================================================= -->
 
-    <!-- Modal: View Deliverable Details -->
+    <!-- Modal: View Deliverable Details (2.7.0: two columns that fit the screen; Timeline / History tabs scroll inside) -->
     <div id="detail-modal" role="dialog" aria-modal="true" aria-labelledby="modal-feature-name" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl p-6 relative max-h-[92vh] overflow-y-auto custom-scrollbar">
-            <button type="button" onclick="closeModal()" data-dialog-close aria-label="Close" class="absolute top-4 right-4 text-slate-500 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-all">
-                <i class="ph-bold ph-x text-base"></i>
-            </button>
-            <div class="flex items-center gap-2 mb-2">
-                <span id="modal-status-badge" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">Planned</span>
-                <span id="modal-target-date" class="text-xs text-slate-500 font-medium">Q3 2026</span>
-                <span id="modal-rank-effort" class="flex items-center gap-1.5 text-xs text-slate-500"></span>
-            </div>
-            <div id="modal-over-note" class="hidden mb-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs"></div>
-            <h3 id="modal-feature-name" class="text-lg font-bold text-slate-900 leading-snug">Feature Title</h3>
-            <p id="modal-module-name" class="text-xs text-brand-600 font-semibold mb-4">Module Name</p>
-            <div class="space-y-3 border-t border-slate-100 pt-3 text-xs">
-                <div>
-                    <h4 class="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1">Scope & Inclusions</h4>
-                    <div id="modal-inclusions-list" class="flex flex-wrap gap-1.5"></div>
+        <div id="detail-modal-panel" class="bg-white rounded-2xl max-w-4xl w-full border border-slate-200 shadow-2xl relative flex flex-col overflow-hidden max-h-[92vh] md:max-h-none md:h-[min(40rem,calc(100dvh_-_2rem))]">
+            <header class="px-6 pt-4 pb-3 shrink-0 flex items-start gap-3">
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-2 mb-1.5">
+                        <span id="modal-status-badge" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">Planned</span>
+                        <span id="modal-target-date" class="text-xs text-slate-500 font-medium">Q3 2026</span>
+                        <span id="modal-rank-effort" class="flex items-center gap-1.5 text-xs text-slate-500"></span>
+                    </div>
+                    <div id="modal-over-note" class="hidden mb-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs"></div>
+                    <h3 id="modal-feature-name" class="text-lg font-bold text-slate-900 leading-snug break-words">Feature Title</h3>
+                    <p id="modal-module-name" class="text-xs text-brand-600 font-semibold">Module Name</p>
                 </div>
-                <div>
-                    <h4 class="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1">Details & Rationale</h4>
-                    <p id="modal-description" class="text-slate-600 leading-relaxed"></p>
+                <button type="button" onclick="closeModal()" data-dialog-close aria-label="Close" class="shrink-0 text-slate-500 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
+            </header>
+            <div class="flex-1 min-h-0 overflow-y-auto md:overflow-hidden custom-scrollbar grid grid-cols-1 md:grid-cols-12 border-t border-slate-100">
+                <div id="detail-modal-main" class="md:col-span-7 md:min-h-0 md:overflow-y-auto custom-scrollbar px-6 py-3 space-y-3 text-xs">
+                    <section>
+                        <h4 class="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1.5">Scope & Inclusions</h4>
+                        <div id="modal-inclusions-list" class="flex flex-wrap gap-1.5"></div>
+                    </section>
+                    <section>
+                        <h4 class="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1.5">Details & Rationale</h4>
+                        <p id="modal-description" class="text-slate-600 leading-relaxed whitespace-pre-wrap break-words line-clamp-3"></p>
+                        <button type="button" id="modal-description-more" onclick="toggleDetailDescription()" class="hidden mt-1 text-xs font-semibold text-brand-600 hover:underline">Show more</button>
+                    </section>
+                    <div id="modal-linked-feedback-box"></div>
                 </div>
-                <div id="modal-linked-feedback-box"></div>
+                <aside class="md:col-span-5 flex flex-col md:min-h-0 bg-slate-50/80 border-t md:border-t-0 md:border-l border-slate-100 p-3">
+                    <div role="tablist" aria-label="Deliverable activity" id="detail-tabs" class="milestone-tabs grid grid-cols-2 gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold shrink-0">
+                        <button type="button" role="tab" id="detail-tab-stages" aria-controls="modal-stage-timeline" onclick="switchDetailTab('stages')"><i class="ph-bold ph-flow-arrow text-sm" aria-hidden="true"></i><span>Timeline</span><span id="detail-stage-pct" class="tab-badge"></span></button>
+                        <button type="button" role="tab" id="detail-tab-logs" aria-controls="detail-history-panel" onclick="switchDetailTab('logs')"><i class="ph-bold ph-clock-counter-clockwise text-sm" aria-hidden="true"></i><span>History</span><span id="detail-history-count" class="tab-badge">0</span></button>
+                    </div>
+                    <div id="modal-stage-timeline" role="tabpanel" aria-labelledby="detail-tab-stages" class="mt-3 max-h-[50vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1"></div>
+                    <div id="detail-history-panel" role="tabpanel" aria-labelledby="detail-tab-logs" class="hidden mt-3 max-h-[50vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                        <div id="detail-history-list" class="space-y-2 text-xs"></div>
+                    </div>
+                </aside>
             </div>
-            <div id="modal-stage-timeline" class="mt-4 pt-3 border-t border-slate-100"></div>
-            <div class="flex items-center justify-end gap-2 pt-3 mt-4 border-t border-slate-100">
+            <footer class="flex items-center justify-end gap-2 px-6 py-2.5 border-t border-slate-100 shrink-0">
                 <button type="button" onclick="closeModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
                     Close
                 </button>
                 <button type="button" onclick="editFromDetails()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
                     <i class="ph-bold ph-pencil-simple"></i> <span id="details-edit-label">Edit</span>
                 </button>
-            </div>
+            </footer>
         </div>
     </div>
 
@@ -664,108 +691,102 @@
         </div>
     </div>
 
-    <!-- Modal: Edit Milestone Details -->
+    <!-- Modal: Edit Milestone Details (2.7.0: fits the screen; only the tab contents and the feedback picker scroll) -->
     <div id="edit-milestone-modal" role="dialog" aria-modal="true" aria-labelledby="edit-milestone-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4">
-        <div class="bg-white sm:rounded-2xl max-w-4xl w-full h-full sm:h-auto border border-slate-200 shadow-2xl p-4 sm:p-6 relative sm:max-h-[92vh] flex flex-col overflow-hidden">
-            <button type="button" onclick="closeEditMilestoneModal()" data-dialog-close aria-label="Close" class="absolute top-4 right-4 text-slate-500 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all z-10">
-                <i class="ph-bold ph-x text-lg"></i>
-            </button>
-            <div class="flex items-center gap-2 mb-4 shrink-0">
-                <div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-lg">
+        <div id="edit-milestone-panel" class="bg-white sm:rounded-2xl max-w-5xl w-full h-full sm:h-auto sm:max-h-[92vh] md:max-h-none md:h-[min(46rem,calc(100dvh_-_2rem))] border border-slate-200 shadow-2xl relative flex flex-col overflow-hidden">
+            <header class="px-5 py-2 border-b border-slate-100 flex items-center gap-3 shrink-0">
+                <div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-lg shrink-0">
                     <i class="ph-bold ph-sliders"></i>
                 </div>
-                <div>
-                    <h3 id="edit-milestone-title" class="text-lg font-bold text-slate-900">Edit Milestone Details</h3>
-                    <p class="text-xs text-slate-500">Update deliverable parameters, review history logs, and collaborate.</p>
+                <div class="flex-1 min-w-0">
+                    <h3 id="edit-milestone-title" class="text-base font-bold text-slate-900 leading-tight">Edit milestone</h3>
+                    <p id="edit-milestone-summary" class="text-[11px] text-slate-500 truncate"></p>
                 </div>
-            </div>
+                <button type="button" onclick="closeEditMilestoneModal()" data-dialog-close aria-label="Close" class="shrink-0 text-slate-500 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
+            </header>
 
-            <!-- Two-Column Body: Form on Left, History & Comments on Right -->
-            <div class="flex-1 overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-12 gap-6 pr-1">
-                
-                <!-- Left Column: Milestone Configuration (7 cols) -->
-                <form id="edit-detail-form" class="min-w-0 md:col-span-7 space-y-3.5 flex flex-col justify-between">
-                    <div id="edit-remote-notice" role="status" class="hidden p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium flex items-start gap-2">
-                        <i class="ph-bold ph-users text-base shrink-0"></i>
-                        <span id="edit-remote-notice-text"></span>
-                    </div>
-                    <div class="space-y-3.5">
+            <!-- Two columns: the form (fields + footer) and the History / Timeline / Comments tabs -->
+            <div class="flex-1 min-h-0 overflow-y-auto md:overflow-hidden custom-scrollbar grid grid-cols-1 md:grid-cols-12">
+
+                <form id="edit-detail-form" class="min-w-0 md:col-span-7 flex flex-col md:min-h-0 md:border-r border-slate-100">
+                    <div id="edit-detail-fields" class="md:flex-1 md:min-h-0 md:overflow-y-auto custom-scrollbar px-5 py-3 space-y-2">
+                        <div id="edit-remote-notice" role="status" class="hidden p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium flex items-start gap-2">
+                            <i class="ph-bold ph-users text-base shrink-0"></i>
+                            <span id="edit-remote-notice-text"></span>
+                        </div>
                         <input type="hidden" id="detail-item-id">
-                        
+
                         <div class="space-y-1">
-                            <label for="detail-item-name" class="text-xs font-semibold text-slate-700">Feature / Deliverable Name</label>
-                            <input type="text" id="detail-item-name" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                            <label for="detail-item-name" class="text-xs font-semibold text-slate-700">Feature / deliverable name</label>
+                            <input type="text" id="detail-item-name" required class="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
                         </div>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div class="space-y-1">
-                                <label for="detail-item-module" class="text-xs font-semibold text-slate-700">Module / Category</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="space-y-1 min-w-0">
+                                <label for="detail-item-module" class="text-xs font-semibold text-slate-700">Module</label>
                                 <div class="relative">
-                                    <input type="text" id="detail-item-module" required class="w-full pl-3 pr-9 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                                    <input type="text" id="detail-item-module" required class="w-full pl-3 pr-9 py-1.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
                                     <button type="button" id="detail-item-module-toggle" tabindex="-1" aria-label="Show modules" class="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-brand-600 rounded-lg"><i class="ph-bold ph-caret-down text-sm"></i></button>
                                     <ul id="detail-item-module-listbox" role="listbox" aria-label="Existing modules" class="hidden absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto custom-scrollbar bg-white border border-slate-200 rounded-xl shadow-lg py-1"></ul>
                                 </div>
                             </div>
-                            <div class="space-y-1">
-                                <label for="detail-item-date" class="text-xs font-semibold text-slate-700">Target Date (Month-Year)</label>
-                                <input type="month" id="detail-item-date" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                            <div class="space-y-1 min-w-0">
+                                <label for="detail-item-date" class="text-xs font-semibold text-slate-700">Target month</label>
+                                <input type="month" id="detail-item-date" class="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                            </div>
+                            <div class="space-y-1 min-w-0">
+                                <label for="detail-item-effort" class="text-xs font-semibold text-slate-700">Effort <span class="font-normal text-slate-500" title="All people combined, e.g. 2 people × 5 days = 10">(person-days) <i class="ph ph-info" aria-hidden="true"></i></span></label>
+                                <input type="number" id="detail-item-effort" step="0.5" min="0.5" max="999" placeholder="Not estimated" aria-describedby="detail-effort-help" class="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                                <span id="detail-effort-help" class="sr-only">All people combined, e.g. 2 people × 5 days = 10</span>
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div class="space-y-1">
-                                <label for="detail-item-effort" class="text-xs font-semibold text-slate-700">Effort (person-days)</label>
-                                <input type="number" id="detail-item-effort" step="0.5" min="0.5" max="999" placeholder="Not estimated" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
-                                <p class="text-[10px] text-slate-500">All people combined, e.g. 2 people × 5 days = 10</p>
-                            </div>
-                            <div class="space-y-1">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="space-y-1 min-w-0">
                                 <label for="detail-item-moveto" class="text-xs font-semibold text-slate-700">Rank <span id="detail-rank-label" class="font-normal text-slate-500"></span></label>
-                                <input type="number" id="detail-item-moveto" step="1" min="1" placeholder="Move to #" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                                <input type="number" id="detail-item-moveto" step="1" min="1" placeholder="Move to #" class="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                            </div>
+                            <div class="space-y-1 min-w-0">
+                                <label for="detail-item-stage" class="text-xs font-semibold text-slate-700">Stage</label>
+                                <select id="detail-item-stage" class="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"></select>
+                            </div>
+                            <div class="space-y-1 min-w-0">
+                                <span class="text-xs font-semibold text-slate-700">Status</span>
+                                <div id="detail-item-status-label" class="px-3 py-1.5 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-700 truncate"></div>
+                                <input type="hidden" id="detail-item-status">
                             </div>
                         </div>
                         <p id="detail-load-note" class="hidden" role="status"></p>
 
                         <div class="space-y-1">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div class="space-y-1">
-                                    <label for="detail-item-stage" class="text-xs font-semibold text-slate-700">Stage</label>
-                                    <select id="detail-item-stage" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"></select>
-                                </div>
-                                <div class="space-y-1">
-                                    <span class="text-xs font-semibold text-slate-700">Status</span>
-                                    <div id="detail-item-status-label" class="px-3 py-2 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-700"></div>
-                                    <input type="hidden" id="detail-item-status">
-                                </div>
-                            </div>
+                            <label for="detail-item-inclusions" class="text-xs font-semibold text-slate-700">Scope inclusions <span class="font-normal text-slate-500">(comma-separated)</span></label>
+                            <input type="text" id="detail-item-inclusions" class="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
                         </div>
 
                         <div class="space-y-1">
-                            <label for="detail-item-inclusions" class="text-xs font-semibold text-slate-700">Scope Inclusions (comma-separated)</label>
-                            <input type="text" id="detail-item-inclusions" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                            <label for="detail-item-description" class="text-xs font-semibold text-slate-700">Description & context</label>
+                            <textarea id="detail-item-description" rows="3" class="w-full px-3 py-1.5 text-[13px] leading-[1.125rem] border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all custom-scrollbar resize-none"></textarea>
                         </div>
 
+                        <!-- Related feedback: one line of chips + "Link feedback" (the checklist lives in the picker below) -->
                         <div class="space-y-1">
-                            <label for="detail-item-description" class="text-xs font-semibold text-slate-700">Description & Context</label>
-                            <textarea id="detail-item-description" rows="3" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all custom-scrollbar"></textarea>
-                        </div>
-
-                        <!-- Related Feedback Multi-selector -->
-                        <div class="space-y-1 pt-1">
-                            <label class="text-xs font-semibold text-slate-700 flex items-center justify-between">
-                                <span>Related Feedback & Suggestions</span>
-                                <span class="text-[10px] text-slate-500 font-normal">Connect user requests</span>
-                            </label>
-                            <div id="edit-milestone-feedback-list" class="max-h-28 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1 bg-slate-50/50 custom-scrollbar text-xs">
-                                <!-- Populated dynamically -->
+                            <span class="text-xs font-semibold text-slate-700">Related feedback & suggestions <span id="edit-milestone-feedback-count" class="font-normal text-slate-500"></span></span>
+                            <div class="flex flex-nowrap items-center gap-1.5 min-w-0">
+                                <div id="edit-milestone-feedback-chips" class="flex flex-nowrap items-center gap-1.5 min-w-0"></div>
+                                <button type="button" id="edit-milestone-feedback-toggle" onclick="toggleFeedbackPicker()" aria-expanded="false" aria-controls="edit-milestone-feedback-picker" class="editor-only shrink-0 whitespace-nowrap inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-dashed border-slate-300 text-[11px] font-semibold text-slate-600 hover:border-brand-400 hover:text-brand-700">
+                                    <i class="ph-bold ph-plus text-[10px]"></i> Link feedback
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 mt-4">
+                    <div class="px-5 py-2 border-t border-slate-100 flex items-center justify-between gap-2 shrink-0">
                         <button type="button" onclick="deleteFromDetailModal()" class="editor-only px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5">
                             <i class="ph-bold ph-trash"></i> Delete
                         </button>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 ml-auto">
                             <button type="button" onclick="closeEditMilestoneModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
                                 Cancel
                             </button>
@@ -776,56 +797,46 @@
                     </div>
                 </form>
 
-                <!-- Right Column: Activity History Logs & Comments (5 cols) -->
-                <div class="md:col-span-5 bg-slate-50/80 border border-slate-200 rounded-xl p-3.5 flex flex-col justify-between overflow-hidden">
-                    <div>
-                        <!-- Header with sub-tabs for History & Comments -->
-                        <div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
-                            <div class="flex items-center gap-1 bg-slate-200/70 p-0.5 rounded-lg text-xs font-semibold">
-                                <button type="button" id="tab-btn-logs" onclick="switchMilestoneSideTab('logs')" class="px-2.5 py-1 rounded-md bg-white text-brand-700 shadow-2xs transition-all">
-                                    <i class="ph-bold ph-clock-counter-clockwise mr-1"></i> History
-                                </button>
-                                <button type="button" id="tab-btn-stages" onclick="switchMilestoneSideTab('stages')" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all">
-                                    <i class="ph-bold ph-flow-arrow mr-1"></i> Timeline
-                                </button>
-                                <button type="button" id="tab-btn-comments" onclick="switchMilestoneSideTab('comments')" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all">
-                                    <i class="ph-bold ph-chat-teardrop-text mr-1"></i> Comments
-                                    <span id="milestone-comments-count" class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-300 text-slate-700 font-bold">0</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Panel 1: Activity History Logs -->
-                        <div id="milestone-logs-panel" class="space-y-2.5 max-h-[340px] overflow-y-auto custom-scrollbar pr-1">
-                            <div id="milestone-history-list" class="space-y-2 text-xs">
-                                <!-- Populated dynamically -->
-                            </div>
-                        </div>
-
-                        <!-- Panel 1b (2.5.0): the deliverable's stage timeline -->
-                        <div id="milestone-stages-panel" class="hidden max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
-                            <div id="milestone-stages-list" class="text-xs"></div>
-                        </div>
-
-                        <!-- Panel 2: Comments Feed -->
-                        <div id="milestone-comments-panel" class="hidden space-y-2.5 max-h-[280px] overflow-y-auto custom-scrollbar pr-1">
-                            <div id="milestone-comments-list" class="space-y-2.5 text-xs">
-                                <!-- Populated dynamically -->
-                            </div>
-                        </div>
+                <!-- History / Timeline / Comments: one-line tabs; the open tab fills the height left and scrolls -->
+                <div class="md:col-span-5 bg-slate-50/80 border-t md:border-t-0 border-slate-100 p-3 flex flex-col md:min-h-0">
+                    <div role="tablist" aria-label="Milestone activity" id="milestone-tabs" class="milestone-tabs grid grid-cols-3 gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold shrink-0">
+                        <button type="button" role="tab" id="tab-btn-logs" aria-controls="milestone-logs-panel" onclick="switchMilestoneSideTab('logs')"><i class="ph-bold ph-clock-counter-clockwise text-sm" aria-hidden="true"></i><span>History</span><span id="milestone-history-count" class="tab-badge">0</span></button>
+                        <button type="button" role="tab" id="tab-btn-stages" aria-controls="milestone-stages-panel" onclick="switchMilestoneSideTab('stages')"><i class="ph-bold ph-flow-arrow text-sm" aria-hidden="true"></i><span>Timeline</span><span id="milestone-stage-pct" class="tab-badge"></span></button>
+                        <button type="button" role="tab" id="tab-btn-comments" aria-controls="milestone-comments-panel" onclick="switchMilestoneSideTab('comments')"><i class="ph-bold ph-chat-teardrop-text text-sm" aria-hidden="true"></i><span>Comments</span><span id="milestone-comments-count" class="tab-badge">0</span></button>
                     </div>
 
-                    <!-- Bottom Comment Input Box (active when in comments tab) -->
-                    <div id="milestone-comment-input-box" class="editor-only hidden pt-3 border-t border-slate-200 mt-2">
+                    <div id="milestone-logs-panel" role="tabpanel" aria-labelledby="tab-btn-logs" class="mt-3 max-h-[60vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                        <div id="milestone-history-list" class="space-y-2 text-xs"></div>
+                    </div>
+
+                    <!-- The deliverable's stage timeline (2.5.0) -->
+                    <div id="milestone-stages-panel" role="tabpanel" aria-labelledby="tab-btn-stages" class="hidden mt-3 max-h-[60vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                        <div id="milestone-stages-list" class="text-xs"></div>
+                    </div>
+
+                    <div id="milestone-comments-panel" role="tabpanel" aria-labelledby="tab-btn-comments" class="hidden mt-3 max-h-[60vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                        <div id="milestone-comments-list" class="space-y-2.5 text-xs"></div>
+                    </div>
+
+                    <!-- Comment box, pinned under the Comments list -->
+                    <div id="milestone-comment-input-box" class="editor-only hidden pt-2.5 border-t border-slate-200 mt-2 shrink-0">
                         <div class="flex items-center gap-1.5">
-                            <input type="text" id="milestone-new-comment-input" aria-label="New comment" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); addMilestoneComment(); }" placeholder="Write a comment or note..." class="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-200 focus:border-brand-500 rounded-xl outline-none">
+                            <input type="text" id="milestone-new-comment-input" aria-label="New comment" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); addMilestoneComment(); }" placeholder="Write a comment..." class="flex-1 px-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none bg-white">
                             <button type="button" onclick="addMilestoneComment()" aria-label="Send comment" class="p-1.5 px-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold transition-all">
                                 <i class="ph-bold ph-paper-plane-right"></i>
                             </button>
                         </div>
                     </div>
                 </div>
+            </div>
 
+            <!-- Feedback picker (anchored to the window, above the footer, so the form never scrolls sideways) -->
+            <div id="edit-milestone-feedback-picker" role="group" aria-label="Link feedback" class="hidden absolute z-30 left-4 right-4 bottom-16 md:left-auto md:w-80 md:right-[calc(41.667%_+_1.25rem)] md:bottom-14 bg-white border border-slate-200 rounded-xl shadow-xl p-2">
+                <input type="search" id="edit-milestone-feedback-search" aria-label="Search feedback" placeholder="Search feedback..." oninput="filterFeedbackPicker()" class="w-full mb-1.5 px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
+                <div id="edit-milestone-feedback-list" class="max-h-48 overflow-y-auto custom-scrollbar space-y-0.5 text-xs"></div>
+                <div class="flex justify-end pt-1.5 mt-1 border-t border-slate-100">
+                    <button type="button" onclick="toggleFeedbackPicker(false)" class="px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-[11px] font-semibold text-slate-700">Done</button>
+                </div>
             </div>
         </div>
     </div>
@@ -3502,10 +3513,14 @@
 
             pendingStageAction = null;
             const timelineBox = document.getElementById('modal-stage-timeline');
-            if (timelineBox) timelineBox.innerHTML = stageTimelineHtml(item, canEditActive());
+            if (timelineBox) { timelineBox.innerHTML = stageTimelineHtml(item, canEditActive()); timelineBox.scrollTop = 0; }
+            const detailPct = document.getElementById('detail-stage-pct');
+            if (detailPct) detailPct.textContent = `${stageProgress(item)}%`;
 
             setDetailStatusBadge(statusForStage(currentStageId(item)));
-            document.getElementById('modal-description').textContent = item.description || 'No additional context provided.';
+            const desc = document.getElementById('modal-description');
+            desc.textContent = item.description || 'No additional context provided.';
+            desc.classList.add('line-clamp-3');
 
             const incContainer = document.getElementById('modal-inclusions-list');
             incContainer.innerHTML = '';
@@ -3520,38 +3535,88 @@
                 incContainer.innerHTML = '<span class="text-xs text-slate-500">No inclusions specified.</span>';
             }
 
+            // Linked feedback: one line each, the first 3 then "Show N more"
             const fbBox = document.getElementById('modal-linked-feedback-box');
             if (fbBox) {
                 fbBox.innerHTML = '';
-                if (item.feedbackIds && item.feedbackIds.length && activeRoadmap.feedback) {
-                    const linked = activeRoadmap.feedback.filter(f => item.feedbackIds.includes(f.id));
-                    if (linked.length) {
-                        fbBox.innerHTML = `
-                            <div class="mt-3 pt-3 border-t border-slate-100">
-                                <h4 class="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1.5 flex items-center gap-1">
-                                    <i class="ph-bold ph-chat-centered-text text-brand-600"></i> Linked Feedback (${linked.length})
-                                </h4>
-                                <div class="flex flex-col gap-1.5">
-                                    ${linked.map(f => `
-                                        <div class="p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs">
-                                            <span class="font-semibold text-slate-800">${escapeHtml(f.title)}</span>
-                                            <span class="text-slate-500 text-[10px] block mt-0.5">${escapeHtml(f.category)} • ${escapeHtml(f.source || 'User')}</span>
-                                        </div>
-                                    `).join('')}
-                                </div>
+                const linked = (item.feedbackIds || []).length && activeRoadmap.feedback ? activeRoadmap.feedback.filter(f => item.feedbackIds.includes(f.id)) : [];
+                if (linked.length) {
+                    fbBox.innerHTML = `
+                        <section>
+                            <h4 class="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1.5 flex items-center gap-1">
+                                <i class="ph-bold ph-chat-centered-text text-brand-600"></i> Linked Feedback (${linked.length})
+                            </h4>
+                            <div class="flex flex-col gap-1">
+                                ${linked.map((f, i) => `
+                                    <div class="detail-feedback-row ${i >= 3 ? 'hidden' : 'flex'} items-baseline gap-2 min-w-0 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-100" title="${escapeHtml(`${f.title} · ${f.category} · ${f.source || 'User'}`)}">
+                                        <span class="font-semibold text-slate-800 truncate">${escapeHtml(f.title)}</span>
+                                        <span class="text-slate-500 text-[10px] truncate shrink-0 max-w-[45%]">${escapeHtml(f.category)} • ${escapeHtml(f.source || 'User')}</span>
+                                    </div>`).join('')}
                             </div>
-                        `;
-                    }
+                            ${linked.length > 3 ? `<button type="button" id="detail-feedback-more" onclick="showAllDetailFeedback()" class="mt-1 text-xs font-semibold text-brand-600 hover:underline">Show ${linked.length - 3} more</button>` : ''}
+                        </section>`;
                 }
             }
 
             const editLabel = document.getElementById('details-edit-label');
             if (editLabel) editLabel.textContent = canEditActive() ? 'Edit' : 'History & comments';
 
+            // History tab: the same audit entries as the Edit window
+            stopDetailHistory();
+            if (useCloudPersistence && !activeRoadmap.isPreview) {
+                detailHistoryUnsub = onSnapshot(query(wsCollection('auditLog'), where('target.id', '==', id)), snap => {
+                    detailActivity = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id })).filter(e => e.roadmapId === activeRoadmap.id);
+                    renderDetailHistory();
+                }, err => console.warn('Details history listener error:', err));
+            }
+            renderDetailHistory();
+            switchDetailTab('stages');
+
             if (detailModal) detailModal.classList.remove('hidden');
+            // "Show more" only when the description is actually cut
+            const more = document.getElementById('modal-description-more');
+            if (more) { more.textContent = 'Show more'; more.classList.toggle('hidden', desc.scrollHeight <= desc.clientHeight + 1); }
+        };
+
+        let detailHistoryUnsub = null;
+        let detailActivity = [];
+        function stopDetailHistory() {
+            detailHistoryUnsub?.();
+            detailHistoryUnsub = null;
+            detailActivity = [];
+        }
+        function renderDetailHistory() {
+            const item = getActiveRoadmap()?.items.find(i => i.id === detailItemId);
+            const list = document.getElementById('detail-history-list');
+            if (!item || !list) return;
+            const entries = (useCloudPersistence && !getActiveRoadmap()?.isPreview ? detailActivity : demoAuditLog.filter(e => e.target?.id === item.id))
+                .slice().sort((a, b) => toMillis(b.at) - toMillis(a.at));
+            list.innerHTML = milestoneHistoryHtml(item, entries);
+            const count = document.getElementById('detail-history-count');
+            if (count) count.textContent = entries.length + (item.legacyHistory || item.history || []).length;
+        }
+        window.switchDetailTab = function(tab) {
+            [['stages', 'detail-tab-stages', 'modal-stage-timeline'], ['logs', 'detail-tab-logs', 'detail-history-panel']].forEach(([id, btn, panel]) => {
+                document.getElementById(btn)?.setAttribute('aria-selected', String(id === tab));
+                document.getElementById(btn)?.setAttribute('tabindex', id === tab ? '0' : '-1');
+                document.getElementById(panel)?.classList.toggle('hidden', id !== tab);
+            });
+            if (tab === 'stages') scrollToCurrentStage('modal-stage-timeline');
+        };
+        window.toggleDetailDescription = function() {
+            const desc = document.getElementById('modal-description');
+            const more = document.getElementById('modal-description-more');
+            if (!desc || !more) return;
+            const clamped = desc.classList.toggle('line-clamp-3');
+            more.textContent = clamped ? 'Show more' : 'Show less';
+        };
+        window.showAllDetailFeedback = function() {
+            document.querySelectorAll('#modal-linked-feedback-box .detail-feedback-row.hidden').forEach(r => { r.classList.remove('hidden'); r.classList.add('flex'); });
+            document.getElementById('detail-feedback-more')?.remove();
         };
 
         window.closeModal = function() {
+            stopDetailHistory();
             if (detailModal) detailModal.classList.add('hidden');
         };
 
@@ -3562,17 +3627,40 @@
             if (id) selectMilestoneForEdit(id);
         };
 
+        // Keep the current stage in view when the Timeline tab opens (long timelines scroll inside the tab)
+        function scrollToCurrentStage(panelId) {
+            requestAnimationFrame(() => {
+                const panel = document.getElementById(panelId);
+                const cur = panel?.querySelector('[data-stage-state="current"]');
+                if (!panel || !cur || panel.classList.contains('hidden')) return;
+                const offset = cur.getBoundingClientRect().top - panel.getBoundingClientRect().top;
+                if (offset < 0 || offset > panel.clientHeight - 40) panel.scrollTop += offset - 60;
+            });
+        }
+        // ← / → (Home / End) move between tabs in both milestone windows
+        document.addEventListener('keydown', e => {
+            const tab = e.target.closest?.('.milestone-tabs [role="tab"]');
+            if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+            const tabs = [...tab.parentElement.querySelectorAll('[role="tab"]')];
+            const i = tabs.indexOf(tab);
+            const next = e.key === 'Home' ? tabs[0] : e.key === 'End' ? tabs[tabs.length - 1] : tabs[(i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+            e.preventDefault();
+            next.click();
+            next.focus();
+        });
+
         window.switchMilestoneSideTab = function(tab) {
             activeMilestoneSideTab = tab;
-            const on = 'px-2.5 py-1 rounded-md bg-white text-brand-700 shadow-2xs transition-all';
-            const off = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all';
             [['logs', 'tab-btn-logs', 'milestone-logs-panel'], ['stages', 'tab-btn-stages', 'milestone-stages-panel'], ['comments', 'tab-btn-comments', 'milestone-comments-panel']].forEach(([id, btn, panel]) => {
                 const b = document.getElementById(btn);
-                if (b) b.className = id === tab ? on : off;
+                b?.setAttribute('aria-selected', String(id === tab));
+                b?.setAttribute('tabindex', id === tab ? '0' : '-1');
                 document.getElementById(panel)?.classList.toggle('hidden', id !== tab);
             });
             document.getElementById('milestone-comment-input-box')?.classList.toggle('hidden', tab !== 'comments');
-            if (tab === 'stages') renderOpenTimelines();
+            if (tab === 'stages') { renderOpenTimelines(); scrollToCurrentStage('milestone-stages-panel'); }
+            // Comments read like a chat: open at the newest, next to the comment box
+            if (tab === 'comments') requestAnimationFrame(() => { const p = document.getElementById('milestone-comments-panel'); if (p) p.scrollTop = p.scrollHeight; });
         };
 
         // Audit entry -> lines of text for the activity list (first line is the headline)
@@ -3611,18 +3699,9 @@
             }
         }
 
-        function renderMilestoneActivity(item) {
-            const logsList = document.getElementById('milestone-history-list');
-            const commentsList = document.getElementById('milestone-comments-list');
-            const countBadge = document.getElementById('milestone-comments-count');
-
-            const entries = (useCloudPersistence && !item.isPreviewItem ? openMilestoneActivity : demoAuditLog.filter(e => e.target?.id === item.id))
-                .slice().sort((a, b) => toMillis(b.at) - toMillis(a.at));
+        // A milestone's history (newest first) as cards, with the pre-audit entries and a closing line
+        function milestoneHistoryHtml(item, entries) {
             const legacy = (item.legacyHistory || item.history || []).slice().reverse();
-            const comments = useCloudPersistence && !item.isPreviewItem ? openMilestoneComments : (item.comments || []);
-
-            if (countBadge) countBadge.textContent = comments.length;
-
             const row = ({ lines, who, whoTitle, when, whenTitle, legacyRow }) => `
                 <div class="flex items-start gap-2.5 p-2 rounded-lg ${legacyRow ? 'bg-slate-50' : 'bg-white'} border border-slate-100 shadow-2xs">
                     <div class="w-6 h-6 rounded-full ${legacyRow ? 'bg-slate-100 text-slate-500' : 'bg-brand-50 text-brand-600'} flex items-center justify-center shrink-0 mt-0.5 text-xs">
@@ -3637,19 +3716,49 @@
                         <span class="text-[10px] text-slate-500 block" title="${escapeHtml(whoTitle)}">${escapeHtml(who)}</span>
                     </div>
                 </div>`;
+            const html = entries.map(e => row({
+                lines: describeAudit(e),
+                who: e.by?.name || 'Member',
+                whoTitle: e.by?.email ? `${e.by.name} (${e.by.email})` : '',
+                when: formatRelativeTime(e.at),
+                whenTitle: formatPHT(e.at)
+            })).join('') + (legacy.length ? `
+                <p class="pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Earlier history (before audit log, not protected)</p>
+                ${legacy.map(h => row({ lines: [h.action || 'Change'], who: h.user || 'Member', whoTitle: '', when: formatRelativeTime(h.timestamp), whenTitle: formatPHT(h.timestamp), legacyRow: true })).join('')}` : '');
+            if (!html) return '<div class="py-8 text-center text-slate-500 text-xs italic">No activity recorded yet.</div>';
+            const created = toDate(item.createdAt);
+            return html + `<p class="py-2 text-center text-[11px] text-slate-500">That's everything since this milestone was created${created ? ` (${escapeHtml(shortDay(item.createdAt))})` : ''}.</p>`;
+        }
 
-            if (logsList) {
-                const html = entries.map(e => row({
-                    lines: describeAudit(e),
-                    who: e.by?.name || 'Member',
-                    whoTitle: e.by?.email ? `${e.by.name} (${e.by.email})` : '',
-                    when: formatRelativeTime(e.at),
-                    whenTitle: formatPHT(e.at)
-                })).join('') + (legacy.length ? `
-                    <p class="pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Earlier history (before audit log, not protected)</p>
-                    ${legacy.map(h => row({ lines: [h.action || 'Change'], who: h.user || 'Member', whoTitle: '', when: formatRelativeTime(h.timestamp), whenTitle: formatPHT(h.timestamp), legacyRow: true })).join('')}` : '');
-                logsList.innerHTML = html || '<div class="py-8 text-center text-slate-500 text-xs italic">No activity recorded yet.</div>';
-            }
+        // One line under the Edit window title: rank, status, who changed it last
+        function renderEditSummary(item) {
+            const el = document.getElementById('edit-milestone-summary');
+            const roadmap = getActiveRoadmap();
+            if (!el || !roadmap) return;
+            const rank = rankOf(roadmap, item.id);
+            const parts = [rank ? `Rank #${rank} of ${(roadmap.items || []).length}` : '', STATUS_LABELS[statusForStage(currentStageId(item))] || ''];
+            if (item.updatedBy?.name && toMillis(item.updatedAt)) parts.push(`last changed ${formatRelativeTime(item.updatedAt).replace(/^Just now$/, 'just now')} by ${item.updatedBy.name}`);
+            el.textContent = parts.filter(Boolean).join(' · ');
+            el.title = item.updatedAt ? formatPHT(item.updatedAt) : '';
+        }
+
+        let shownCommentCount = 0;
+        function renderMilestoneActivity(item) {
+            const logsList = document.getElementById('milestone-history-list');
+            const commentsList = document.getElementById('milestone-comments-list');
+            const countBadge = document.getElementById('milestone-comments-count');
+
+            const entries = (useCloudPersistence && !item.isPreviewItem ? openMilestoneActivity : demoAuditLog.filter(e => e.target?.id === item.id))
+                .slice().sort((a, b) => toMillis(b.at) - toMillis(a.at));
+            const legacy = (item.legacyHistory || item.history || []).slice().reverse();
+            const comments = useCloudPersistence && !item.isPreviewItem ? openMilestoneComments : (item.comments || []);
+
+            if (countBadge) countBadge.textContent = comments.length;
+            const historyCount = document.getElementById('milestone-history-count');
+            if (historyCount) historyCount.textContent = entries.length + legacy.length;
+            renderEditSummary(item);
+
+            if (logsList) logsList.innerHTML = milestoneHistoryHtml(item, entries);
 
             if (commentsList) {
                 if (comments.length === 0) {
@@ -3674,10 +3783,14 @@
                                 </span>
                                 <span class="text-[10px] text-slate-500" title="${escapeHtml(formatPHT(time))}">${escapeHtml(formatRelativeTime(time))}</span>
                             </div>
-                            <p class="text-xs text-slate-600 leading-relaxed">${escapeHtml(c.text)}</p>
+                            <p class="text-xs text-slate-600 leading-relaxed break-words">${escapeHtml(c.text)}</p>
                         </div>`;
                     }).join('');
                 }
+                // A new comment (yours after posting, or a colleague's) scrolls the open Comments tab to it
+                const panel = document.getElementById('milestone-comments-panel');
+                if (comments.length > shownCommentCount && panel && !panel.classList.contains('hidden')) panel.scrollTop = panel.scrollHeight;
+                shownCommentCount = comments.length;
             }
         }
 
@@ -3724,6 +3837,7 @@
         function setFormFieldValue(field, item) {
             if (field === 'feedbackIds') {
                 populateFeedbackCheckboxes('edit-milestone-feedback-list', item.feedbackIds || []);
+                renderFeedbackChips();
                 return;
             }
             const el = document.getElementById(EDIT_FIELDS[field]);
@@ -3731,11 +3845,62 @@
         }
 
         function setEditReadOnly(readOnly) {
-            document.querySelectorAll('#edit-detail-form input, #edit-detail-form select, #edit-detail-form textarea')
+            document.querySelectorAll('#edit-detail-form input, #edit-detail-form select, #edit-detail-form textarea, #edit-milestone-feedback-list input')
                 .forEach(el => { el.disabled = readOnly; });
             const title = document.getElementById('edit-milestone-title');
-            if (title) title.textContent = readOnly ? 'Milestone Details' : 'Edit Milestone Details';
+            if (title) title.textContent = readOnly ? 'Milestone details' : 'Edit milestone';
+            if (readOnly) toggleFeedbackPicker(false);
+            renderFeedbackChips();
         }
+
+        // Related feedback in the Edit window: up to 2 chips, "+N", and the picker's checklist (saved with Save changes)
+        function renderFeedbackChips() {
+            const box = document.getElementById('edit-milestone-feedback-chips');
+            if (!box) return;
+            const roadmap = getActiveRoadmap();
+            const ids = getCheckedFeedbackIds('edit-milestone-feedback-list');
+            const items = ids.map(id => (roadmap?.feedback || []).find(f => f.id === id)).filter(Boolean);
+            const editable = canEditActive();
+            const shown = items.slice(0, 2), rest = items.slice(2);
+            box.innerHTML = shown.map(f => `<span class="inline-flex items-center gap-1 min-w-0 max-w-[15rem] pl-2 ${editable ? 'pr-1' : 'pr-2'} py-0.5 rounded-lg bg-brand-50 text-brand-700 border border-brand-200 text-[11px] font-semibold" title="${escapeHtml(f.title)}">
+                    <i class="ph-bold ph-chat-centered-text text-[10px] shrink-0" aria-hidden="true"></i><span class="truncate">${escapeHtml(f.title)}</span>
+                    ${editable ? `<button type="button" onclick="unlinkFeedbackChip('${escapeHtml(f.id)}')" class="p-0.5 rounded hover:bg-brand-100 shrink-0" aria-label="Unlink ${escapeHtml(f.title)}"><i class="ph-bold ph-x text-[10px]" aria-hidden="true"></i></button>` : ''}</span>`).join('') +
+                (rest.length ? `<span class="shrink-0 px-1.5 py-0.5 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-semibold border border-slate-200" title="${escapeHtml('Also linked: ' + rest.map(f => f.title).join(', '))}" aria-label="${escapeHtml(`and ${rest.length} more: ${rest.map(f => f.title).join(', ')}`)}">+${rest.length}</span>` : '') +
+                (items.length ? '' : '<span class="text-[11px] text-slate-500 italic whitespace-nowrap">None linked</span>');
+            const count = document.getElementById('edit-milestone-feedback-count');
+            if (count) count.textContent = items.length ? `(${items.length})` : '';
+        }
+        window.unlinkFeedbackChip = function(id) {
+            const box = document.querySelector(`input[name="edit-milestone-feedback-list-fb"][value="${CSS.escape(id)}"]`);
+            if (box && !box.disabled) { box.checked = false; renderFeedbackChips(); }
+        };
+        window.toggleFeedbackPicker = function(open) {
+            const picker = document.getElementById('edit-milestone-feedback-picker');
+            const toggle = document.getElementById('edit-milestone-feedback-toggle');
+            if (!picker) return;
+            const show = open ?? picker.classList.contains('hidden');
+            if (show && !canEditActive()) return;
+            picker.classList.toggle('hidden', !show);
+            toggle?.setAttribute('aria-expanded', String(show));
+            if (show) {
+                const search = document.getElementById('edit-milestone-feedback-search');
+                if (search) { search.value = ''; filterFeedbackPicker(); search.focus(); }
+            } else if (open === false && picker.contains(document.activeElement)) toggle?.focus();
+        };
+        window.filterFeedbackPicker = function() {
+            const q = (document.getElementById('edit-milestone-feedback-search')?.value || '').trim().toLowerCase();
+            document.querySelectorAll('#edit-milestone-feedback-list label').forEach(l => l.classList.toggle('hidden', !!q && !l.textContent.toLowerCase().includes(q)));
+        };
+        document.getElementById('edit-milestone-feedback-list')?.addEventListener('change', renderFeedbackChips);
+        // Esc closes only the picker; a click outside it closes it too
+        document.getElementById('edit-milestone-feedback-picker')?.addEventListener('keydown', e => {
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); toggleFeedbackPicker(false); }
+        });
+        document.addEventListener('mousedown', e => {
+            const picker = document.getElementById('edit-milestone-feedback-picker');
+            if (!picker || picker.classList.contains('hidden') || picker.contains(e.target) || e.target.closest('#edit-milestone-feedback-toggle')) return;
+            toggleFeedbackPicker(false);
+        });
 
         // Called by the live milestone listener while the Edit window is open
         function onOpenMilestoneChanged(roadmap, change) {
@@ -3823,8 +3988,11 @@
                 }, panelError));
             }
             if (activeRoadmap.isPreview) item.isPreviewItem = true;
+            shownCommentCount = 0;
             renderMilestoneActivity(item);
             switchMilestoneSideTab('logs');
+            const pct = document.getElementById('milestone-stage-pct');
+            if (pct) pct.textContent = `${stageProgress(item)}%`;
 
             if (editMilestoneModal) editMilestoneModal.classList.remove('hidden');
         };
@@ -3859,6 +4027,7 @@
         }
 
         window.closeEditMilestoneModal = function() {
+            toggleFeedbackPicker(false);
             selectedMilestoneId = null;
             stopEditListeners();
             if (editMilestoneModal) editMilestoneModal.classList.add('hidden');
@@ -5416,6 +5585,7 @@
             stopEditListeners();
             stopUsersListeners();
             stopFeedbackHistory();
+            stopDetailHistory();
             closeFeedbackPanel(false);
             roadmapsReady = false;
             stopActivity();
@@ -5881,7 +6051,8 @@
                 lines.push(`It will be last in ${date ? formatMonthFull(parseInt(date.slice(5), 10)) : 'the backlog'} (#${idx + 1}). You can move it up afterwards.`);
             }
             note.textContent = lines.join(' ');
-            note.className = `${lines.length ? '' : 'hidden '}p-2.5 rounded-xl text-xs border ${{ rose: 'bg-rose-50 border-rose-200 text-rose-800', amber: 'bg-amber-50 border-amber-200 text-amber-800', slate: 'bg-slate-50 border-slate-200 text-slate-700' }[tone]}`;
+            note.title = editing ? lines.join(' ') : '';
+            note.className = `${lines.length ? '' : 'hidden '}${editing ? 'px-2.5 py-1 rounded-lg text-[11px] truncate' : 'p-2.5 rounded-xl text-xs'} border ${{ rose: 'bg-rose-50 border-rose-200 text-rose-800', amber: 'bg-amber-50 border-amber-200 text-amber-800', slate: 'bg-slate-50 border-slate-200 text-slate-700' }[tone]}`;
         }
         ['modal', 'detail'].forEach(prefix => {
             ['date', 'effort'].forEach(f => document.getElementById(`${prefix}-item-${f}`)?.addEventListener('input', () => updateLoadNote(prefix)));
@@ -6358,8 +6529,11 @@
                 const item = roadmap?.items.find(i => i.id === itemId);
                 if (!item) return;
                 el.innerHTML = stageTimelineHtml(item, canEditActive());
-                // The details header badge follows the stage too
+                // The details header badge and the Timeline tab's % follow the stage too
                 if (elId === 'modal-stage-timeline') setDetailStatusBadge(statusForStage(currentStageId(item)));
+                const pct = document.getElementById(elId === 'modal-stage-timeline' ? 'detail-stage-pct' : 'milestone-stage-pct');
+                if (pct) pct.textContent = `${stageProgress(item)}%`;
+                if (elId === 'milestone-stages-list') renderEditSummary(item);
             });
             const input = document.getElementById('stage-note-input');
             if (input && pendingStageAction?.focus) { input.focus(); pendingStageAction.focus = false; }
