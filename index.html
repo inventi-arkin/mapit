@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.9.0" data-released="2026-11-25">
+    <meta name="mapit-version" content="2.10.0" data-released="2026-11-25">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -208,6 +208,9 @@
                     <span id="nav-activity-count" class="hidden px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500 text-white font-bold ml-0.5"></span>
                 </button>
             </span>
+            <button id="nav-sprints" onclick="switchView('sprints')" aria-label="Sprints" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
+                <i class="ph ph-kanban text-sm"></i> Sprints
+            </button>
         </nav>
 
         <!-- Right Side: account and New Roadmap (the roadmap selector is in the Roadmaps bar) -->
@@ -334,6 +337,7 @@
                     <button id="show-load-toggle" type="button" role="switch" aria-checked="true" onclick="toggleShowLoad()" class="hidden items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all">
                         <span class="track w-7 h-4 rounded-full bg-brand-600 relative transition-colors" aria-hidden="true"><span class="knob absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform"></span></span>Show load
                     </button>
+                    <button type="button" id="timeline-show-done" role="switch" aria-checked="false" onclick="toggleShowDone()" class="show-done-toggle inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-semibold whitespace-nowrap bg-white border-slate-200 text-slate-600"><span class="track relative w-7 h-4 rounded-full bg-slate-300 transition-colors" aria-hidden="true"><span class="knob absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform"></span></span><span class="label">Show done</span></button>
                     <button id="annual-expand-toggle" type="button" onclick="toggleAllAnnualModules()" aria-pressed="false" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition-all">
                         <i class="ph-bold ph-arrows-out-line-vertical text-xs"></i><span>Expand all</span>
                     </button>
@@ -428,6 +432,9 @@
                         </select>
                     </div>
 
+                    <div class="flex items-center">
+                        <button type="button" id="editor-show-done" role="switch" aria-checked="false" onclick="toggleShowDone()" class="show-done-toggle inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-semibold whitespace-nowrap bg-white border-slate-200 text-slate-600"><span class="track relative w-7 h-4 rounded-full bg-slate-300 transition-colors" aria-hidden="true"><span class="knob absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform"></span></span><span class="label">Show done</span></button>
+                    </div>
                     <div class="flex items-center">
                         <select id="editor-person-filter" aria-label="Filter by person" onchange="setPersonFilter(this.value)" class="max-w-[11rem] px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
                             <option value="ALL">All people</option>
@@ -542,6 +549,28 @@
         </div>
 
         <!-- ======================================================= -->
+        <!-- VIEW 5: SPRINTS (2.10.0): one sprint's tasks as a board -->
+        <!-- ======================================================= -->
+        <div id="sprints-view" class="hidden max-w-6xl mx-auto w-full sm:flex-1 sm:min-h-0 sm:overflow-hidden flex-col gap-4">
+            <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm shrink-0 space-y-2.5">
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="flex items-center gap-1 min-w-0">
+                        <button type="button" id="sv-prev" onclick="stepSprint(-1)" aria-label="Previous sprint" class="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none"><i class="ph-bold ph-caret-left"></i></button>
+                        <select id="sv-sprint" aria-label="Sprint" onchange="setSprintFromPicker(this.value)" class="min-w-0 max-w-[17rem] px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-800 cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"></select>
+                        <button type="button" id="sv-next" onclick="stepSprint(1)" aria-label="Next sprint" class="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none"><i class="ph-bold ph-caret-right"></i></button>
+                    </div>
+                    <div id="sv-scope" role="group" aria-label="Which roadmaps" class="flex gap-1 bg-slate-100 p-1 rounded-xl">
+                        <button type="button" data-scope="this" onclick="setSprintScope('this')" class="px-2.5 py-1 rounded-lg text-xs font-semibold">This roadmap</button>
+                        <button type="button" data-scope="all" onclick="setSprintScope('all')" class="px-2.5 py-1 rounded-lg text-xs font-semibold">All roadmaps</button>
+                    </div>
+                    <select id="sv-person" aria-label="Filter by person" onchange="setSprintPerson(this.value)" class="sm:ml-auto max-w-[12rem] px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none text-xs cursor-pointer"><option value="ALL">All people</option></select>
+                </div>
+                <div id="sv-summary" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" aria-live="polite"></div>
+            </div>
+            <div id="sprints-board" class="sm:flex-1 sm:min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm p-3 sm:overflow-y-auto custom-scrollbar"></div>
+        </div>
+
+        <!-- ======================================================= -->
         <!-- VIEW 4: ACTIVITY (2.2.0, Editors + Admins)              -->
         <!-- ======================================================= -->
         <div id="activity-view" class="hidden max-w-6xl mx-auto w-full sm:flex-1 sm:min-h-0 sm:overflow-hidden flex-col gap-4">
@@ -611,6 +640,9 @@
                 <span class="relative"><i class="ph ph-clock-counter-clockwise text-lg"></i><span id="mob-nav-activity-count" class="hidden absolute -top-1 -right-3 px-1 rounded-full text-[9px] bg-rose-500 text-white font-bold"></span></span> Activity
             </button>
         </span>
+        <button id="mob-nav-sprints" onclick="switchView('sprints')" class="flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold text-slate-500">
+            <i class="ph ph-kanban text-lg"></i> Sprints
+        </button>
     </nav>
 
     <!-- ======================================================= -->
@@ -1323,7 +1355,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, getDocs, updateDoc, collection, query, where, orderBy, limit, startAfter, onSnapshot, writeBatch, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, getDocs, updateDoc, collection, collectionGroup, query, where, orderBy, limit, startAfter, onSnapshot, writeBatch, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Application State
         let currentUser = null;
@@ -1548,6 +1580,9 @@
             if (editorView) editorView.classList.add('hidden');
             if (feedbackView) feedbackView.classList.add('hidden');
             if (activityView) { activityView.classList.add('hidden'); activityView.classList.remove('flex'); }
+            const sprintsView = document.getElementById('sprints-view');
+            if (sprintsView) { sprintsView.classList.add('hidden'); sprintsView.classList.remove('flex'); }
+            if (viewName !== 'sprints') stopSprintBoard();
             // What was on screen while Activity was open counts as read
             if (leavingActivity) markActivitySeen();
 
@@ -1555,7 +1590,8 @@
                 { el: navRoadmap, id: 'roadmap' },
                 { el: navEditor, id: 'editor' },
                 { el: navFeedback, id: 'feedback' },
-                { el: document.getElementById('nav-activity'), id: 'activity' }
+                { el: document.getElementById('nav-activity'), id: 'activity' },
+                { el: document.getElementById('nav-sprints'), id: 'sprints' }
             ];
 
             navButtons.forEach(item => {
@@ -1569,7 +1605,7 @@
                 else item.el.removeAttribute('aria-current');
             });
 
-            ['roadmap', 'editor', 'feedback', 'activity'].forEach(id => {
+            ['roadmap', 'editor', 'feedback', 'activity', 'sprints'].forEach(id => {
                 const mobBtn = document.getElementById('mob-nav-' + id);
                 if (!mobBtn) return;
                 mobBtn.classList.toggle('text-brand-700', id === viewName);
@@ -1618,6 +1654,10 @@
                 if (!useCloudPersistence || activityKey !== activityKeyNow() || !activityUnsub) loadActivity();
                 else renderActivity();
                 markActivitySeen();
+            } else if (viewName === 'sprints') {
+                sprintsView?.classList.remove('hidden');
+                sprintsView?.classList.add('flex');
+                loadSprintBoard();
             }
             if (!getActiveRoadmap()) renderWorkspaceEmpty();
         };
@@ -1878,6 +1918,7 @@
             }
             syncActivity();
             renderPersonFilters();
+            if (sprintsViewOpen()) renderSprintBoard();
             if (pendingFeedbackLink) setTimeout(tryOpenFeedbackLink, 0);
         };
 
@@ -1899,8 +1940,9 @@
             document.body.classList.toggle('no-edit-role', !canEdit());
             document.body.classList.toggle('not-admin', !isAdmin());
             document.body.classList.toggle('can-add-feedback', canAddFeedback());
-            document.getElementById('mobile-nav')?.classList.toggle('grid-cols-4', canEdit());
-            document.getElementById('mobile-nav')?.classList.toggle('grid-cols-3', !canEdit());
+            document.getElementById('mobile-nav')?.classList.toggle('grid-cols-5', canEdit());
+            document.getElementById('mobile-nav')?.classList.toggle('grid-cols-4', !canEdit());
+            document.getElementById('mobile-nav')?.classList.remove('grid-cols-3');
 
             const badge = document.getElementById('header-role-badge');
             if (badge) {
@@ -2328,6 +2370,8 @@
             const stageFilter = document.getElementById('timeline-stage-filter')?.value || 'ALL';
             if (stageFilter !== 'ALL') items = items.filter(i => matchesStage(i, stageFilter));
             if (personFilter !== 'ALL') items = items.filter(passesPersonFilter);
+            timelineExplicitDone = stageFilter === 'done';
+            renderShowDoneSwitch('timeline-show-done', !showDone && !timelineExplicitDone ? items.filter(isDoneItem).length : 0);
 
             if (activePerspective === 'year') {
                 renderAnnualTimeline(items);
@@ -2390,7 +2434,9 @@
         }
         // Deliverable rows of one list, in rank order (place = position in this list)
         function listRowsHtml(roadmap, items, listKey, withPlace = true) {
-            const rows = sortByRank(roadmap, items);
+            const all = sortByRank(roadmap, items);
+            const rows = showDone || timelineExplicitDone ? all : all.filter(i => !isDoneItem(i));
+            if (all.length && !rows.length) return `<div class="list-all-done px-3 py-2 text-[11px] italic text-slate-500 border-t border-slate-100">All ${all.length} done · <button type="button" onclick="event.stopPropagation(); toggleShowDone()" class="not-italic font-semibold text-brand-700 hover:underline">Show</button></div>`;
             const reorder = canEditActive();
             const statusText = s => escapeHtml(STATUS_LABELS[s] || s);
             return listColumnsHtml() + `<div data-rank-list="${escapeHtml(listKey)}">` + rows.map((item, n) => {
@@ -2707,6 +2753,12 @@
                 filtered = filtered.filter(i => i.status === statusVal);
             }
 
+            // 2.10.0: Done deliverables hidden unless "Show done" is on, or the filters ask for them (hide-done FR-5)
+            const explicitDone = statusVal === 'done' || stageVal === 'done';
+            const hiddenDone = !showDone && !explicitDone ? filtered.filter(isDoneItem).length : 0;
+            if (hiddenDone) filtered = filtered.filter(i => !isDoneItem(i));
+            renderShowDoneSwitch('editor-show-done', hiddenDone);
+
             // Rank order by default (ranking FR-3); Target date / Effort on request
             filtered = sortByRank(roadmap, filtered);
             if (editorSort === 'date') filtered = filtered.slice().sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
@@ -2736,7 +2788,7 @@
                     <tr>
                         <td colspan="10" class="text-center py-12 text-slate-500">
                             <i class="ph ph-sliders text-3xl mb-1 text-slate-300"></i>
-                            <p class="font-medium text-xs">No deliverables match your search or filter.</p>
+                            <p class="font-medium text-xs">${hiddenDone ? `All ${pluralize(hiddenDone, 'matching deliverable')} ${hiddenDone === 1 ? 'is' : 'are'} done. <button type="button" onclick="toggleShowDone()" class="text-brand-700 font-bold hover:underline">Show done</button>` : 'No deliverables match your search or filter.'}</p>
                             <button onclick="openAddMilestoneModal()" class="editor-only mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
                                 <i class="ph-bold ph-plus"></i> Add new deliverable
                             </button>
@@ -4266,6 +4318,7 @@
         function onSprintsSnapshot(snap) {
             sprints = normalizeSprints(snap.data()?.sprints);
             renderTaskPanels();
+            if (sprintsViewOpen()) loadSprintBoard();
         }
         function canEditSprints() { return canEditWorkflow(); }
         function loadDemoSprints() {
@@ -4663,6 +4716,232 @@
             }, 'save the sprints');
         };
         ['sprint-gen-start', 'sprint-gen-weeks', 'sprint-gen-count', 'sprint-gen-name', 'sprint-gen-first'].forEach(id => document.getElementById(id)?.addEventListener('input', () => renderSprintsWindow()));
+
+        // =======================================================
+        // "SHOW DONE" SWITCH (2.10.0, specs/hide-done.md): Done deliverables hidden by default in the Editor and Roadmap lists
+        // =======================================================
+        const SHOW_DONE_KEY = 'mapit.showDone';
+        let showDone = false;
+        try { showDone = localStorage.getItem(SHOW_DONE_KEY) === 'on'; } catch (e) { /* private mode */ }
+        let timelineExplicitDone = false;       // the Roadmap Stage filter asks for Done: show them anyway
+        const isDoneItem = i => (i?.status || 'planned') === 'done';
+        window.toggleShowDone = function() {
+            showDone = !showDone;
+            try { localStorage.setItem(SHOW_DONE_KEY, showDone ? 'on' : 'off'); } catch (e) { /* private mode */ }
+            updateUI();
+        };
+        // Label "Show done (n)": n = done deliverables the current filters are hiding there
+        function renderShowDoneSwitch(id, hidden) {
+            const b = document.getElementById(id);
+            if (!b) return;
+            b.setAttribute('aria-checked', String(showDone));
+            b.className = `show-done-toggle inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-semibold whitespace-nowrap transition-colors ${showDone ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'} ${!showDone && !hidden ? 'opacity-60' : ''}`;
+            b.querySelector('.track')?.classList.toggle('bg-emerald-600', showDone);
+            b.querySelector('.track')?.classList.toggle('bg-slate-300', !showDone);
+            b.querySelector('.knob')?.classList.toggle('translate-x-3', showDone);
+            const label = b.querySelector('.label');
+            if (label) label.textContent = showDone || !hidden ? 'Show done' : `Show done (${hidden})`;
+        }
+
+        // =======================================================
+        // SPRINT VIEW (2.10.0, specs/sprint-view.md): one sprint's tasks across deliverables, as a board by status.
+        // One collection-group query on tasks (sprintId ==), filtered to live roadmaps / deliverables in the app.
+        // =======================================================
+        let svSprint = undefined;               // sprint id, 'NONE' (backlog), or undefined = pick the current one
+        let svScope = 'this', svPerson = 'ALL';
+        let svTasks = [], svLoaded = false, svError = '', svErrorLink = '';
+        let svUnsub = null, svKey = '';
+        const svOpenCols = new Set(['todo']);   // phones: which columns are open
+        let svDoneOpen = false;
+        const SV_COLS = ['todo', 'in-progress', 'blocked', 'done'];
+
+        function sprintsViewOpen() { return !document.getElementById('sprints-view')?.classList.contains('hidden'); }
+        function defaultSprintId() {
+            const today = phtToday();
+            return (currentSprint() || sprints.find(s => s.start > today) || sprints[sprints.length - 1])?.id || 'NONE';
+        }
+        function svSprintId() {
+            if (svSprint === undefined || (svSprint !== 'NONE' && !sprintById(svSprint))) svSprint = sprints.length ? defaultSprintId() : 'NONE';
+            return svSprint;
+        }
+        // Tasks of the selected sprint: Firestore listener (cloud) or the demo's in-memory tasks
+        function loadSprintBoard() {
+            const sid = svSprintId();
+            if (!useCloudPersistence) {
+                stopSprintBoard();
+                svTasks = [];
+                roadmaps.forEach(r => (r.items || []).forEach(item => (demoTasks.get(item.id) || []).forEach(t => {
+                    if (!t.deletedAt && (t.sprintId || 'NONE') === sid) svTasks.push({ ...t, key: `${r.id}/${item.id}/${t.id}`, roadmapId: r.id, milestoneId: item.id, src: t });
+                })));
+                svLoaded = true; svError = '';
+                renderSprintBoard();
+                return;
+            }
+            const key = sid;
+            if (svUnsub && svKey === key) { renderSprintBoard(); return; }
+            stopSprintBoard();
+            svKey = key; svLoaded = false; svError = ''; svErrorLink = '';
+            renderSprintBoard();
+            svUnsub = onSnapshot(query(collectionGroup(db, 'tasks'), where('sprintId', '==', sid === 'NONE' ? null : sid)), snap => {
+                const base = WORKSPACE_PATH.join('/') + '/roadmaps/';
+                svTasks = snap.docs.filter(d => d.ref.path.startsWith(base)).map(d => {
+                    const parts = d.ref.path.slice(base.length).split('/');   // rid / milestones / mid / tasks / tid
+                    return { ...d.data({ serverTimestamps: 'estimate' }), id: d.id, key: `${parts[0]}/${parts[2]}/${d.id}`, roadmapId: parts[0], milestoneId: parts[2] };
+                });
+                svLoaded = true; svError = '';
+                renderSprintBoard();
+            }, err => {
+                console.warn('Sprint board listener error:', err);
+                svLoaded = true;
+                if (err?.code === 'failed-precondition') {
+                    svError = 'The sprint board needs a one-time database setting (an index). Ask a MapIt admin to add it.';
+                    svErrorLink = isAdmin() ? (String(err.message || '').match(/https:\/\/console\.firebase\.google\.com\S+/)?.[0] || '') : '';
+                } else svError = navigator.onLine ? 'The sprint board is not available.' : 'The sprint board is not available offline.';
+                svUnsub = null; svKey = '';
+                renderSprintBoard();
+            });
+        }
+        function stopSprintBoard() { svUnsub?.(); svUnsub = null; svKey = ''; }
+
+        // The tasks that show: live roadmap + live deliverable + scope + person
+        function svVisibleTasks() {
+            const active = getActiveRoadmap();
+            const me = myEmail();
+            return svTasks.map(t => {
+                const roadmap = roadmaps.find(r => r.id === t.roadmapId);
+                const item = roadmap && !roadmap.deletedAt ? (roadmap.items || []).find(i => i.id === t.milestoneId) : null;
+                return item ? { ...t, roadmap, item } : null;
+            }).filter(t => t && !t.deletedAt
+                && (svScope === 'all' || t.roadmapId === active?.id)
+                && (svPerson === 'ALL' || (svPerson === 'NONE' ? !t.assignee?.email : t.assignee?.email === (svPerson === 'ME' ? me : svPerson))))
+              .sort((a, b) => (a.roadmapId === b.roadmapId ? rankOf(a.roadmap, a.item.id) - rankOf(b.roadmap, b.item.id) : a.roadmap.title.localeCompare(b.roadmap.title))
+                  || (a.orderKey ?? 0) - (b.orderKey ?? 0));
+        }
+        function canBoardStatus(t) {
+            if (!t.roadmap || t.roadmap.deletedAt) return false;
+            if (!useCloudPersistence) return !!currentUser;
+            return canEdit() || (!!t.assignee?.email && t.assignee.email === myEmail());
+        }
+
+        function renderSprintBoard() {
+            const box = document.getElementById('sprints-board');
+            if (!box || !sprintsViewOpen()) return;
+            const sid = svSprintId();
+            const sprint = sprintById(sid);
+            // Toolbar values
+            const sel = document.getElementById('sv-sprint');
+            if (sel) {
+                const cur = currentSprint();
+                const html = sprints.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} · ${escapeHtml(shortDate(s.start))} – ${escapeHtml(shortDate(s.end))}${cur?.id === s.id ? ' (current)' : ''}</option>`).join('') + '<option value="NONE">No sprint (backlog)</option>';
+                if (sel.dataset.html !== html) { sel.innerHTML = html; sel.dataset.html = html; }
+                sel.value = sid;
+            }
+            const idx = sprints.findIndex(s => s.id === sid);
+            document.getElementById('sv-prev')?.toggleAttribute('disabled', idx <= 0);
+            document.getElementById('sv-next')?.toggleAttribute('disabled', idx < 0 || idx >= sprints.length - 1);
+            document.querySelectorAll('#sv-scope [data-scope]').forEach(b => { const on = b.dataset.scope === svScope; b.setAttribute('aria-pressed', String(on)); b.className = `px-2.5 py-1 rounded-lg text-xs font-semibold ${on ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'}`; });
+            const ps = document.getElementById('sv-person');
+            if (ps) {
+                const html = `<option value="ALL">All people</option><option value="ME">Me (${escapeHtml(actor().name)})</option><option disabled>──────────</option>${activePeople().map(p => `<option value="${escapeHtml(p.email)}">${escapeHtml(p.name)}</option>`).join('')}<option value="NONE">Unassigned</option>`;
+                if (ps.dataset.html !== html) { ps.innerHTML = html; ps.dataset.html = html; }
+                ps.value = svPerson;
+            }
+            const summary = document.getElementById('sv-summary');
+            if (!svLoaded) { box.innerHTML = '<p class="py-16 text-center text-sm text-slate-500 italic">Loading the sprint…</p>'; if (summary) summary.innerHTML = ''; return; }
+            if (svError) {
+                box.innerHTML = `<div class="py-14 text-center text-sm text-slate-600 max-w-lg mx-auto"><i class="ph-bold ph-database text-3xl text-slate-300" aria-hidden="true"></i><p class="mt-1 font-semibold">${escapeHtml(svError)}</p>${svErrorLink ? `<p class="mt-2 text-xs"><a href="${escapeHtml(svErrorLink)}" target="_blank" rel="noopener noreferrer" class="text-brand-700 font-semibold hover:underline">Open Firebase to add the index ↗</a></p>` : ''}</div>`;
+                if (summary) summary.innerHTML = '';
+                return;
+            }
+            const list = svVisibleTasks();
+            const done = list.filter(t => t.status === 'done'), blocked = list.filter(t => t.status === 'blocked').length;
+            const pd = list.reduce((s, t) => s + (t.estimateDays || 0), 0), pdDone = done.reduce((s, t) => s + (t.estimateDays || 0), 0);
+            const pct = pd ? Math.round(pdDone / pd * 100) : list.length ? Math.round(done.length / list.length * 100) : 0;
+            if (summary) {
+                const today = phtToday();
+                const left = sprint && sprint.start <= today && today <= sprint.end ? Math.round((new Date(sprint.end + 'T00:00:00') - new Date(today + 'T00:00:00')) / 864e5) + 1 : null;
+                summary.innerHTML = `<b class="text-slate-900">${sprint ? `${escapeHtml(sprint.name)} · ${escapeHtml(shortDate(sprint.start))} – ${escapeHtml(shortDate(sprint.end))}` : 'No sprint (backlog)'}</b>
+                    ${left !== null ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200">current · ${pluralize(left, 'day')} left</span>` : ''}
+                    <span class="sv-counts text-slate-600">${pluralize(list.length, 'task')} · ${done.length} done${blocked ? ` · <span class="text-rose-700 font-semibold">${blocked} blocked</span>` : ''}${pd ? ` · ${fmtDays(pdDone)} of ${fmtDays(pd)} done` : ''}</span>
+                    <span class="flex items-center gap-1.5"><span class="w-32 h-1.5 rounded-full bg-slate-100 overflow-hidden" aria-hidden="true"><span class="block h-full bg-emerald-500" style="width:${pct}%"></span></span><span class="text-slate-500">${pct}%</span></span>`;
+            }
+            if (!sprints.length && sid === 'NONE' && !list.length) {
+                box.innerHTML = `<div class="py-16 text-center text-sm text-slate-500"><i class="ph-bold ph-kanban text-3xl text-slate-300" aria-hidden="true"></i><p class="font-bold text-slate-700 mt-1">No sprints yet</p>${canEditSprints() ? '<p class="text-xs mt-1"><button type="button" onclick="openSprintsWindow()" class="text-brand-700 font-semibold hover:underline">Set up sprints</button></p>' : '<p class="text-xs mt-1">A MapIt admin can set up the sprint calendar.</p>'}</div>`;
+                return;
+            }
+            if (!list.length) {
+                box.innerHTML = `<div class="py-16 text-center text-sm text-slate-500"><i class="ph-bold ph-kanban text-3xl text-slate-300" aria-hidden="true"></i><p class="font-bold text-slate-700 mt-1">No tasks in ${escapeHtml(sprint ? sprint.name : 'the backlog')}${svScope === 'this' ? ' for this roadmap' : ''}${svPerson !== 'ALL' ? ' for this person' : ''}</p>
+                    <p class="text-xs mt-1">${svScope === 'this' ? '<button type="button" onclick="setSprintScope(\'all\')" class="text-brand-700 font-semibold hover:underline">Show all roadmaps</button>, or add' : 'Add'} tasks from a deliverable's Tasks tab.</p></div>`;
+                return;
+            }
+            box.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">${SV_COLS.map(k => {
+                const [label] = TASK_STATUS[k];
+                const items = list.filter(t => t.status === k);
+                const p = items.reduce((s, t) => s + (t.estimateDays || 0), 0);
+                const phoneClosed = !svOpenCols.has(k);
+                const doneCollapsed = k === 'done' && items.length > 10 && !svDoneOpen;
+                return `<section class="sv-col bg-slate-100/70 rounded-2xl p-2 flex flex-col min-w-0 sm:min-h-[16rem]" data-col="${k}" aria-labelledby="sv-col-${k}">
+                    <h3 id="sv-col-${k}" class="flex items-center justify-between gap-2 px-1.5 pb-2 text-[11px] font-bold uppercase tracking-wider ${k === 'blocked' ? 'text-rose-700' : 'text-slate-600'}">
+                        <button type="button" onclick="toggleSprintColumn('${k}')" class="sm:pointer-events-none inline-flex items-center gap-1 uppercase tracking-wider" aria-expanded="${!phoneClosed}"><i class="ph-bold ${phoneClosed ? 'ph-caret-right' : 'ph-caret-down'} sm:hidden" aria-hidden="true"></i>${label} <span class="ml-1 px-1.5 rounded-full bg-white text-slate-700">${items.length}</span></button>
+                        <span class="normal-case tracking-normal font-semibold text-slate-500">${p ? fmtDays(p) : ''}</span></h3>
+                    <div class="sv-cards space-y-1.5 ${phoneClosed ? 'max-sm:hidden' : ''}">${doneCollapsed ? `<button type="button" onclick="toggleSprintDone()" class="w-full px-2 py-3 rounded-xl border border-dashed border-slate-300 text-xs font-semibold text-slate-600 hover:bg-white">Done (${items.length}) ▸</button>`
+                        : items.map(svCardHtml).join('') || '<p class="px-2 py-4 text-center text-[11px] text-slate-400 italic">Nothing here</p>'}</div>
+                </section>`;
+            }).join('')}</div>`;
+        }
+        function svCardHtml(t) {
+            const [label, cls, icon] = TASK_STATUS[t.status] || TASK_STATUS.todo;
+            const ok = canBoardStatus(t), key = escapeHtml(t.key);
+            return `<div class="sv-card bg-white rounded-xl border border-slate-200 p-2.5 shadow-xs hover:shadow-sm space-y-1.5" data-key="${key}" tabindex="0" onkeydown="if (event.key === 'Enter' && event.target === this) openSprintTask('${key}')">
+                <div class="flex items-start gap-2">
+                    <button type="button" class="task-status shrink-0 inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-full border text-[10px] font-bold ${cls} ${ok ? 'hover:shadow-sm' : 'opacity-70 cursor-default'}" ${ok ? `onclick="boardNextStatus('${key}')"` : 'disabled'} aria-label="Status: ${label}${ok ? ', change' : ''}" title="${ok ? 'Click: next status' : 'Only the assignee or an Editor can change this'}"><i class="ph-bold ${icon} text-xs" aria-hidden="true"></i>${label}</button>
+                    <button type="button" onclick="openSprintTask('${key}')" class="sv-title text-left text-xs font-semibold leading-snug break-words min-w-0 ${t.status === 'done' ? 'line-through text-slate-400' : 'text-slate-800 hover:text-brand-700'}">${escapeHtml(t.title)}</button>
+                </div>
+                <div class="flex items-center gap-1.5 text-[11px] text-slate-500 min-w-0"><i class="ph-bold ph-git-commit rotate-90 text-[10px] shrink-0" aria-hidden="true"></i><button type="button" onclick="openSprintTask('${key}')" class="sv-deliverable truncate hover:text-brand-700 hover:underline" title="${escapeHtml(t.item.name)}">${escapeHtml(t.item.name)}</button>${svScope === 'all' ? `<span class="sv-roadmap shrink-0 max-w-[8rem] truncate px-1.5 rounded bg-slate-100 text-[10px] font-semibold" title="${escapeHtml(t.roadmap.title)}">${escapeHtml(t.roadmap.title)}</span>` : ''}</div>
+                <div class="flex items-center gap-2 text-[11px]"><span class="${t.estimateDays ? 'text-slate-600' : 'text-slate-300'}">${t.estimateDays ? fmtDays(t.estimateDays) : '—'}</span>${t.link ? '<i class="ph-bold ph-link text-slate-400" aria-label="Has a link"></i>' : ''}<span class="ml-auto">${t.assignee?.email ? avatarHtml(t.assignee, 'Assignee', 'sm') : '<span class="w-5 h-5 rounded-full inline-flex items-center justify-center text-[9px] font-bold bg-slate-50 text-slate-400 border border-dashed border-slate-300" title="Unassigned" role="img" aria-label="Unassigned">–</span>'}</span></div>
+            </div>`;
+        }
+        // Toolbar actions
+        window.setSprintFromPicker = function(value) { svSprint = value || 'NONE'; loadSprintBoard(); };
+        window.stepSprint = function(dir) {
+            const i = sprints.findIndex(s => s.id === svSprintId());
+            const next = sprints[i + dir];
+            if (next) { svSprint = next.id; loadSprintBoard(); }
+        };
+        window.setSprintScope = function(scope) { svScope = scope === 'all' ? 'all' : 'this'; renderSprintBoard(); };
+        window.setSprintPerson = function(value) { svPerson = value || 'ALL'; renderSprintBoard(); };
+        window.toggleSprintColumn = function(k) { if (svOpenCols.has(k)) svOpenCols.delete(k); else svOpenCols.add(k); renderSprintBoard(); };
+        window.toggleSprintDone = function() { svDoneOpen = !svDoneOpen; renderSprintBoard(); };
+        window.boardNextStatus = async function(key) {
+            const t = svVisibleTasks().find(x => x.key === key);
+            if (!t || !canBoardStatus(t)) return;
+            const status = TASK_NEXT[t.status] || 'in-progress';
+            const data = { status, doneAt: status === 'done' ? (useCloudPersistence ? serverTimestamp() : new Date().toISOString()) : null };
+            const entry = auditEntry(t.roadmap, 'task.updated', { type: 'milestone', id: t.item.id, label: t.item.name }, [{ f: 'taskStatus', task: clip(t.title, 200), from: TASK_STATUS[t.status][0], to: TASK_STATUS[status][0] }]);
+            if (!useCloudPersistence) {
+                const src = (demoTasks.get(t.milestoneId) || []).find(x => x.id === t.id);
+                if (src) Object.assign(src, data);
+                logDemo(entry);
+                loadSprintBoard();
+                return;
+            }
+            const aid = newId('a');
+            const ok = await commitBatch(batch => {
+                batch.update(wsRef('roadmaps', t.roadmapId, 'milestones', t.milestoneId, 'tasks', t.id), { ...data, ...stamp(aid) });
+                batch.set(auditRef(aid), entry);
+            }, 'change the task status');
+            if (!ok) showSaveStatus('error', 'You can no longer change this task.');
+        };
+        // A card opens its deliverable on the Tasks tab with the task expanded (Viewers: the details window)
+        window.openSprintTask = function(key) {
+            const t = svVisibleTasks().find(x => x.key === key);
+            if (!t) return;
+            if (getActiveRoadmap()?.id !== t.roadmapId) selectRoadmap(t.roadmapId);
+            if (canEditActive()) { selectMilestoneForEdit(t.milestoneId); switchMilestoneSideTab('tasks'); }
+            else { openItemDetails(t.milestoneId); switchDetailTab('tasks'); }
+            taskOpenId = t.id;
+            renderTaskPanels();
+        };
 
         // ---- Edit window: what the user changed vs. what others changed meanwhile ----
         const EDIT_FIELDS = {
@@ -5246,7 +5525,7 @@
                             </div>
                             <p class="text-xs text-slate-500">
                                 Perspective: <strong class="text-brand-600">${perspectiveNames[activePerspective]}</strong> &nbsp;|&nbsp;
-                                Filter: <strong class="text-slate-700">${escapeHtml(activeSubfilter === 'ALL' ? 'All Deliverables' : activeSubfilter)}</strong>
+                                Filter: <strong class="text-slate-700">${escapeHtml(activeSubfilter === 'ALL' ? 'All Deliverables' : activeSubfilter)}</strong>${!showDone && !timelineExplicitDone && (activeRoadmap.items || []).some(isDoneItem) ? ' &nbsp;|&nbsp; Done deliverables hidden' : ''}
                             </p>
                         </div>
                         <div class="text-right">
@@ -6472,6 +6751,8 @@
             roadmapsReady = false;
             resetPeople();
             stopTasks();
+            stopSprintBoard();
+            svSprint = undefined;
             sprints = [];
             stopActivity();
             stopUnread();
