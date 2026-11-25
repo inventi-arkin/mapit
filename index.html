@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.8.0" data-released="2026-11-24">
+    <meta name="mapit-version" content="2.9.0" data-released="2026-11-25">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -87,6 +87,8 @@
         .milestone-tabs .tab-badge { font-size: 10px; font-weight: 700; padding: 0 .375rem; border-radius: 9999px; background: rgba(203, 213, 225, .8); color: #334155; }
         .milestone-tabs [aria-selected="true"] .tab-badge { background: #e0effe; color: #0359a1; }
         .milestone-tabs .tab-badge:empty { display: none; }
+        .milestone-tabs.grid-cols-4 [role="tab"] > i { display: none; }
+        .milestone-tabs.grid-cols-4 [role="tab"] { padding-left: .25rem; padding-right: .25rem; gap: .25rem; }
         /* Edit window labels: block with a 16 px line (inline labels took the 24 px body line and cost the 600 px fit) */
         #edit-detail-fields .space-y-1 > label, #edit-detail-fields .space-y-1 > span:first-child { display: block; line-height: 1rem; }
         /* No gap above the first row when the remote-change notice is hidden */
@@ -238,6 +240,9 @@
                     </button>
                     <button type="button" role="menuitem" id="workflow-btn" onclick="openWorkflowSettings()" class="hidden w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-flow-arrow text-base text-indigo-600" aria-hidden="true"></i> Workflow settings
+                    </button>
+                    <button type="button" role="menuitem" id="sprints-btn" onclick="openSprintsWindow()" class="hidden w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
+                        <i class="ph-bold ph-calendar-dots text-base text-indigo-600" aria-hidden="true"></i> Sprints
                     </button>
                     <button type="button" role="menuitem" id="private-roadmaps-btn" onclick="closeAccountMenu(); openPrivateRoadmapsModal()" class="hidden w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-lock-simple text-base text-brand-600" aria-hidden="true"></i> Private roadmaps
@@ -631,7 +636,7 @@
                 </button>
             </header>
             <div class="flex-1 min-h-0 overflow-y-auto md:overflow-hidden custom-scrollbar grid grid-cols-1 md:grid-cols-12 border-t border-slate-100">
-                <div id="detail-modal-main" class="md:col-span-7 md:min-h-0 md:overflow-y-auto custom-scrollbar px-6 py-3 space-y-3 text-xs">
+                <div id="detail-modal-main" class="md:col-span-6 md:min-h-0 md:overflow-y-auto custom-scrollbar px-6 py-3 space-y-3 text-xs">
                     <section id="modal-people-box">
                         <h4 class="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1.5">People</h4>
                         <div id="modal-people-list" class="flex flex-wrap items-center gap-x-4 gap-y-1.5"></div>
@@ -647,14 +652,18 @@
                     </section>
                     <div id="modal-linked-feedback-box"></div>
                 </div>
-                <aside class="md:col-span-5 flex flex-col md:min-h-0 bg-slate-50/80 border-t md:border-t-0 md:border-l border-slate-100 p-3">
-                    <div role="tablist" aria-label="Deliverable activity" id="detail-tabs" class="milestone-tabs grid grid-cols-2 gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold shrink-0">
+                <aside class="md:col-span-6 flex flex-col md:min-h-0 bg-slate-50/80 border-t md:border-t-0 md:border-l border-slate-100 p-3">
+                    <div role="tablist" aria-label="Deliverable activity" id="detail-tabs" class="milestone-tabs grid grid-cols-3 gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold shrink-0">
                         <button type="button" role="tab" id="detail-tab-stages" aria-controls="modal-stage-timeline" onclick="switchDetailTab('stages')"><i class="ph-bold ph-flow-arrow text-sm" aria-hidden="true"></i><span>Timeline</span><span id="detail-stage-pct" class="tab-badge"></span></button>
                         <button type="button" role="tab" id="detail-tab-logs" aria-controls="detail-history-panel" onclick="switchDetailTab('logs')"><i class="ph-bold ph-clock-counter-clockwise text-sm" aria-hidden="true"></i><span>History</span><span id="detail-history-count" class="tab-badge">0</span></button>
+                        <button type="button" role="tab" id="detail-tab-tasks" aria-controls="detail-tasks-panel" onclick="switchDetailTab('tasks')"><i class="ph-bold ph-list-checks text-sm" aria-hidden="true"></i><span>Tasks</span><span id="detail-tasks-count" class="tab-badge"></span></button>
                     </div>
                     <div id="modal-stage-timeline" role="tabpanel" aria-labelledby="detail-tab-stages" class="mt-3 max-h-[50vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1"></div>
                     <div id="detail-history-panel" role="tabpanel" aria-labelledby="detail-tab-logs" class="hidden mt-3 max-h-[50vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1">
                         <div id="detail-history-list" class="space-y-2 text-xs"></div>
+                    </div>
+                    <div id="detail-tasks-panel" role="tabpanel" aria-labelledby="detail-tab-tasks" class="hidden mt-3 max-h-[50vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                        <div id="detail-tasks-list" class="text-xs"></div>
                     </div>
                 </aside>
             </div>
@@ -666,6 +675,41 @@
                     <i class="ph-bold ph-pencil-simple"></i> <span id="details-edit-label">Edit</span>
                 </button>
             </footer>
+        </div>
+    </div>
+
+    <!-- Modal: Sprints (2.9.0, Admins): the workspace sprint calendar -->
+    <div id="sprints-modal" role="dialog" aria-modal="true" aria-labelledby="sprints-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4">
+        <div class="bg-white sm:rounded-2xl max-w-3xl w-full h-full sm:h-auto sm:max-h-[92vh] border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
+                <h3 id="sprints-title" class="text-sm font-black text-slate-900 flex items-center gap-2"><span class="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center" aria-hidden="true"><i class="ph-bold ph-calendar-dots"></i></span>Sprints <span class="text-[11px] font-semibold text-slate-500">· shared by every roadmap</span></h3>
+                <button type="button" onclick="closeSprintsWindow()" data-dialog-close aria-label="Close" class="text-slate-500 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100"><i class="ph-bold ph-x text-base"></i></button>
+            </div>
+            <div class="p-5 overflow-y-auto custom-scrollbar flex-1 grid grid-cols-1 md:grid-cols-5 gap-5 text-xs">
+                <div class="md:col-span-3 min-w-0">
+                    <table class="w-full">
+                        <thead class="text-[10px] uppercase tracking-wider text-slate-500"><tr><th class="text-left py-1">Name</th><th class="text-left">Start</th><th class="text-left">End</th><th></th><th></th></tr></thead>
+                        <tbody id="sprints-rows" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                    <button type="button" onclick="addSprintRow()" class="mt-2 text-[11px] font-semibold text-brand-700 hover:underline"><i class="ph-bold ph-plus" aria-hidden="true"></i> Add sprint</button>
+                </div>
+                <div class="md:col-span-2 rounded-xl border border-slate-200 p-3 space-y-2 bg-slate-50/60 self-start">
+                    <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Generate sprints</h4>
+                    <div><label for="sprint-gen-start" class="block text-[11px] font-semibold text-slate-600 mb-0.5">First start date</label><input type="date" id="sprint-gen-start" class="w-full px-2 py-1.5 border border-slate-200 rounded-lg bg-white"></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label for="sprint-gen-weeks" class="block text-[11px] font-semibold text-slate-600 mb-0.5">Length</label><select id="sprint-gen-weeks" class="w-full px-2 py-1.5 border border-slate-200 rounded-lg bg-white"><option value="1">1 week</option><option value="2" selected>2 weeks</option><option value="3">3 weeks</option><option value="4">4 weeks</option></select></div>
+                        <div><label for="sprint-gen-count" class="block text-[11px] font-semibold text-slate-600 mb-0.5">How many</label><input type="number" id="sprint-gen-count" min="1" max="26" value="6" class="w-full px-2 py-1.5 border border-slate-200 rounded-lg bg-white"></div>
+                    </div>
+                    <div><label for="sprint-gen-name" class="block text-[11px] font-semibold text-slate-600 mb-0.5">Names</label><div class="flex items-center gap-1"><input id="sprint-gen-name" value="Sprint {n}" maxlength="60" class="w-full px-2 py-1.5 border border-slate-200 rounded-lg bg-white"><span class="text-slate-500">from</span><input type="number" id="sprint-gen-first" aria-label="First number" min="0" value="1" class="w-16 px-2 py-1.5 border border-slate-200 rounded-lg bg-white"></div></div>
+                    <p class="text-[10px] text-slate-500">Preview: <span id="sprint-gen-preview"></span></p>
+                    <button type="button" onclick="generateSprints()" class="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 font-semibold hover:bg-slate-100">Add these sprints</button>
+                </div>
+            </div>
+            <div class="flex flex-wrap justify-between items-center gap-2 px-5 py-3 border-t border-slate-100 shrink-0">
+                <span class="text-[11px]"><span id="sprints-overlap" class="hidden text-amber-700"><i class="ph-bold ph-warning" aria-hidden="true"></i> Some sprints overlap. That's allowed, but check the dates.</span><span id="sprints-error" class="hidden text-rose-700"></span></span>
+                <span class="flex gap-2"><button type="button" onclick="closeSprintsWindow()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
+                <button type="button" onclick="saveSprints()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold">Save</button></span>
+            </div>
         </div>
     </div>
 
@@ -826,10 +870,11 @@
 
                 <!-- History / Timeline / Comments: one-line tabs; the open tab fills the height left and scrolls -->
                 <div class="md:col-span-5 bg-slate-50/80 border-t md:border-t-0 border-slate-100 p-3 flex flex-col md:min-h-0">
-                    <div role="tablist" aria-label="Milestone activity" id="milestone-tabs" class="milestone-tabs grid grid-cols-3 gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold shrink-0">
+                    <div role="tablist" aria-label="Milestone activity" id="milestone-tabs" class="milestone-tabs grid grid-cols-4 gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold shrink-0">
                         <button type="button" role="tab" id="tab-btn-logs" aria-controls="milestone-logs-panel" onclick="switchMilestoneSideTab('logs')"><i class="ph-bold ph-clock-counter-clockwise text-sm" aria-hidden="true"></i><span>History</span><span id="milestone-history-count" class="tab-badge">0</span></button>
                         <button type="button" role="tab" id="tab-btn-stages" aria-controls="milestone-stages-panel" onclick="switchMilestoneSideTab('stages')"><i class="ph-bold ph-flow-arrow text-sm" aria-hidden="true"></i><span>Timeline</span><span id="milestone-stage-pct" class="tab-badge"></span></button>
                         <button type="button" role="tab" id="tab-btn-comments" aria-controls="milestone-comments-panel" onclick="switchMilestoneSideTab('comments')"><i class="ph-bold ph-chat-teardrop-text text-sm" aria-hidden="true"></i><span>Comments</span><span id="milestone-comments-count" class="tab-badge">0</span></button>
+                        <button type="button" role="tab" id="tab-btn-tasks" aria-controls="milestone-tasks-panel" onclick="switchMilestoneSideTab('tasks')"><i class="ph-bold ph-list-checks text-sm" aria-hidden="true"></i><span>Tasks</span><span id="milestone-tasks-count" class="tab-badge"></span></button>
                     </div>
 
                     <div id="milestone-logs-panel" role="tabpanel" aria-labelledby="tab-btn-logs" class="mt-3 max-h-[60vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1">
@@ -843,6 +888,11 @@
 
                     <div id="milestone-comments-panel" role="tabpanel" aria-labelledby="tab-btn-comments" class="hidden mt-3 max-h-[60vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1">
                         <div id="milestone-comments-list" class="space-y-2.5 text-xs"></div>
+                    </div>
+
+                    <!-- 2.9.0: the deliverable's tasks -->
+                    <div id="milestone-tasks-panel" role="tabpanel" aria-labelledby="tab-btn-tasks" class="hidden mt-3 max-h-[60vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                        <div id="milestone-tasks-list" class="text-xs"></div>
                     </div>
 
                     <!-- Comment box, pinned under the Comments list -->
@@ -1883,6 +1933,7 @@
                 roleLine.classList.toggle('hidden', !text);
             }
             document.getElementById('workflow-btn')?.classList.toggle('hidden', !canEditWorkflow());
+            document.getElementById('sprints-btn')?.classList.toggle('hidden', !canEditSprints());
             const binCount = binEntries().length;
             const binVisible = !!myRole && (canEdit() || binCount > 0);
             document.getElementById('recycle-bin-btn')?.classList.toggle('hidden', !binVisible);
@@ -2025,6 +2076,7 @@
             useCloudPersistence = false;
             await establishUserSession('alex.morgan@workspace.com', 'Alex Morgan (Demo)', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80');
             loadDemoPeople();
+            loadDemoSprints();
             updateUI();
             hideLoginGate();
         };
@@ -3637,7 +3689,9 @@
                 }, err => console.warn('Details history listener error:', err));
             }
             renderDetailHistory();
+            startTasks(activeRoadmap, item);
             switchDetailTab('stages');
+            renderTaskPanels();
 
             if (detailModal) detailModal.classList.remove('hidden');
             // "Show more" only when the description is actually cut
@@ -3663,12 +3717,13 @@
             if (count) count.textContent = entries.length + (item.legacyHistory || item.history || []).length;
         }
         window.switchDetailTab = function(tab) {
-            [['stages', 'detail-tab-stages', 'modal-stage-timeline'], ['logs', 'detail-tab-logs', 'detail-history-panel']].forEach(([id, btn, panel]) => {
+            [['stages', 'detail-tab-stages', 'modal-stage-timeline'], ['logs', 'detail-tab-logs', 'detail-history-panel'], ['tasks', 'detail-tab-tasks', 'detail-tasks-panel']].forEach(([id, btn, panel]) => {
                 document.getElementById(btn)?.setAttribute('aria-selected', String(id === tab));
                 document.getElementById(btn)?.setAttribute('tabindex', id === tab ? '0' : '-1');
                 document.getElementById(panel)?.classList.toggle('hidden', id !== tab);
             });
             if (tab === 'stages') scrollToCurrentStage('modal-stage-timeline');
+            if (tab === 'tasks') renderTaskPanels();
         };
         window.toggleDetailDescription = function() {
             const desc = document.getElementById('modal-description');
@@ -3684,6 +3739,7 @@
 
         window.closeModal = function() {
             stopDetailHistory();
+            if (document.getElementById('edit-milestone-modal')?.classList.contains('hidden')) stopTasks();
             if (detailModal) detailModal.classList.add('hidden');
         };
 
@@ -3718,7 +3774,7 @@
 
         window.switchMilestoneSideTab = function(tab) {
             activeMilestoneSideTab = tab;
-            [['logs', 'tab-btn-logs', 'milestone-logs-panel'], ['stages', 'tab-btn-stages', 'milestone-stages-panel'], ['comments', 'tab-btn-comments', 'milestone-comments-panel']].forEach(([id, btn, panel]) => {
+            [['logs', 'tab-btn-logs', 'milestone-logs-panel'], ['stages', 'tab-btn-stages', 'milestone-stages-panel'], ['comments', 'tab-btn-comments', 'milestone-comments-panel'], ['tasks', 'tab-btn-tasks', 'milestone-tasks-panel']].forEach(([id, btn, panel]) => {
                 const b = document.getElementById(btn);
                 b?.setAttribute('aria-selected', String(id === tab));
                 b?.setAttribute('tabindex', id === tab ? '0' : '-1');
@@ -3726,6 +3782,7 @@
             });
             document.getElementById('milestone-comment-input-box')?.classList.toggle('hidden', tab !== 'comments');
             if (tab === 'stages') { renderOpenTimelines(); scrollToCurrentStage('milestone-stages-panel'); }
+            if (tab === 'tasks') renderTaskPanels();
             // Comments read like a chat: open at the newest, next to the comment box
             if (tab === 'comments') requestAnimationFrame(() => { const p = document.getElementById('milestone-comments-panel'); if (p) p.scrollTop = p.scrollHeight; });
         };
@@ -3746,6 +3803,14 @@
                 if (c.f === 'source') return c.to ? `Source changed to "${c.to}"` : 'Source removed';
                 if (c.f === 'feedback') return String(c.to).startsWith('+') ? `Linked feedback "${String(c.to).slice(1)}"` : `Unlinked feedback "${String(c.to).slice(1)}"`;
                 if (c.f === 'rank') return `Rank changed from #${c.from} to #${c.to}`;
+                if (c.f === 'taskStatus') return `Task "${c.task}": ${c.from} → ${c.to}`;
+                if (c.f === 'taskTitle') return `Task renamed: "${c.from}" → "${c.to}"`;
+                if (c.f === 'taskAssignee') return c.to === '—' ? `Task "${c.task}": unassigned` : `Task "${c.task}": assigned to ${c.to}`;
+                if (c.f === 'taskSprint') return `Task "${c.task}": moved to ${c.to}`;
+                if (c.f === 'taskEstimate') return `Task "${c.task}": estimate ${c.to}`;
+                if (c.f === 'taskNotes') return `Task "${c.task}": notes updated`;
+                if (c.f === 'taskLink') return `Task "${c.task}": link ${c.to}`;
+                if (c.f === 'taskOrder') return 'Reordered tasks';
                 if (c.f === 'owner') return c.to === '—' ? `Owner removed (was ${c.from})` : c.from === '—' ? `Owner set to ${c.to}` : `Owner: ${c.from} → ${c.to}`;
                 if (c.f === 'team') return String(c.to).startsWith('+') ? `Added ${String(c.to).slice(1)} to the team` : `Removed ${String(c.to).slice(1)} from the team`;
                 if (c.f === 'stage') return `Stage: ${c.from || '—'} → ${c.to}`;
@@ -3761,6 +3826,12 @@
                 case 'milestone.updated': return changes.length ? changes.map(line) : ['Milestone updated'];
                 case 'milestone.deleted': return ['Milestone deleted'];
                 case 'comment.added': return ['Added comment'];
+                case 'task.created': return [`Added task "${changes[0]?.to || ''}"`];
+                case 'task.updated': case 'task.reordered': return changes.length ? changes.map(line) : ['Task updated'];
+                case 'task.deleted': return [`Moved task "${changes[0]?.to || ''}" to the Recycle Bin`];
+                case 'task.restored': return [`Restored task "${changes[0]?.to || ''}"`];
+                case 'task.purged': return [`Removed task "${changes[0]?.to || ''}" for good`];
+                case 'workspace.sprints_changed': return [`Sprint calendar: ${changes[0]?.to || 'changed'}`];
                 case 'feedback.created': return ['Feedback added'].concat(changes.map(c => `${FIELD_LABELS[c.f] || c.f}: ${c.to}`));
                 case 'feedback.updated': return changes.length ? changes.map(line) : ['Feedback updated'];
                 case 'roadmap.moved': return ['Moved into the shared workspace'];
@@ -4164,6 +4235,435 @@
             renderPersonFilters();
         }
 
+        // =======================================================
+        // TASKS PER DELIVERABLE + SPRINT CALENDAR (2.9.0, specs/deliverable-tasks.md)
+        // Tasks live in roadmaps/{rid}/milestones/{mid}/tasks and load only while that deliverable's window is open.
+        // =======================================================
+        const TASK_STATUS = {
+            todo: ['To do', 'bg-white border-slate-300 text-slate-500', 'ph-circle'],
+            'in-progress': ['In progress', 'bg-brand-50 border-brand-300 text-brand-700', 'ph-circle-half'],
+            blocked: ['Blocked', 'bg-rose-50 border-rose-300 text-rose-700', 'ph-prohibit'],
+            done: ['Done', 'bg-emerald-50 border-emerald-300 text-emerald-700', 'ph-check-circle']
+        };
+        const TASK_NEXT = { todo: 'in-progress', 'in-progress': 'done', done: 'todo', blocked: 'in-progress' };
+        let sprints = [];                       // [{ id, name, start: 'YYYY-MM-DD', end }] by start date
+        let taskState = { mid: null, roadmapId: null, tasks: [], loaded: false, error: '' };
+        let taskUnsub = null;
+        let taskOpenId = null, taskMenuId = null, taskFilter = 'ALL', taskDeletedOpen = false;
+        const demoTasks = new Map();            // demo mode: milestone id -> tasks
+
+        // ---- Sprints ----
+        function phtToday() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date()); }
+        function currentSprint() { const t = phtToday(); return sprints.find(s => s.start <= t && t <= s.end) || null; }
+        function sprintById(id) { return id ? sprints.find(s => s.id === id) || null : null; }
+        function sprintShort(s) { const n = String(s.name).match(/\d+/); return n ? 'S' + n[0] : String(s.name).slice(0, 4); }
+        function shortDate(ymd) { return ymd ? new Date(ymd + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''; }
+        function normalizeSprints(list) {
+            return (Array.isArray(list) ? list : []).filter(s => s?.id && s.start && s.end)
+                .map(s => ({ id: String(s.id), name: clip(s.name || 'Sprint', 80), start: String(s.start), end: String(s.end) }))
+                .sort((a, b) => a.start.localeCompare(b.start) || a.name.localeCompare(b.name));
+        }
+        function onSprintsSnapshot(snap) {
+            sprints = normalizeSprints(snap.data()?.sprints);
+            renderTaskPanels();
+        }
+        function canEditSprints() { return canEditWorkflow(); }
+        function loadDemoSprints() {
+            const d = new Date(phtToday() + 'T00:00:00');
+            d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 14);      // Monday two weeks ago
+            const ymd = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+            sprints = Array.from({ length: 6 }, (_, i) => {
+                const s = new Date(d); s.setDate(d.getDate() + i * 14);
+                const e = new Date(s); e.setDate(s.getDate() + 11);
+                return { id: `sp-demo-${i}`, name: `Sprint ${23 + i}`, start: ymd(s), end: ymd(e) };
+            });
+        }
+
+        // ---- Loading the open deliverable's tasks ----
+        const taskRef = id => wsRef('roadmaps', taskState.roadmapId, 'milestones', taskState.mid, 'tasks', id);
+        function startTasks(roadmap, item) {
+            if (taskState.mid === item.id && taskState.roadmapId === roadmap.id) return;
+            stopTasks();
+            taskState = { mid: item.id, roadmapId: roadmap.id, tasks: [], loaded: false, error: '' };
+            if (!useCloudPersistence || roadmap.isPreview) {
+                if (!demoTasks.has(item.id)) demoTasks.set(item.id, []);
+                taskState.tasks = demoTasks.get(item.id);
+                taskState.loaded = true;
+                return;
+            }
+            taskUnsub = onSnapshot(wsCollection('roadmaps', roadmap.id, 'milestones', item.id, 'tasks'), snap => {
+                taskState.tasks = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id }));
+                taskState.loaded = true;
+                taskState.error = '';
+                purgeExpiredTasks();
+                renderTaskPanels();
+            }, err => {
+                console.warn('Tasks listener error:', err);
+                taskState.loaded = true;
+                taskState.error = navigator.onLine ? 'Tasks are not available.' : 'Tasks are not available offline.';
+                renderTaskPanels();
+            });
+        }
+        function stopTasks() {
+            taskUnsub?.();
+            taskUnsub = null;
+            taskState = { mid: null, roadmapId: null, tasks: [], loaded: false, error: '' };
+            taskOpenId = null; taskMenuId = null; taskFilter = 'ALL'; taskDeletedOpen = false;
+        }
+        function openTaskItem() { return getActiveRoadmap()?.items.find(i => i.id === taskState.mid) || null; }
+        const liveTasks = () => taskState.tasks.filter(t => !t.deletedAt).sort((a, b) => (a.orderKey ?? 0) - (b.orderKey ?? 0) || toMillis(a.createdAt) - toMillis(b.createdAt));
+        const binnedTasks = () => taskState.tasks.filter(t => t.deletedAt && !isExpired(t));
+        function canTaskStatus(t) { return canEditActive() || (!!t.assignee?.email && t.assignee.email === myEmail() && !getActiveRoadmap()?.deletedAt); }
+
+        // ---- Rendering (Edit window: milestone-tasks-list; details window: detail-tasks-list) ----
+        function taskStatusHtml(t) {
+            const [label, cls, icon] = TASK_STATUS[t.status] || TASK_STATUS.todo;
+            const ok = canTaskStatus(t), id = escapeHtml(t.id);
+            return `<span class="relative shrink-0 inline-flex items-center">
+                <button type="button" class="task-status inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-full border text-[10px] font-bold ${cls} ${ok ? 'hover:shadow-sm' : 'opacity-80 cursor-default'}" ${ok ? `onclick="event.stopPropagation(); cycleTaskStatus('${id}')"` : 'disabled'} aria-label="Status: ${label}${ok ? ', change' : ''}" title="${ok ? 'Click: next status · ▾ all statuses' : 'Only the assignee or an Editor can change this'}"><i class="ph-bold ${icon} text-xs" aria-hidden="true"></i>${label}</button>
+                ${ok ? `<button type="button" class="ml-0.5 text-slate-400 hover:text-slate-700" onclick="event.stopPropagation(); toggleTaskMenu('${id}')" aria-label="All statuses" aria-expanded="${taskMenuId === t.id}"><i class="ph-bold ph-caret-down text-[10px]" aria-hidden="true"></i></button>` : ''}
+                ${taskMenuId === t.id ? `<span class="absolute left-0 top-full mt-1 z-20 w-36 bg-white border border-slate-200 rounded-lg shadow-lg py-1" role="menu">${Object.entries(TASK_STATUS).map(([k, [l, , ic]]) => `<button type="button" role="menuitem" onclick="event.stopPropagation(); setTaskStatus('${id}', '${k}')" class="w-full flex items-center gap-2 px-2.5 py-1.5 text-[11px] font-semibold hover:bg-slate-50 ${k === t.status ? 'text-brand-700' : 'text-slate-700'}"><i class="ph-bold ${ic}" aria-hidden="true"></i>${l}</button>`).join('')}</span>` : ''}
+            </span>`;
+        }
+        function taskSprintChip(t) {
+            const s = sprintById(t.sprintId);
+            if (!s) return '<span class="shrink-0 text-[10px] text-slate-400 italic">No sprint</span>';
+            const cur = currentSprint()?.id === s.id;
+            return `<span class="task-sprint shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${cur ? 'bg-brand-50 text-brand-700 border border-brand-200' : 'bg-slate-100 text-slate-600'}" title="${escapeHtml(`${s.name} · ${shortDate(s.start)} – ${shortDate(s.end)}${cur ? ' (current)' : ''}`)}">${cur ? '<span class="w-1.5 h-1.5 rounded-full bg-brand-500" aria-hidden="true"></span>' : ''}${escapeHtml(sprintShort(s))}</span>`;
+        }
+        function taskFormHtml(t, item) {
+            const ed = canEditActive(), id = escapeHtml(t.id), dis = ed ? '' : 'disabled';
+            const field = 'w-full px-2 py-1 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none disabled:bg-slate-50';
+            const lbl = 'block text-[10px] font-semibold text-slate-600 mb-0.5';
+            const onItem = [item?.owner, ...(item?.team || [])].filter(r => r?.email).map(r => r.email);
+            const people = activePeople();
+            const opt = p => `<option value="${escapeHtml(p.email)}" ${t.assignee?.email === p.email ? 'selected' : ''}>${escapeHtml(p.name)}${p.email === myEmail() ? ' (you)' : ''}</option>`;
+            const assigneeMissing = t.assignee?.email && !people.some(p => p.email === t.assignee.email);
+            const cur = currentSprint();
+            return `<div class="task-form px-2.5 pb-2.5 pt-1.5 grid grid-cols-6 gap-2 border-t border-slate-100" onclick="event.stopPropagation()">
+                <div class="col-span-6"><label class="${lbl}" for="task-title-${id}">Title</label><input id="task-title-${id}" data-task-field="title" class="${field}" maxlength="200" value="${escapeHtml(t.title)}" ${dis} onchange="saveTaskField('${id}', 'title', this.value)"></div>
+                <div class="col-span-3"><label class="${lbl}" for="task-assignee-${id}">Assignee</label><select id="task-assignee-${id}" data-task-field="assignee" class="${field}" ${dis} onchange="saveTaskField('${id}', 'assignee', this.value)">
+                    <option value="">Unassigned</option>
+                    ${assigneeMissing ? `<option value="${escapeHtml(t.assignee.email)}" selected>${escapeHtml(personOf(t.assignee).name)} (no access)</option>` : ''}
+                    <optgroup label="On this deliverable">${people.filter(p => onItem.includes(p.email)).map(opt).join('')}</optgroup>
+                    <optgroup label="Everyone else">${people.filter(p => !onItem.includes(p.email)).map(opt).join('')}</optgroup></select></div>
+                <div class="col-span-2"><label class="${lbl}" for="task-sprint-${id}">Sprint</label><select id="task-sprint-${id}" data-task-field="sprintId" class="${field}" ${dis} onchange="saveTaskField('${id}', 'sprintId', this.value)">
+                    <option value="">No sprint</option>${sprints.map(s => `<option value="${escapeHtml(s.id)}" ${t.sprintId === s.id ? 'selected' : ''}>${escapeHtml(s.name)}${cur?.id === s.id ? ' (current)' : ''}</option>`).join('')}</select></div>
+                <div class="col-span-1"><label class="${lbl}" for="task-est-${id}">Estimate</label><input id="task-est-${id}" data-task-field="estimateDays" type="number" step="0.5" min="0.5" max="999" placeholder="pd" class="${field}" value="${t.estimateDays ?? ''}" ${dis} onchange="saveTaskField('${id}', 'estimateDays', this.value)"></div>
+                <div class="col-span-6"><label class="${lbl}" for="task-notes-${id}">Notes</label><textarea id="task-notes-${id}" data-task-field="notes" rows="2" maxlength="2000" class="${field} resize-none" ${dis} onchange="saveTaskField('${id}', 'notes', this.value)">${escapeHtml(t.notes || '')}</textarea></div>
+                <div class="col-span-6 flex items-end gap-2"><div class="flex-1"><label class="${lbl}" for="task-link-${id}">Link</label><input id="task-link-${id}" data-task-field="link" type="url" maxlength="500" placeholder="https://…" class="${field}" value="${escapeHtml(t.link || '')}" ${dis} onchange="saveTaskField('${id}', 'link', this.value)"></div>
+                    ${t.link ? `<a href="${escapeHtml(t.link)}" target="_blank" rel="noopener noreferrer" class="mb-1 text-[11px] font-semibold text-brand-700 hover:underline whitespace-nowrap">Open ↗</a>` : ''}</div>
+                <p id="task-error-${id}" class="hidden col-span-6 text-[11px] text-rose-700"></p>
+                <div class="col-span-6 flex items-center justify-between pt-0.5"><span class="text-[10px] text-slate-500">${ed ? 'Saved when you leave a field · ' : ''}Added by ${escapeHtml(t.createdBy?.name || 'Member')}${t.createdAt ? ` · ${escapeHtml(shortDay(t.createdAt))}` : ''}</span>
+                    ${ed ? `<span class="flex items-center gap-0.5"><button type="button" onclick="moveTask('${id}', -1)" class="p-1 rounded hover:bg-slate-100 text-slate-500" title="Move up" aria-label="Move up"><i class="ph-bold ph-arrow-up" aria-hidden="true"></i></button><button type="button" onclick="moveTask('${id}', 1)" class="p-1 rounded hover:bg-slate-100 text-slate-500" title="Move down" aria-label="Move down"><i class="ph-bold ph-arrow-down" aria-hidden="true"></i></button>
+                        <button type="button" onclick="deleteTask('${id}')" class="ml-1 px-2 py-1 rounded-lg text-rose-600 hover:bg-rose-50 text-[11px] font-semibold"><i class="ph-bold ph-trash" aria-hidden="true"></i> Delete</button></span>` : ''}</div>
+            </div>`;
+        }
+        function taskRowHtml(t, item) {
+            const open = taskOpenId === t.id, id = escapeHtml(t.id);
+            return `<div class="task-row rounded-lg border ${open ? 'border-brand-200 bg-white shadow-sm' : 'border-transparent hover:bg-white'}" data-task-id="${id}">
+                <div class="flex items-center gap-2 px-2 py-1.5 cursor-pointer" role="button" tabindex="0" aria-expanded="${open}" onclick="toggleTaskOpen('${id}')" onkeydown="taskRowKey(event, '${id}')">
+                    ${taskStatusHtml(t)}
+                    <span class="task-title flex-1 min-w-0 truncate text-xs ${t.status === 'done' ? 'line-through text-slate-400' : 'font-semibold text-slate-800'}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
+                    ${t.link ? '<i class="ph-bold ph-link text-slate-400 shrink-0" title="Has a link" aria-label="Has a link"></i>' : ''}
+                    ${taskSprintChip(t)}
+                    <span class="shrink-0 w-10 text-right text-[11px] ${t.estimateDays ? 'text-slate-600' : 'text-slate-300'}">${t.estimateDays ? fmtDays(t.estimateDays) : '—'}</span>
+                    ${t.assignee?.email ? avatarHtml(t.assignee, 'Assignee', 'sm') : '<span class="w-5 h-5 rounded-full inline-flex items-center justify-center text-[9px] font-bold bg-slate-50 text-slate-400 border border-dashed border-slate-300 shrink-0" title="Unassigned" role="img" aria-label="Unassigned">–</span>'}
+                </div>
+                ${open ? taskFormHtml(t, item) : ''}
+            </div>`;
+        }
+        function tasksPanelHtml(item, where) {
+            if (!taskState.loaded) return '<p class="py-6 text-center text-xs text-slate-500 italic">Loading tasks…</p>';
+            if (taskState.error) return `<p class="py-6 text-center text-xs text-slate-500 italic">${escapeHtml(taskState.error)}</p>`;
+            const all = liveTasks(), cur = currentSprint();
+            const shown = all.filter(t => taskFilter === 'ALL' ? true : taskFilter === 'CUR' ? !!cur && t.sprintId === cur.id : taskFilter === 'NONE' ? !sprintById(t.sprintId) : t.sprintId === taskFilter);
+            const done = shown.filter(t => t.status === 'done'), blocked = shown.filter(t => t.status === 'blocked').length;
+            const pd = shown.reduce((s, t) => s + (t.estimateDays || 0), 0), pdDone = done.reduce((s, t) => s + (t.estimateDays || 0), 0);
+            const totalPd = all.reduce((s, t) => s + (t.estimateDays || 0), 0), effort = effortOf(item);
+            const ed = canEditActive();
+            const filter = `<select id="${where}-task-filter" aria-label="Filter tasks by sprint" onchange="setTaskFilter(this.value)" class="px-2 py-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-700">
+                <option value="ALL">All sprints</option><option value="CUR" ${cur ? '' : 'disabled'}>Current sprint${cur ? ` (${escapeHtml(sprintShort(cur))})` : ''}</option>
+                ${sprints.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('')}<option value="NONE">No sprint</option></select>`;
+            const emptyMsg = all.length ? 'No tasks in this sprint.' : ed ? 'No tasks yet. Add the first one below.' : 'No tasks yet.';
+            const bin = binnedTasks();
+            return `<div class="flex items-center justify-between gap-2 mb-1.5 text-[11px] text-slate-600">
+                    <span class="task-summary"><b class="text-slate-800">${done.length} of ${shown.length} done</b>${blocked ? ` · <span class="text-rose-700 font-semibold">${blocked} blocked</span>` : ''}${pd ? ` · ${fmtDays(pdDone)} of ${fmtDays(pd)} done` : ''}</span>${filter}</div>
+                ${effort || totalPd ? `<div class="task-effort mb-1.5 text-[11px] ${effort && totalPd > effort ? 'text-amber-700' : 'text-slate-500'}">Tasks: ${fmtDays(totalPd)}${effort ? ` of ${fmtDays(effort)} effort` : ''}</div>` : ''}
+                ${!sprints.length && canEditSprints() ? '<p class="mb-1.5 text-[11px] text-slate-500">No sprints yet. <button type="button" onclick="openSprintsWindow()" class="font-semibold text-brand-700 hover:underline">Set up sprints</button></p>' : ''}
+                <div class="space-y-0.5">${shown.map(t => taskRowHtml(t, item)).join('') || `<p class="py-5 text-center text-xs text-slate-500 italic">${emptyMsg}</p>`}</div>
+                ${ed ? `<div class="mt-1.5 flex items-center gap-2 px-2 py-1.5 rounded-lg border border-dashed border-slate-300 bg-white focus-within:border-brand-400"><i class="ph-bold ph-plus text-slate-400" aria-hidden="true"></i><input id="${where}-task-add" aria-label="Add task" maxlength="200" class="task-add flex-1 text-xs outline-none bg-transparent" placeholder="Add task… (Enter)${cur ? ` · goes to ${escapeHtml(cur.name)} (current)` : ''}" onkeydown="if (event.key === 'Enter') { event.preventDefault(); addTask(this); }"></div>` : ''}
+                ${bin.length ? `<div class="mt-3 border-t border-slate-200 pt-2"><button type="button" onclick="toggleDeletedTasks()" aria-expanded="${taskDeletedOpen}" class="task-bin-toggle text-[11px] font-semibold text-slate-500 hover:text-slate-800"><i class="ph-bold ${taskDeletedOpen ? 'ph-caret-down' : 'ph-caret-right'}" aria-hidden="true"></i> Deleted tasks (${bin.length})</button>
+                    ${taskDeletedOpen ? bin.map(t => `<div class="task-binned mt-1 flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-100/70 text-xs" data-task-id="${escapeHtml(t.id)}"><i class="ph-bold ph-trash text-slate-400" aria-hidden="true"></i><span class="flex-1 min-w-0 truncate text-slate-600" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
+                        <span class="shrink-0 text-[10px] text-slate-500">by ${escapeHtml(t.deletedBy?.name || 'Member')} · ${pluralize(Math.max(0, Math.ceil((toMillis(t.purgeAt) - Date.now()) / DAY_MS)), 'day')} left</span>
+                        ${ed ? `<button type="button" onclick="restoreTask('${escapeHtml(t.id)}')" class="shrink-0 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[11px] font-semibold hover:bg-slate-50">Restore</button>` : ''}
+                        ${isAdmin() || (!useCloudPersistence && ed) ? `<button type="button" onclick="purgeTask('${escapeHtml(t.id)}')" class="shrink-0 px-2 py-0.5 rounded-md text-[11px] font-semibold text-rose-600 hover:bg-rose-50">Delete forever</button>` : ''}</div>`).join('') : ''}</div>` : ''}`;
+        }
+        function renderTaskPanels() {
+            const item = openTaskItem();
+            [['milestone-tasks-list', 'edit', 'edit-milestone-modal', 'milestone-tasks-count'], ['detail-tasks-list', 'detail', 'detail-modal', 'detail-tasks-count']].forEach(([listId, where, modalId, countId]) => {
+                const list = document.getElementById(listId);
+                const count = document.getElementById(countId);
+                const visible = !!item && !document.getElementById(modalId)?.classList.contains('hidden');
+                if (count) { const all = liveTasks(); count.textContent = visible && taskState.loaded ? (all.length ? `${all.filter(t => t.status === 'done').length}/${all.length}` : '0') : ''; }
+                if (!list || !visible) return;
+                // Don't redraw under someone typing in a task field; the save redraws
+                const active = document.activeElement;
+                if (active && list.contains(active) && active.matches('[data-task-field]')) return;
+                const addValue = document.getElementById(`${where}-task-add`)?.value || '';
+                const addFocused = active?.id === `${where}-task-add`;
+                const scroller = list.closest('[role="tabpanel"]');
+                const top = scroller?.scrollTop || 0;
+                list.innerHTML = tasksPanelHtml(item, where);
+                const filter = document.getElementById(`${where}-task-filter`);
+                if (filter) filter.value = taskFilter;
+                const add = document.getElementById(`${where}-task-add`);
+                if (add) { add.value = addValue; if (addFocused) add.focus(); }
+                if (scroller) scroller.scrollTop = top;
+            });
+        }
+
+        // ---- Interactions ----
+        window.setTaskFilter = function(value) { taskFilter = value || 'ALL'; renderTaskPanels(); };
+        window.toggleTaskOpen = function(id) { taskOpenId = taskOpenId === id ? null : id; taskMenuId = null; renderTaskPanels(); };
+        window.toggleTaskMenu = function(id) { taskMenuId = taskMenuId === id ? null : id; renderTaskPanels(); };
+        window.toggleDeletedTasks = function() { taskDeletedOpen = !taskDeletedOpen; renderTaskPanels(); };
+        window.taskRowKey = function(e, id) {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTaskOpen(id); }
+            else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && canEditActive()) { e.preventDefault(); moveTask(id, e.key === 'ArrowUp' ? -1 : 1); }
+        };
+        document.addEventListener('click', e => {
+            if (taskMenuId && !e.target.closest('[role="menu"]')) { taskMenuId = null; renderTaskPanels(); }
+        });
+
+        // One write + its audit entry (target = the deliverable, so its History and Activity "Mine" pick it up)
+        async function writeTasks(action, changes, ops, label = 'save the task') {
+            const roadmap = getActiveRoadmap(), item = openTaskItem();
+            if (!roadmap || !item) return false;
+            const entry = auditEntry(roadmap, action, { type: 'milestone', id: item.id, label: item.name }, changes);
+            if (!useCloudPersistence || roadmap.isPreview) {
+                ops.forEach(op => {
+                    if (op.kind === 'set') taskState.tasks.push({ ...op.data, id: op.id });
+                    else if (op.kind === 'update') Object.assign(taskState.tasks.find(t => t.id === op.id) || {}, op.data);
+                    else if (op.kind === 'delete') { const i = taskState.tasks.findIndex(t => t.id === op.id); if (i >= 0) taskState.tasks.splice(i, 1); }
+                });
+                logDemo(entry);
+                renderTaskPanels();
+                if (selectedMilestoneId === item.id) renderMilestoneActivity(item);
+                if (detailItemId === item.id && !document.getElementById('detail-modal')?.classList.contains('hidden')) renderDetailHistory();
+                return true;
+            }
+            const purge = ops.find(op => op.kind === 'delete');
+            const aid = purge ? `purge-task-${purge.id}` : newId('a');
+            return commitBatch(batch => {
+                ops.forEach(op => {
+                    if (op.kind === 'set') batch.set(taskRef(op.id), { ...op.data, createdAt: serverTimestamp(), ...stamp(aid) });
+                    else if (op.kind === 'update') batch.update(taskRef(op.id), { ...op.data, ...stamp(aid) });
+                    else batch.delete(taskRef(op.id));
+                });
+                batch.set(auditRef(aid), entry);
+            }, label);
+        }
+        const taskById = id => taskState.tasks.find(t => t.id === id);
+        const taskLabel = t => clip(t?.title || 'Task', 200);
+
+        window.addTask = async function(input) {
+            const title = (input?.value || '').trim();
+            if (!title || !canEditActive() || !taskState.mid) return;
+            input.value = '';
+            const keys = liveTasks().map(t => t.orderKey ?? 0);
+            const data = { title: clip(title, 200), status: 'todo', assignee: null, sprintId: currentSprint()?.id || null, estimateDays: null, notes: '', link: '',
+                orderKey: (keys.length ? Math.max(...keys) : 0) + 1000, createdBy: actor(), deletedAt: null };
+            if (!useCloudPersistence) data.createdAt = new Date().toISOString();
+            const boxId = input.id;
+            await writeTasks('task.created', [{ f: 'task', to: data.title }], [{ kind: 'set', id: newId('t'), data }], 'add the task');
+            document.getElementById(boxId)?.focus();   // the list was redrawn; focus the new box
+        };
+        window.cycleTaskStatus = function(id) { const t = taskById(id); if (t) setTaskStatus(id, TASK_NEXT[t.status] || 'in-progress'); };
+        window.setTaskStatus = async function(id, status) {
+            const t = taskById(id);
+            taskMenuId = null;
+            if (!t || !canTaskStatus(t) || !TASK_STATUS[status] || t.status === status) { renderTaskPanels(); return; }
+            const data = { status, doneAt: status === 'done' ? (useCloudPersistence ? serverTimestamp() : new Date().toISOString()) : null };
+            const ok = await writeTasks('task.updated', [{ f: 'taskStatus', task: taskLabel(t), from: TASK_STATUS[t.status][0], to: TASK_STATUS[status][0] }], [{ kind: 'update', id, data }], 'change the task status');
+            if (!ok) showSaveStatus('error', 'You can no longer change this task.');
+        };
+        window.saveTaskField = async function(id, field, raw) {
+            const t = taskById(id);
+            if (!t || !canEditActive()) return;
+            const err = document.getElementById(`task-error-${CSS.escape ? id : id}`);
+            const fail = msg => { if (err) { err.textContent = msg; err.classList.remove('hidden'); } };
+            let value, change;
+            if (field === 'title') {
+                value = clip(String(raw).trim(), 200);
+                if (!value) { fail('A task needs a title.'); renderTaskPanels(); return; }
+                if (value === t.title) return;
+                change = { f: 'taskTitle', task: taskLabel(t), from: taskLabel(t), to: value };
+            } else if (field === 'assignee') {
+                value = raw ? personRef(raw) : null;
+                if ((value?.email || '') === (t.assignee?.email || '')) return;
+                change = { f: 'taskAssignee', task: taskLabel(t), to: value ? value.name : '—' };
+            } else if (field === 'sprintId') {
+                value = raw || null;
+                if (value === (t.sprintId || null)) return;
+                change = { f: 'taskSprint', task: taskLabel(t), to: sprintById(value)?.name || 'No sprint' };
+            } else if (field === 'estimateDays') {
+                const s = String(raw).trim();
+                if (s !== '' && !validEffort(s)) { fail('Estimate: 0.5 to 999 person-days, in steps of 0.5.'); return; }
+                value = s === '' ? null : Number(s);
+                if (value === (t.estimateDays ?? null)) return;
+                change = { f: 'taskEstimate', task: taskLabel(t), to: value ? fmtDays(value) : '—' };
+            } else if (field === 'notes') {
+                value = clip(String(raw), 2000);
+                if (value === (t.notes || '')) return;
+                change = { f: 'taskNotes', task: taskLabel(t) };
+            } else if (field === 'link') {
+                value = String(raw).trim();
+                if (value && !/^https:\/\/\S+$/i.test(value)) { fail('Links must start with https://'); return; }
+                value = clip(value, 500);
+                if (value === (t.link || '')) return;
+                change = { f: 'taskLink', task: taskLabel(t), to: value ? 'set' : 'removed' };
+            } else return;
+            document.activeElement?.blur?.();
+            await writeTasks('task.updated', [change], [{ kind: 'update', id, data: { [field]: value } }]);
+            renderTaskPanels();
+        };
+        window.moveTask = async function(id, dir) {
+            if (!canEditActive()) return;
+            const list = liveTasks(), i = list.findIndex(t => t.id === id), j = i + dir;
+            if (i < 0 || j < 0 || j >= list.length) return;
+            const a = list[i], b = list[j];
+            const ka = a.orderKey ?? i * 1000, kb = b.orderKey ?? j * 1000;
+            await writeTasks('task.reordered', [{ f: 'taskOrder', task: taskLabel(a) }], [{ kind: 'update', id: a.id, data: { orderKey: kb } }, { kind: 'update', id: b.id, data: { orderKey: ka === kb ? ka - dir : ka } }], 'reorder the tasks');
+        };
+        window.deleteTask = async function(id) {
+            const t = taskById(id);
+            if (!t || !canEditActive()) return;
+            const ok = await confirmAction({ title: 'Delete task', messageHtml: `Delete <strong>"${escapeHtml(t.title)}"</strong>? It moves to Deleted tasks for 30 days and can be restored.`, confirmLabel: 'Delete' });
+            if (!ok) return;
+            taskOpenId = null;
+            const done = await writeTasks('task.deleted', [{ f: 'task', to: taskLabel(t) }], [{ kind: 'update', id, data: { deletedAt: deletedNow(), deletedBy: actor(), purgeAt: purgeAtValue() } }], 'delete the task');
+            if (done) showUndo(`"${t.title}" moved to Deleted tasks.`, () => restoreTask(id));
+        };
+        window.restoreTask = async function(id) {
+            const t = taskById(id);
+            if (!t || !canEditActive()) return;
+            await writeTasks('task.restored', [{ f: 'task', to: taskLabel(t) }], [{ kind: 'update', id, data: binFieldsCleared() }], 'restore the task');
+        };
+        window.purgeTask = async function(id, quiet = false) {
+            const t = taskById(id);
+            if (!t || !(isAdmin() || (!useCloudPersistence && canEditActive()))) return;
+            if (!quiet && !(await confirmAction({ title: 'Delete task forever', messageHtml: `Remove <strong>"${escapeHtml(t.title)}"</strong> for good? This can't be undone.`, confirmLabel: 'Delete forever' }))) return;
+            await writeTasks('task.purged', [{ f: 'task', to: taskLabel(t) }], [{ kind: 'delete', id }], 'remove the task');
+        };
+        // Admin sessions remove tasks whose 30 days are over (as for the Recycle Bin)
+        function purgeExpiredTasks() {
+            if (!isAdmin() || !useCloudPersistence) return;
+            taskState.tasks.filter(t => t.deletedAt && isExpired(t)).forEach(t => purgeTask(t.id, true));
+        }
+
+        // ---- Sprints window (Admins; demo can try it) ----
+        let sprintsDraft = [];
+        window.openSprintsWindow = function() {
+            closeAccountMenu();
+            if (!canEditSprints()) return;
+            sprintsDraft = sprints.map(s => ({ ...s }));
+            const gs = document.getElementById('sprint-gen-start');
+            if (gs) {
+                const last = sprintsDraft[sprintsDraft.length - 1];
+                const next = last ? new Date(last.end + 'T00:00:00') : new Date(phtToday() + 'T00:00:00');
+                next.setDate(next.getDate() + (last ? 1 : 0));
+                while (next.getDay() !== 1) next.setDate(next.getDate() + 1);     // a Monday
+                gs.value = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+                const n = last ? (parseInt(String(last.name).match(/\d+/)?.[0], 10) || 0) + 1 : 1;
+                document.getElementById('sprint-gen-first').value = String(n);
+            }
+            renderSprintsWindow();
+            document.getElementById('sprints-modal')?.classList.remove('hidden');
+        };
+        window.closeSprintsWindow = function() { document.getElementById('sprints-modal')?.classList.add('hidden'); };
+        function sprintOverlaps() {
+            const list = sprintsDraft.slice().sort((a, b) => a.start.localeCompare(b.start));
+            return list.some((s, i) => i > 0 && s.start <= list[i - 1].end);
+        }
+        function renderSprintsWindow() {
+            const body = document.getElementById('sprints-rows');
+            if (!body) return;
+            const today = phtToday();
+            sprintsDraft.sort((a, b) => (a.start || '9').localeCompare(b.start || '9'));
+            body.innerHTML = sprintsDraft.map((s, i) => {
+                const cur = s.start && s.end && s.start <= today && today <= s.end;
+                return `<tr class="${cur ? 'bg-brand-50/50' : ''}" data-sprint-id="${escapeHtml(s.id)}">
+                    <td class="py-1.5 pr-2"><input aria-label="Sprint name" maxlength="80" class="w-full px-2 py-1 border border-slate-200 rounded-lg text-xs" value="${escapeHtml(s.name)}" oninput="editSprint(${i}, 'name', this.value)"></td>
+                    <td class="pr-2"><input type="date" aria-label="Start" class="w-full px-2 py-1 border border-slate-200 rounded-lg text-xs" value="${escapeHtml(s.start)}" onchange="editSprint(${i}, 'start', this.value)"></td>
+                    <td class="pr-2"><input type="date" aria-label="End" class="w-full px-2 py-1 border border-slate-200 rounded-lg text-xs" value="${escapeHtml(s.end)}" onchange="editSprint(${i}, 'end', this.value)"></td>
+                    <td class="text-[10px] font-bold whitespace-nowrap">${cur ? '<span class="text-brand-700">current</span>' : s.end && s.end < today ? '<span class="text-slate-400 font-normal">past</span>' : ''}</td>
+                    <td class="text-right"><button type="button" onclick="removeSprint(${i})" class="p-1 text-slate-400 hover:text-rose-600" aria-label="Remove ${escapeHtml(s.name)}"><i class="ph-bold ph-trash" aria-hidden="true"></i></button></td></tr>`;
+            }).join('') || '<tr><td colspan="5" class="py-6 text-center text-slate-500 italic">No sprints yet. Add one or generate a series.</td></tr>';
+            document.getElementById('sprints-overlap')?.classList.toggle('hidden', !sprintOverlaps());
+            document.getElementById('sprints-error')?.classList.add('hidden');
+            const preview = document.getElementById('sprint-gen-preview');
+            if (preview) { const g = generatedSprints(); preview.textContent = g.length ? `${g.slice(0, 3).map(s => `${s.name} (${shortDate(s.start)} – ${shortDate(s.end)})`).join(', ')}${g.length > 3 ? ` … ${g.length} sprints` : ''}` : 'Nothing to add: those dates are already covered.'; }
+        }
+        window.editSprint = function(i, key, value) { if (sprintsDraft[i]) { sprintsDraft[i][key] = value; if (key !== 'name') renderSprintsWindow(); else document.getElementById('sprints-overlap')?.classList.toggle('hidden', !sprintOverlaps()); } };
+        window.addSprintRow = function() {
+            const last = sprintsDraft[sprintsDraft.length - 1];
+            sprintsDraft.push({ id: newId('sp'), name: `Sprint ${sprintsDraft.length + 1}`, start: '', end: '' });
+            renderSprintsWindow();
+            document.querySelector('#sprints-rows tr:last-child input')?.focus();
+        };
+        window.removeSprint = async function(i) {
+            const s = sprintsDraft[i];
+            if (!s) return;
+            const ok = await confirmAction({ title: 'Remove sprint', messageHtml: `Remove <strong>${escapeHtml(s.name)}</strong>? Tasks in this sprint will show "No sprint". This takes effect when you save.`, confirmLabel: 'Remove' });
+            if (!ok) return;
+            sprintsDraft.splice(i, 1);
+            renderSprintsWindow();
+        };
+        function generatedSprints() {
+            const start = document.getElementById('sprint-gen-start')?.value;
+            const weeks = Math.min(4, Math.max(1, parseInt(document.getElementById('sprint-gen-weeks')?.value, 10) || 2));
+            const count = Math.min(26, Math.max(1, parseInt(document.getElementById('sprint-gen-count')?.value, 10) || 1));
+            const pattern = document.getElementById('sprint-gen-name')?.value || 'Sprint {n}';
+            const first = parseInt(document.getElementById('sprint-gen-first')?.value, 10) || 1;
+            if (!start) return [];
+            const ymd = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+            const out = [];
+            const d = new Date(start + 'T00:00:00');
+            for (let i = 0; i < count; i++) {
+                const s = new Date(d); s.setDate(d.getDate() + i * weeks * 7);
+                const e = new Date(s); e.setDate(s.getDate() + weeks * 7 - (s.getDay() === 1 ? 3 : 1));   // Monday start: ends on Friday
+                const sprint = { id: newId('sp'), name: clip(pattern.includes('{n}') ? pattern.replace('{n}', String(first + i)) : `${pattern} ${first + i}`, 80), start: ymd(s), end: ymd(e) };
+                if (!sprintsDraft.some(x => x.start && x.end && x.start <= sprint.end && sprint.start <= x.end)) out.push(sprint);
+            }
+            return out;
+        }
+        window.previewSprints = function() { renderSprintsWindow(); };
+        window.generateSprints = function() { sprintsDraft.push(...generatedSprints()); renderSprintsWindow(); };
+        window.saveSprints = async function() {
+            if (!canEditSprints()) return;
+            const err = document.getElementById('sprints-error');
+            const bad = sprintsDraft.find(s => !String(s.name).trim() || !s.start || !s.end || s.start > s.end);
+            if (bad) { err.textContent = `Check "${bad.name || 'Unnamed sprint'}": it needs a name, and a start date on or before its end date.`; err.classList.remove('hidden'); return; }
+            const next = normalizeSprints(sprintsDraft.map(s => ({ ...s, name: String(s.name).trim() })));
+            const before = new Map(sprints.map(s => [s.id, s]));
+            const added = next.filter(s => !before.has(s.id)).length;
+            const removed = sprints.filter(s => !next.some(n => n.id === s.id)).length;
+            const changed = next.filter(s => before.has(s.id) && JSON.stringify(before.get(s.id)) !== JSON.stringify(s)).length;
+            closeSprintsWindow();
+            if (!added && !removed && !changed) return;
+            const summary = [added && `${added} added`, removed && `${removed} removed`, changed && `${changed} changed`].filter(Boolean).join(', ');
+            const entry = auditEntry(null, 'workspace.sprints_changed', { type: 'workspace', id: 'sprints', label: 'Sprint calendar' }, [{ f: 'sprints', to: summary }]);
+            if (!useCloudPersistence) { sprints = next; logDemo(entry); renderTaskPanels(); return; }
+            const aid = newId('a');
+            await commitBatch(batch => {
+                batch.set(wsRef('settings', 'sprints'), { sprints: next, ...stamp(aid) });
+                batch.set(auditRef(aid), entry);
+            }, 'save the sprints');
+        };
+        ['sprint-gen-start', 'sprint-gen-weeks', 'sprint-gen-count', 'sprint-gen-name', 'sprint-gen-first'].forEach(id => document.getElementById(id)?.addEventListener('input', () => renderSprintsWindow()));
+
         // ---- Edit window: what the user changed vs. what others changed meanwhile ----
         const EDIT_FIELDS = {
             name: 'detail-item-name', module: 'detail-item-module', date: 'detail-item-date', status: 'detail-item-status',
@@ -4354,6 +4854,8 @@
                 }, panelError));
             }
             if (activeRoadmap.isPreview) item.isPreviewItem = true;
+            startTasks(activeRoadmap, item);
+            renderTaskPanels();
             shownCommentCount = 0;
             renderMilestoneActivity(item);
             switchMilestoneSideTab('logs');
@@ -4393,6 +4895,7 @@
         }
 
         window.closeEditMilestoneModal = function() {
+            stopTasks();
             toggleFeedbackPicker(false);
             togglePeoplePicker(false);
             selectedMilestoneId = null;
@@ -5861,6 +6364,7 @@
         function startWorkspaceListeners() {
             stopAllListeners();
             sessionUnsubs.push(onSnapshot(wsRef('members', myEmail()), onMyMemberChanged, onListenerError));
+            sessionUnsubs.push(onSnapshot(wsRef('settings', 'sprints'), onSprintsSnapshot, err => console.warn('Sprint calendar unavailable:', err)));
             sessionUnsubs.push(onSnapshot(wsCollection('people'), onPeopleSnapshot, err => console.warn('People directory unavailable:', err)));
             sessionUnsubs.push(onSnapshot(wsRef('settings', 'workflow'), onWorkflowSnapshot, err => console.warn('Workflow settings unavailable, using the default workflow:', err)));
             return subscribeRoadmaps();
@@ -5967,6 +6471,8 @@
             closeFeedbackPanel(false);
             roadmapsReady = false;
             resetPeople();
+            stopTasks();
+            sprints = [];
             stopActivity();
             stopUnread();
         }
@@ -7177,7 +7683,7 @@
             if (/\.(deleted|restored|purged)$/.test(a)) return 'bin';
             if (a.startsWith('member.') || a.startsWith('workspace.')) return 'people';
             if (a.startsWith('comment.')) return 'comment';
-            if (a.startsWith('milestone.')) return 'milestone';
+            if (a.startsWith('milestone.') || a.startsWith('task.')) return 'milestone';
             if (a.startsWith('feedback.')) return 'feedback';
             return 'roadmap';
         }
@@ -7223,6 +7729,12 @@
             let text;
             switch (e.action) {
                 case 'milestone.created': text = `${who} added milestone ${q(label)}`; break;
+                case 'task.created': text = `${who} added task ${q(changes[0]?.to)} to ${q(label)}`; break;
+                case 'task.updated': case 'task.reordered': text = `${who} updated ${q(label)}: ${escapeHtml(describeAudit(e)[0] || 'task changed')}`; break;
+                case 'task.deleted': text = `${who} moved task ${q(changes[0]?.to)} of ${q(label)} to the Recycle Bin`; break;
+                case 'task.restored': text = `${who} restored task ${q(changes[0]?.to)} of ${q(label)}`; break;
+                case 'task.purged': text = `${who} removed task ${q(changes[0]?.to)} of ${q(label)} for good`; break;
+                case 'workspace.sprints_changed': text = `${who} changed the sprint calendar (${escapeHtml(changes[0]?.to || '')})`; break;
                 case 'feedback.created': text = `${who} added feedback ${q(label)}`; break;
                 case 'roadmap.created': text = `${who} created roadmap ${q(label)}`; break;
                 case 'milestone.updated':
