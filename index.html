@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.10.1" data-released="2026-11-26">
+    <meta name="mapit-version" content="2.11.0" data-released="2026-11-26">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -80,6 +80,38 @@
         body:not(.can-add-feedback) .feedback-add-only {
             display: none !important;
         }
+        /* 2.11.0 (R-2): one control size: 32 px (40 px on phones), rounded-xl, text-xs */
+        .ctl { height: 2rem; padding-left: .75rem; padding-right: .75rem; border-radius: .75rem; font-size: .75rem; line-height: 1rem; display: inline-flex; align-items: center; gap: .375rem; white-space: nowrap; }
+        select.ctl { padding-right: 1.75rem; }
+        .ctl-icon { width: 2rem; padding: 0; justify-content: center; }
+        .ctl-quiet { border: 1px solid #e2e8f0; background: #f8fafc; color: #334155; font-weight: 600; }
+        .ctl-quiet:hover { background: #f1f5f9; }
+        .ctl-primary { background: #0270c7; color: #fff; font-weight: 600; box-shadow: 0 1px 2px rgba(2, 112, 199, .2); }
+        .ctl-primary:hover { background: #0359a1; }
+        @media (max-width: 639px) { .ctl { height: 2.5rem; } .ctl-icon { width: 2.5rem; } }
+        /* Filters (2.11.0, D-4 / R-6): Roadmap = popover under "Filters" on desktop; every filter group = bottom sheet on phones */
+        @media (min-width: 640px) {
+            .filter-pop { position: absolute; right: 0; top: calc(100% + .5rem); z-index: 40; width: 18rem; background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; box-shadow: 0 10px 25px -5px rgba(15, 23, 42, .18); padding: .75rem; display: flex; flex-direction: column; gap: .5rem; }
+            .filter-pop.hidden { display: none; }
+        }
+        @media (max-width: 639px) {
+            .filter-sheet:not(.hidden) { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto; z-index: 60; display: flex; flex-direction: column; align-items: stretch; gap: .75rem; background: #fff; border-radius: 1rem 1rem 0 0; padding: 1.25rem 1rem calc(1rem + env(safe-area-inset-bottom)); box-shadow: 0 -10px 30px rgba(15, 23, 42, .2); max-height: 85vh; overflow-y: auto; }
+            .filter-sheet:not(.hidden) select, .filter-sheet:not(.hidden) .sw { width: 100%; max-width: none; }
+        }
+        /* Roadmap ⚙ menu items */
+        .rm-item { width: 100%; display: flex; align-items: center; gap: .5rem; padding: .5rem .75rem; font-weight: 600; color: #334155; outline: none; text-align: left; }
+        .rm-item:hover, .rm-item:focus { background: #f8fafc; }
+        .rm-item > i { font-size: 1rem; color: #64748b; }
+        .rm-item.text-rose-600 > i { color: inherit; }
+        /* R-5: one switch (Show done, Show load, Mine) */
+        .sw { display: inline-flex; align-items: center; gap: .5rem; height: 2rem; padding: 0 .65rem; border-radius: .75rem; border: 1px solid #e2e8f0; background: #fff; font-size: .75rem; font-weight: 600; color: #475569; white-space: nowrap; }
+        .sw:hover { background: #f8fafc; }
+        .sw .track { position: relative; width: 1.75rem; height: 1rem; border-radius: 9999px; background: #cbd5e1; transition: background-color .15s; flex-shrink: 0; }
+        .sw .knob { position: absolute; top: 2px; left: 2px; width: .75rem; height: .75rem; border-radius: 9999px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s; }
+        .sw[aria-checked="true"] { border-color: #bae0fd; background: #f0f7ff; color: #0359a1; }
+        .sw[aria-checked="true"] .track { background: #0270c7; }
+        .sw[aria-checked="true"] .knob { transform: translateX(.75rem); }
+        @media (max-width: 639px) { .sw { height: 2.5rem; } }
         /* Milestone windows (2.7.0): one-line segmented tabs with a count / % badge */
         .milestone-tabs [role="tab"] { display: flex; align-items: center; justify-content: center; gap: .375rem; padding: .375rem .5rem; border-radius: .5rem; color: #475569; white-space: nowrap; min-width: 0; }
         .milestone-tabs [role="tab"]:hover { color: #0f172a; }
@@ -184,8 +216,6 @@
             <div>
                 <h1 class="text-sm font-extrabold text-slate-900 tracking-tight flex items-center gap-1.5">
                     Map It
-                    <span class="hidden sm:inline text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200">Roadmap</span>
-                    <span data-app-version class="text-[10px] font-semibold text-slate-500"></span>
                 </h1>
             </div>
         </div>
@@ -199,26 +229,22 @@
                 <i class="ph ph-sliders text-sm"></i> Editor
             </button>
             <button id="nav-feedback" onclick="switchView('feedback')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
-                <i class="ph ph-chat-centered-text text-sm"></i> <span class="hidden lg:inline">Feedback & Suggestions</span><span class="lg:hidden">Feedback</span>
+                <i class="ph ph-chat-centered-text text-sm"></i> Feedback
                 <span id="nav-feedback-count" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700 font-bold ml-0.5">0</span>
-            </button>
-            <span class="role-editor-only contents">
-                <button id="nav-activity" onclick="switchView('activity')" aria-label="Activity" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
-                    <i class="ph ph-clock-counter-clockwise text-sm"></i> Activity
-                    <span id="nav-activity-count" class="hidden px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500 text-white font-bold ml-0.5"></span>
-                </button>
-            </span>
-            <button id="nav-sprints" onclick="switchView('sprints')" aria-label="Sprints" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
-                <i class="ph ph-kanban text-sm"></i> Sprints
             </button>
         </nav>
 
-        <!-- Right Side: account and New Roadmap (the roadmap selector is in the Roadmaps bar) -->
+        <!-- Right side (2.11.0): Activity bell + account. New roadmap is in the roadmap dropdown -->
         <div class="flex items-center gap-2">
+            <button type="button" id="activity-bell" onclick="toggleActivityPanel()" aria-label="Activity" aria-haspopup="dialog" aria-expanded="false" aria-controls="activity-view" title="Activity"
+                class="role-editor-only relative w-8 h-8 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300">
+                <i class="ph-bold ph-bell text-base" aria-hidden="true"></i>
+                <span id="nav-activity-count" class="hidden absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold leading-4 text-center"></span>
+            </button>
             <!-- Account chip + menu: who you are, your role, Users (admins), Private roadmaps, Sign out -->
             <div class="relative" id="account-menu-wrap">
                 <button type="button" id="header-user-badge" onclick="toggleAccountMenu()" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu" title="Account"
-                    class="flex items-center gap-2 px-2.5 py-1.5 bg-slate-100/90 hover:bg-slate-200/80 rounded-xl border border-slate-200 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300">
+                    class="h-8 flex items-center gap-2 px-2 bg-slate-100/90 hover:bg-slate-200/80 rounded-xl border border-slate-200 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300">
                     <span class="relative shrink-0 flex items-center justify-center">
                         <img id="header-user-avatar" src="" alt="" class="hidden w-6 h-6 rounded-full object-cover border border-slate-200">
                         <span id="header-user-initials" class="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px] font-black uppercase shadow-2xs">U</span>
@@ -238,11 +264,12 @@
                         <i class="ph-bold ph-user-focus text-base text-brand-600" aria-hidden="true"></i> My deliverables
                         <span id="account-mine-count" class="ml-auto text-[10px] font-bold px-1.5 rounded-full bg-brand-50 text-brand-700"></span>
                     </button>
+                    <p id="account-workspace-label" class="hidden px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-t border-slate-100 mt-1">Workspace</p>
                     <button type="button" role="menuitem" id="users-btn" onclick="closeAccountMenu(); openUsersModal()" class="admin-only w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-users-three text-base text-indigo-600" aria-hidden="true"></i> Users
                     </button>
                     <button type="button" role="menuitem" id="workflow-btn" onclick="openWorkflowSettings()" class="hidden w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
-                        <i class="ph-bold ph-flow-arrow text-base text-indigo-600" aria-hidden="true"></i> Workflow settings
+                        <i class="ph-bold ph-flow-arrow text-base text-indigo-600" aria-hidden="true"></i> Workflow
                     </button>
                     <button type="button" role="menuitem" id="sprints-btn" onclick="openSprintsWindow()" class="hidden w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-calendar-dots text-base text-indigo-600" aria-hidden="true"></i> Sprints
@@ -258,13 +285,9 @@
                     <button type="button" role="menuitem" id="account-signout" onclick="closeAccountMenu(); handleSignOut()" class="w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-sign-out text-base" aria-hidden="true"></i> Sign out
                     </button>
+                    <p class="px-3 pt-1.5 pb-0.5 border-t border-slate-100 mt-1 text-[10px] text-slate-400">MapIt <span data-app-version></span></p>
                 </div>
             </div>
-
-            <!-- New Roadmap Button -->
-            <button onclick="openNewRoadmapModal()" aria-label="New Roadmap" class="role-editor-only flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold shadow-sm shadow-brand-500/20 transition-all">
-                <i class="ph-bold ph-plus"></i> <span class="hidden md:inline">New Roadmap</span>
-            </button>
 
         </div>
     </header>
@@ -274,34 +297,30 @@
         <!-- Read-only / preview notices and the private-roadmaps banner -->
         <div id="workspace-notices" class="hidden max-w-6xl mx-auto w-full flex flex-col gap-2 mb-3 shrink-0"></div>
 
-        <!-- Roadmaps bar (2.1.2, R-11): the one roadmap selector, shown on every tab; PDF / Add / Delete only on the Roadmap tab -->
-        <div id="roadmaps-bar" class="max-w-6xl mx-auto w-full mb-4 bg-white rounded-2xl border border-slate-200 p-2.5 shadow-sm shrink-0 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <div class="flex items-center gap-2 min-w-0 flex-1 basis-[22rem]">
-                <label for="roadmap-select" class="hidden sm:flex text-xs font-bold uppercase tracking-wider text-slate-500 px-2 items-center gap-1 shrink-0">
-                    <i class="ph-bold ph-folder"></i> Roadmaps:
-                </label>
-                <div class="relative flex items-center min-w-0 flex-1 sm:flex-none">
-                    <select id="roadmap-select" aria-label="Active roadmap" onchange="selectRoadmap(this.value)" class="w-full sm:w-auto sm:min-w-56 sm:max-w-sm truncate text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 rounded-xl pl-3 pr-8 py-1.5 appearance-none cursor-pointer outline-none focus:border-brand-500">
-                        <!-- Populated dynamically -->
-                    </select>
-                    <i class="ph-bold ph-caret-down absolute right-3 pointer-events-none text-slate-500 text-[10px]" aria-hidden="true"></i>
-                </div>
-                <span id="roadmap-select-progress" class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 shrink-0 whitespace-nowrap"></span>
+        <!-- Roadmaps bar (2.11.0, D-1 / D-3): the roadmap dropdown (with "+ New roadmap"), progress, and ⚙ Roadmap settings, on every tab -->
+        <div id="roadmaps-bar" class="max-w-6xl mx-auto w-full mb-3 sm:mb-4 bg-white rounded-2xl border border-slate-200 px-2.5 py-2 shadow-sm shrink-0 flex items-center gap-2">
+            <div class="relative flex items-center min-w-0 flex-1 sm:flex-none">
+                <select id="roadmap-select" aria-label="Active roadmap" onchange="onRoadmapSelect(this)" class="ctl w-full sm:w-auto sm:min-w-64 sm:max-w-sm truncate font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 pl-3 pr-8 appearance-none cursor-pointer outline-none focus:border-brand-500">
+                    <!-- Populated dynamically -->
+                </select>
+                <i class="ph-bold ph-caret-down absolute right-3 pointer-events-none text-slate-500 text-[10px]" aria-hidden="true"></i>
             </div>
-
-            <div id="roadmap-bar-actions" class="flex flex-wrap items-center gap-2 shrink-0">
-                <button id="capacity-btn" onclick="openCapacityModal()" title="Monthly capacity" aria-label="Capacity" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-xs">
-                    <i class="ph-bold ph-gauge text-sm text-brand-600"></i> <span class="hidden sm:inline">Capacity</span>
-                </button>
-                <button id="export-pdf-btn" onclick="exportRoadmapPDF()" title="Export Roadmap as PDF" aria-label="Export Roadmap as PDF" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-xs">
-                    <i class="ph-bold ph-file-pdf text-sm text-rose-600"></i> <span id="export-pdf-text" class="hidden sm:inline">Export PDF</span>
-                </button>
-                <button onclick="switchView('editor')" title="Add Deliverables" aria-label="Add Deliverables" class="editor-only flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all">
-                    <i class="ph-bold ph-plus"></i> <span class="hidden sm:inline">Add Deliverables</span>
-                </button>
-                <button id="delete-roadmap-btn" onclick="confirmDeleteCurrentRoadmap()" title="Delete Current Roadmap" aria-label="Delete Current Roadmap" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
-                    <i class="ph-bold ph-trash text-sm"></i>
-                </button>
+            <span id="roadmap-select-progress" class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 shrink-0 whitespace-nowrap"></span>
+            <div id="roadmap-bar-actions" class="relative ml-auto shrink-0">
+                <button type="button" id="roadmap-settings-btn" onclick="toggleRoadmapMenu()" aria-haspopup="menu" aria-expanded="false" aria-controls="roadmap-menu" aria-label="Roadmap settings" title="Roadmap settings"
+                    class="ctl ctl-icon bg-white"><i class="ph-bold ph-gear-six text-base" aria-hidden="true"></i></button>
+                <div id="roadmap-menu" role="menu" aria-label="Roadmap settings" class="hidden absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-40 text-xs">
+                    <p class="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">This roadmap</p>
+                    <button type="button" role="menuitem" id="rename-roadmap-btn" onclick="closeRoadmapMenu(); openRenameRoadmapModal()" class="editor-only rm-item"><i class="ph-bold ph-pencil-simple" aria-hidden="true"></i> Rename…</button>
+                    <button type="button" role="menuitem" id="capacity-btn" onclick="closeRoadmapMenu(); openCapacityModal()" class="rm-item"><i class="ph-bold ph-gauge" aria-hidden="true"></i> Capacity…</button>
+                    <button type="button" role="menuitem" id="export-pdf-btn" onclick="closeRoadmapMenu(); exportRoadmapPDF()" class="rm-item"><i class="ph-bold ph-file-pdf" aria-hidden="true"></i> <span id="export-pdf-text">Export PDF</span></button>
+                    <button type="button" role="menuitem" id="export-data-btn" onclick="closeRoadmapMenu(); openDataExportModal('editor')" class="rm-item"><i class="ph-bold ph-download-simple" aria-hidden="true"></i> Export CSV / Excel / JSON</button>
+                    <button type="button" role="menuitem" id="roadmap-sprints-btn" onclick="closeRoadmapMenu(); openSprintsWindow()" class="rm-item"><i class="ph-bold ph-calendar-dots" aria-hidden="true"></i> Sprints… <span class="ml-auto text-[10px] text-slate-400">workspace</span></button>
+                    <button type="button" role="menuitem" id="roadmap-workflow-btn" onclick="closeRoadmapMenu(); openWorkflowSettings()" class="rm-item"><i class="ph-bold ph-flow-arrow" aria-hidden="true"></i> Workflow… <span class="ml-auto text-[10px] text-slate-400">workspace</span></button>
+                    <div id="delete-roadmap-wrap" class="border-t border-slate-100 mt-1 pt-1">
+                        <button type="button" role="menuitem" id="delete-roadmap-btn" onclick="closeRoadmapMenu(); confirmDeleteCurrentRoadmap()" class="rm-item text-rose-600 hover:bg-rose-50 focus:bg-rose-50"><i class="ph-bold ph-trash" aria-hidden="true"></i> Move to Recycle Bin</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -310,56 +329,64 @@
         <!-- ======================================================= -->
         <div id="roadmap-view" class="max-w-6xl mx-auto w-full sm:flex-1 sm:min-h-0 flex flex-col gap-4 sm:overflow-hidden">
             
-            <!-- Perspective Selector & Filter Bar (Annual, Quarterly, Monthly, Modules) -->
-            <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm shrink-0 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <div class="flex items-center gap-2 shrink-0">
-                    <span class="hidden sm:inline text-xs font-bold uppercase tracking-wider text-slate-500">View:</span>
-                    <!-- Rearranged Order: Annual, Quarterly, Monthly, Modules -->
-                    <div id="perspective-buttons" role="group" aria-label="Timeline perspective" class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
-                        <button id="view-btn-year" onclick="setPerspective('year')" class="px-3 py-1 rounded-lg text-xs font-semibold bg-white text-brand-700 shadow-sm transition-all">
-                            Annual
-                        </button>
-                        <button id="view-btn-quarter" onclick="setPerspective('quarter')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
-                            Quarterly
-                        </button>
-                        <button id="view-btn-month" onclick="setPerspective('month')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
-                            Monthly
-                        </button>
-                        <button id="view-btn-module" onclick="setPerspective('module')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
-                            Modules
-                        </button>
+            <!-- Toolbar (2.11.0, R-6): view switcher · [Sprint: ‹ sprint › · List | Board · This | All] · Filters ▾ · Expand all -->
+            <div id="roadmap-toolbar" class="bg-white rounded-2xl border border-slate-200 px-2.5 py-2 shadow-sm shrink-0 flex flex-wrap items-center gap-2">
+                <div id="perspective-buttons" role="group" aria-label="Roadmap view" class="hidden sm:flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
+                    <button id="view-btn-year" onclick="setPerspective('year')" class="h-6 px-2.5 rounded-lg text-xs font-semibold transition-all">Annual</button>
+                    <button id="view-btn-quarter" onclick="setPerspective('quarter')" class="h-6 px-2.5 rounded-lg text-xs font-semibold transition-all">Quarterly</button>
+                    <button id="view-btn-month" onclick="setPerspective('month')" class="h-6 px-2.5 rounded-lg text-xs font-semibold transition-all">Monthly</button>
+                    <button id="view-btn-module" onclick="setPerspective('module')" class="h-6 px-2.5 rounded-lg text-xs font-semibold transition-all">Modules</button>
+                    <button id="view-btn-sprint" onclick="setPerspective('sprint')" class="h-6 px-2.5 rounded-lg text-xs font-semibold transition-all inline-flex items-center gap-1"><i class="ph-bold ph-kanban" aria-hidden="true"></i>Sprint</button>
+                </div>
+                <select id="perspective-select" aria-label="Roadmap view" onchange="setPerspective(this.value)" class="sm:hidden flex-1 min-w-0 ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20">
+                    <option value="year">Annual</option><option value="quarter">Quarterly</option><option value="month">Monthly</option><option value="module">Modules</option><option value="sprint">Sprint</option>
+                </select>
+                <!-- Sprint view controls (D-5) -->
+                <div id="sv-controls" class="hidden order-last sm:order-none w-full sm:w-auto flex-wrap items-center gap-2">
+                    <div class="flex items-center gap-1 min-w-0 flex-1 sm:flex-none">
+                        <button type="button" id="sv-prev" onclick="stepSprint(-1)" aria-label="Previous sprint" class="ctl ctl-icon ctl-quiet bg-white disabled:opacity-30 disabled:pointer-events-none"><i class="ph-bold ph-caret-left" aria-hidden="true"></i></button>
+                        <select id="sv-sprint" aria-label="Sprint" onchange="setSprintFromPicker(this.value)" class="min-w-0 flex-1 sm:flex-none sm:max-w-[14rem] font-bold text-slate-800 bg-white ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"></select>
+                        <button type="button" id="sv-next" onclick="stepSprint(1)" aria-label="Next sprint" class="ctl ctl-icon ctl-quiet bg-white disabled:opacity-30 disabled:pointer-events-none"><i class="ph-bold ph-caret-right" aria-hidden="true"></i></button>
+                    </div>
+                    <div id="sv-mode" role="group" aria-label="Sprint layout" class="flex gap-1 bg-slate-100 p-1 rounded-xl">
+                        <button type="button" data-mode="list" onclick="setSprintMode('list')" class="h-6 sm:h-6 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1"><i class="ph-bold ph-list-bullets" aria-hidden="true"></i>List</button>
+                        <button type="button" data-mode="board" onclick="setSprintMode('board')" class="h-6 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1"><i class="ph-bold ph-kanban" aria-hidden="true"></i>Board</button>
+                    </div>
+                    <div id="sv-scope" role="group" aria-label="Which roadmaps" class="ml-auto sm:ml-0 flex gap-1 bg-slate-100 p-1 rounded-xl">
+                        <button type="button" data-scope="this" onclick="setSprintScope('this')" class="h-6 px-2.5 rounded-lg text-xs font-semibold">This<span class="hidden sm:inline"> roadmap</span></button>
+                        <button type="button" data-scope="all" onclick="setSprintScope('all')" title="All roadmaps" class="h-6 px-2.5 rounded-lg text-xs font-semibold">All</button>
                     </div>
                 </div>
+                <div id="timeline-filters-wrap" class="relative sm:ml-auto">
+                    <button type="button" id="timeline-filters-btn" onclick="toggleFilterSheet('timeline')" aria-expanded="false" aria-controls="timeline-filters" class=" ctl ctl-quiet"><i class="ph-bold ph-funnel" aria-hidden="true"></i>Filters<span id="timeline-filters-count" class="hidden px-1.5 rounded-full bg-brand-100 text-brand-700 text-[10px] font-bold"></span><i class="ph-bold ph-caret-down text-[10px]" aria-hidden="true"></i></button>
+                    <div id="timeline-filters" class="filter-sheet filter-pop hidden" aria-label="Roadmap filters">
+                        <div class="sm:hidden flex items-center"><span class="mx-auto w-10 h-1 rounded-full bg-slate-300 absolute left-1/2 -translate-x-1/2 top-2" aria-hidden="true"></span><b class="text-sm text-slate-900">Filters</b><button type="button" onclick="resetFilters('timeline')" class="ml-auto text-xs font-semibold text-slate-500 hover:text-slate-800">Reset</button></div>
+                        <label id="subfilter-wrap" class="block"><span id="subfilter-label" class="block mb-1 text-[11px] font-semibold text-slate-500">Filter</span><select id="perspective-subfilter" onchange="applySubfilter(this.value)" class="w-full ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"><option value="ALL">Show All</option></select></label>
+                        <label id="timeline-stage-wrap" class="block"><span class="block mb-1 text-[11px] font-semibold text-slate-500">Stage</span><select id="timeline-stage-filter" aria-label="Filter by stage" onchange="applyTimelineStageFilter()" class="w-full ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"><option value="ALL">All stages</option></select></label>
+                        <label id="timeline-person-wrap" class="block"><span class="block mb-1 text-[11px] font-semibold text-slate-500">Person</span><select id="timeline-person-filter" aria-label="Filter by person" onchange="setPersonFilter(this.value)" class="w-full ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"><option value="ALL">All people</option></select></label>
+                        <label id="sv-person-wrap" class="hidden block"><span class="block mb-1 text-[11px] font-semibold text-slate-500">Person (task assignee)</span><select id="sv-person" aria-label="Filter tasks by assignee" onchange="setSprintPerson(this.value)" class="w-full ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"><option value="ALL">All people</option></select></label>
+                        <div class="flex flex-wrap gap-2 pt-1">
+                            <button type="button" id="timeline-show-done" role="switch" aria-checked="false" onclick="toggleShowDone()" class="show-done-toggle sw"><span class="track" aria-hidden="true"><span class="knob"></span></span><span class="label">Show done</span></button>
+                            <button id="show-load-toggle" type="button" role="switch" aria-checked="true" onclick="toggleShowLoad()" class="hidden sw"><span class="track" aria-hidden="true"><span class="knob"></span></span>Show load</button>
+                        </div>
+                        <div class="hidden sm:flex items-center justify-between pt-2 border-t border-slate-100">
+                            <button type="button" onclick="resetFilters('timeline')" class="text-[11px] font-semibold text-slate-500 hover:text-slate-800">Reset</button>
+                            <div id="status-legend" class="flex items-center gap-2 text-[10px] font-medium text-slate-500" aria-label="Status legend">
+                                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Done</span>
+                                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-brand-500"></span>In progress</span>
+                                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Planned</span>
+                            </div>
+                        </div>
+                        <button type="button" onclick="closeFilterSheet()" class="sm:hidden ctl ctl-primary w-full justify-center">Show results</button>
+                    </div>
+                </div>
+                <button id="annual-expand-toggle" type="button" onclick="toggleAllAnnualModules()" aria-pressed="false" class="hidden ctl ctl-quiet"><i class="ph-bold ph-arrows-out-line-vertical" aria-hidden="true"></i><span>Expand all</span></button>
+            </div>
 
-                <!-- Contextual Subfilter -->
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-2 flex-1 min-w-[18rem] justify-start sm:justify-end">
-                    <!-- Show load, Expand all / Collapse all, legend and filters: wrap onto a second line when space runs out -->
-                    <button id="show-load-toggle" type="button" role="switch" aria-checked="true" onclick="toggleShowLoad()" class="hidden items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all">
-                        <span class="track w-7 h-4 rounded-full bg-brand-600 relative transition-colors" aria-hidden="true"><span class="knob absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform"></span></span>Show load
-                    </button>
-                    <button type="button" id="timeline-show-done" role="switch" aria-checked="false" onclick="toggleShowDone()" class="show-done-toggle inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-semibold whitespace-nowrap bg-white border-slate-200 text-slate-600"><span class="track relative w-7 h-4 rounded-full bg-slate-300 transition-colors" aria-hidden="true"><span class="knob absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform"></span></span><span class="label">Show done</span></button>
-                    <button id="annual-expand-toggle" type="button" onclick="toggleAllAnnualModules()" aria-pressed="false" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition-all">
-                        <i class="ph-bold ph-arrows-out-line-vertical text-xs"></i><span>Expand all</span>
-                    </button>
-                    <!-- Status legend for the timeline dots -->
-                    <div id="status-legend" class="flex items-center gap-3 text-[11px] font-medium text-slate-500" aria-label="Status legend">
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Done</span>
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-brand-500"></span>In progress</span>
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Planned</span>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                    <label id="subfilter-label" for="perspective-subfilter" class="text-xs font-medium text-slate-500">Filter:</label>
-                    <select id="perspective-subfilter" onchange="applySubfilter(this.value)" class="text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 cursor-pointer outline-none">
-                        <option value="ALL">Show All</option>
-                    </select>
-                    <select id="timeline-stage-filter" aria-label="Filter by stage" onchange="applyTimelineStageFilter()" class="text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 cursor-pointer outline-none max-w-[11rem]">
-                        <option value="ALL">All stages</option>
-                    </select>
-                    <select id="timeline-person-filter" aria-label="Filter by person" onchange="setPersonFilter(this.value)" class="max-w-[10rem] text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 cursor-pointer outline-none">
-                        <option value="ALL">All people</option>
-                    </select>
-                    </div>
-                </div>
+            <!-- Sprint view (2.11.0, D-5): summary + List (deliverables with tasks in the sprint) or Board (the 2.10 task board) -->
+            <div id="sprints-view" class="hidden sm:flex-1 sm:min-h-0 flex-col gap-3">
+                <div id="sv-summary" class="shrink-0 bg-white rounded-2xl border border-slate-200 px-3 py-2 shadow-sm flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" aria-live="polite"></div>
+                <div id="sprints-board" class="sm:flex-1 sm:min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm p-3 sm:overflow-y-auto custom-scrollbar"></div>
             </div>
 
             <!-- Scrollable Timeline Canvas -->
@@ -382,74 +409,34 @@
         <!-- VIEW 2: EDITOR (Full-width Table + Modal Edit)         -->
         <!-- ======================================================= -->
         <div id="editor-view" class="hidden max-w-6xl mx-auto w-full sm:flex-1 sm:min-h-0 sm:overflow-hidden flex-col gap-4">
-            <!-- Header Controls Bar -->
-            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div class="flex items-center gap-3">
-                    <div>
-                        <h2 class="text-lg font-extrabold text-slate-800">Deliverables & Milestones</h2>
-                        <p class="text-xs text-slate-500">Manage roadmap schedule, modules, and target dates.</p>
-                    </div>
+            <!-- Toolbar (2.11.0): search · filters (a sheet on phones) · count · Export · + Add deliverable -->
+            <div id="editor-toolbar" class="bg-white rounded-2xl border border-slate-200 px-2.5 py-2 shadow-sm shrink-0 flex flex-wrap items-center gap-2 sm:gap-1.5">
+                <div class="relative flex-1 sm:flex-none sm:w-40 min-w-0">
+                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" aria-hidden="true"></i>
+                    <input type="text" id="editor-search-input" aria-label="Search deliverables" oninput="applyEditorFilters()" placeholder="Search deliverables…" class="ctl w-full pl-8 bg-white border border-slate-200 focus:border-brand-500 outline-none text-slate-700">
                 </div>
-
-                <div class="flex flex-wrap items-center gap-2 self-stretch sm:self-auto justify-end">
-                    <button onclick="openDataExportModal('editor')" title="Export Milestones (CSV/Excel/JSON)" class="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all border border-slate-200">
-                        <i class="ph-bold ph-download-simple"></i> Export
-                    </button>
-                    <button onclick="openAddMilestoneModal()" class="editor-only flex items-center gap-2 px-3.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-brand-500/20 transition-all">
-                        <i class="ph-bold ph-plus"></i> Add Milestone
-                    </button>
+                <button type="button" id="editor-filters-btn" onclick="toggleFilterSheet('editor')" aria-expanded="false" aria-controls="editor-filters" class="sm:hidden ctl ctl-quiet"><i class="ph-bold ph-funnel" aria-hidden="true"></i>Filters<span id="editor-filters-count" class="hidden px-1.5 rounded-full bg-brand-100 text-brand-700 text-[10px] font-bold"></span></button>
+                <div id="editor-filters" class="filter-sheet hidden sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-1.5" aria-label="Deliverable filters">
+                    <div class="sm:hidden flex items-center"><span class="mx-auto w-10 h-1 rounded-full bg-slate-300 absolute left-1/2 -translate-x-1/2 top-2" aria-hidden="true"></span><b class="text-sm text-slate-900">Filters</b><button type="button" onclick="resetFilters('editor')" class="ml-auto text-xs font-semibold text-slate-500 hover:text-slate-800">Reset</button></div>
+                    <label class="block"><span class="sm:hidden block mb-1 text-[11px] font-semibold text-slate-500">Module</span><select id="editor-module-filter" aria-label="Filter by module" onchange="applyEditorFilters()" class="sm:max-w-[8rem] ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"><option value="ALL">All modules</option></select></label>
+                    <label class="block"><span class="sm:hidden block mb-1 text-[11px] font-semibold text-slate-500">Status</span><select id="editor-status-filter" aria-label="Filter by status" onchange="applyEditorFilters()" class="sm:max-w-[8rem] ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"><option value="ALL">All statuses</option><option value="planned">Planned</option><option value="in-progress">In progress</option><option value="done">Done</option><option value="over">Over capacity only</option></select></label>
+                    <label class="block"><span class="sm:hidden block mb-1 text-[11px] font-semibold text-slate-500">Stage</span><select id="editor-stage-filter" aria-label="Filter by stage" onchange="applyEditorFilters()" class="sm:max-w-[8rem] ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"><option value="ALL">All stages</option></select></label>
+                    <label class="block"><span class="sm:hidden block mb-1 text-[11px] font-semibold text-slate-500">Person</span><select id="editor-person-filter" aria-label="Filter by person" onchange="setPersonFilter(this.value)" class="sm:max-w-[8rem] ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"><option value="ALL">All people</option></select></label>
+                    <button type="button" id="editor-show-done" role="switch" aria-checked="false" onclick="toggleShowDone()" class="show-done-toggle sw"><span class="track" aria-hidden="true"><span class="knob"></span></span><span class="label">Show done</span></button>
+                    <button type="button" onclick="closeFilterSheet()" class="sm:hidden ctl ctl-primary w-full justify-center">Show results</button>
                 </div>
+                <span id="editor-sort-hint" class="hidden text-[11px] text-slate-500">Sort by Rank to reorder.</span>
+                <span class="w-full sm:w-auto sm:ml-auto flex items-center gap-2">
+                    <span id="editor-filter-count-badge" class="text-[11px] text-slate-500 whitespace-nowrap">0 deliverables</span>
+                    <button onclick="openDataExportModal('editor')" title="Export deliverables (CSV / Excel / JSON)" aria-label="Export" class="ml-auto sm:ml-0 ctl ctl-icon ctl-quiet"><i class="ph-bold ph-download-simple" aria-hidden="true"></i></button>
+                    <button onclick="openAddMilestoneModal()" class="editor-only ctl ctl-primary"><i class="ph-bold ph-plus" aria-hidden="true"></i> Add deliverable</button>
+                </span>
             </div>
 
-            <!-- Editor Table Container -->
-            <div class="sm:flex-1 sm:min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                <!-- Search and Filters Bar -->
-                <div class="px-4 py-2.5 bg-white border-b border-slate-100 flex flex-wrap items-center gap-2.5 text-xs shrink-0">
-                    <div class="relative flex-1 min-w-[180px]">
-                        <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-                        <input type="text" id="editor-search-input" aria-label="Search deliverables" oninput="applyEditorFilters()" placeholder="Search deliverables, modules, or scope..." class="w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 focus:border-brand-500 rounded-xl outline-none transition-all text-xs text-slate-700">
-                    </div>
-
-                    <div class="flex items-center">
-                        <select id="editor-module-filter" aria-label="Filter by module" onchange="applyEditorFilters()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
-                            <option value="ALL">All Modules</option>
-                        </select>
-                    </div>
-
-                    <div class="flex items-center">
-                        <select id="editor-status-filter" aria-label="Filter by status" onchange="applyEditorFilters()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
-                            <option value="ALL">All Statuses</option>
-                            <option value="planned">Planned</option>
-                            <option value="in-progress">In Progress</option>
-                            <option value="done">Completed</option>
-                            <option value="over">Over capacity only</option>
-                        </select>
-                    </div>
-
-                    <div class="flex items-center">
-                        <select id="editor-stage-filter" aria-label="Filter by stage" onchange="applyEditorFilters()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
-                            <option value="ALL">All stages</option>
-                        </select>
-                    </div>
-
-                    <div class="flex items-center">
-                        <button type="button" id="editor-show-done" role="switch" aria-checked="false" onclick="toggleShowDone()" class="show-done-toggle inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-semibold whitespace-nowrap bg-white border-slate-200 text-slate-600"><span class="track relative w-7 h-4 rounded-full bg-slate-300 transition-colors" aria-hidden="true"><span class="knob absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform"></span></span><span class="label">Show done</span></button>
-                    </div>
-                    <div class="flex items-center">
-                        <select id="editor-person-filter" aria-label="Filter by person" onchange="setPersonFilter(this.value)" class="max-w-[11rem] px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
-                            <option value="ALL">All people</option>
-                        </select>
-                    </div>
-
-                    <span id="editor-sort-hint" class="hidden text-[11px] text-slate-500">Sort by Rank to reorder.</span>
-
-                    <div id="editor-filter-count-badge" class="hidden text-[11px] font-semibold text-brand-700 bg-brand-50 px-2 py-1 rounded-lg border border-brand-200">
-                        0 matches
-                    </div>
-                </div>
-
+            <!-- Editor Table Container (ends after its last row: R-10) -->
+            <div id="editor-card" class="sm:flex-initial sm:min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                 <!-- Table Content -->
-                <div class="overflow-x-auto sm:flex-1 sm:overflow-auto custom-scrollbar">
+                <div class="overflow-x-auto sm:flex-1 sm:min-h-0 sm:overflow-auto custom-scrollbar">
                     <table class="w-full text-left border-collapse">
                         <thead class="bg-slate-50 sticky top-0 z-10 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                             <tr>
@@ -477,60 +464,30 @@
         <!-- VIEW 3: FEEDBACK & SUGGESTIONS                         -->
         <!-- ======================================================= -->
         <div id="feedback-view" class="hidden max-w-6xl mx-auto w-full sm:flex-1 sm:min-h-0 sm:overflow-hidden flex-col gap-4">
-            <!-- Feedback Controls Bar -->
-            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div>
-                    <div class="flex items-center gap-2">
-                        <h2 class="text-lg font-extrabold text-slate-800">Feedback & User Suggestions</h2>
-                        <span id="feedback-total-badge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200">0 items</span>
-                    </div>
-                    <p class="text-xs text-slate-500">Customer requests, feature ideas, and suggestions linked to deliverables.</p>
+            <!-- Toolbar (2.11.0): search · filters (a sheet on phones) · count · Export · + Add feedback -->
+            <div id="feedback-toolbar" class="bg-white rounded-2xl border border-slate-200 px-2.5 py-2 shadow-sm shrink-0 flex flex-wrap items-center gap-2 sm:gap-1.5">
+                <div class="relative flex-1 sm:flex-none sm:w-52 min-w-0">
+                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" aria-hidden="true"></i>
+                    <input type="text" id="feedback-search-input" aria-label="Search feedback" oninput="renderFeedbackTable()" placeholder="Search feedback…" class="ctl w-full pl-8 bg-white border border-slate-200 focus:border-brand-500 outline-none text-slate-700">
                 </div>
-
-                <div class="flex flex-wrap items-center gap-2 self-stretch sm:self-auto justify-end">
-                    <button onclick="openDataExportModal('feedback')" title="Export Feedback (CSV/Excel/JSON)" class="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all border border-slate-200">
-                        <i class="ph-bold ph-download-simple"></i> Export
-                    </button>
-                    <button onclick="openAddFeedbackModal()" class="feedback-add-only flex items-center gap-2 px-3.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-brand-500/20 transition-all">
-                        <i class="ph-bold ph-plus"></i> New Suggestion
-                    </button>
+                <button type="button" id="feedback-filters-btn" onclick="toggleFilterSheet('feedback')" aria-expanded="false" aria-controls="feedback-filters" class="sm:hidden ctl ctl-quiet"><i class="ph-bold ph-funnel" aria-hidden="true"></i>Filters<span id="feedback-filters-count" class="hidden px-1.5 rounded-full bg-brand-100 text-brand-700 text-[10px] font-bold"></span></button>
+                <div id="feedback-filters" class="filter-sheet hidden sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-1.5" aria-label="Feedback filters">
+                    <div class="sm:hidden flex items-center"><span class="mx-auto w-10 h-1 rounded-full bg-slate-300 absolute left-1/2 -translate-x-1/2 top-2" aria-hidden="true"></span><b class="text-sm text-slate-900">Filters</b><button type="button" onclick="resetFilters('feedback')" class="ml-auto text-xs font-semibold text-slate-500 hover:text-slate-800">Reset</button></div>
+                    <label class="block"><span class="sm:hidden block mb-1 text-[11px] font-semibold text-slate-500">Status</span><select id="feedback-status-filter" aria-label="Filter by status" onchange="renderFeedbackTable()" class="sm:max-w-[8rem] ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"><option value="ALL">All statuses</option><option value="backlog">Backlog</option><option value="planned">Planned</option><option value="in-progress">In progress</option><option value="done">Done</option></select></label>
+                    <label class="block"><span class="sm:hidden block mb-1 text-[11px] font-semibold text-slate-500">Category</span><select id="feedback-category-filter" aria-label="Filter by category" onchange="renderFeedbackTable()" class="sm:max-w-[8rem] ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"><option value="ALL">All categories</option></select></label>
+                    <label class="block"><span class="sm:hidden block mb-1 text-[11px] font-semibold text-slate-500">Submitted by</span><select id="feedback-submitter-filter" aria-label="Filter by submitter" onchange="renderFeedbackTable()" class="sm:max-w-[8rem] ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"><option value="ALL">All submitters</option></select></label>
+                    <label class="lg:hidden block"><span class="sm:hidden block mb-1 text-[11px] font-semibold text-slate-500">Sort</span><select id="feedback-sort-select" aria-label="Sort" onchange="setFeedbackSortFromSelect(this.value)" class="sm:max-w-[8rem] ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"></select></label>
+                    <button type="button" onclick="closeFilterSheet()" class="sm:hidden ctl ctl-primary w-full justify-center">Show results</button>
                 </div>
+                <span class="w-full sm:w-auto sm:ml-auto flex items-center gap-2">
+                    <span id="feedback-total-badge" class="text-[11px] text-slate-500 whitespace-nowrap">0 feedback</span>
+                    <button onclick="openDataExportModal('feedback')" title="Export feedback (CSV / Excel / JSON)" aria-label="Export" class="ml-auto sm:ml-0 ctl ctl-icon ctl-quiet"><i class="ph-bold ph-download-simple" aria-hidden="true"></i></button>
+                    <button onclick="openAddFeedbackModal()" class="feedback-add-only ctl ctl-primary"><i class="ph-bold ph-plus" aria-hidden="true"></i> Add feedback</button>
+                </span>
             </div>
 
-            <!-- Feedback Table Container -->
-            <div class="sm:flex-1 sm:min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                <!-- Search and Filtering -->
-                <div class="px-4 py-2.5 bg-white border-b border-slate-100 flex flex-wrap items-center gap-2.5 text-xs shrink-0">
-                    <div class="relative flex-1 min-w-[180px]">
-                        <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-                        <input type="text" id="feedback-search-input" aria-label="Search feedback" oninput="renderFeedbackTable()" placeholder="Search title, source, submitter..." class="w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 focus:border-brand-500 rounded-xl outline-none transition-all text-xs text-slate-700">
-                    </div>
-
-                    <div class="flex items-center">
-                        <select id="feedback-status-filter" aria-label="Filter by status" onchange="renderFeedbackTable()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
-                            <option value="ALL">All Statuses</option>
-                            <option value="backlog">Backlog / Unlinked</option>
-                            <option value="planned">Planned</option>
-                            <option value="in-progress">In Progress</option>
-                            <option value="done">Completed</option>
-                        </select>
-                    </div>
-
-                    <div class="flex items-center">
-                        <select id="feedback-category-filter" aria-label="Filter by category" onchange="renderFeedbackTable()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
-                            <option value="ALL">All Categories</option>
-                        </select>
-                    </div>
-                    <div class="flex items-center">
-                        <select id="feedback-submitter-filter" aria-label="Filter by submitter" onchange="renderFeedbackTable()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer">
-                            <option value="ALL">All submitters</option>
-                        </select>
-                    </div>
-                    <label class="lg:hidden flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">Sort
-                        <select id="feedback-sort-select" onchange="setFeedbackSortFromSelect(this.value)" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none focus:ring-2 focus:ring-brand-500/20 text-xs shadow-xs cursor-pointer"></select>
-                    </label>
-                </div>
-
+            <!-- Feedback Table Container (ends after its last row unless the details panel is open: R-10) -->
+            <div id="feedback-card" class="sm:flex-initial sm:min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                 <!-- Table Content + details panel (feedback-details-panel) -->
                 <div class="sm:flex-1 sm:min-h-0 flex relative">
                 <div id="feedback-table-wrap" class="flex-1 min-w-0 overflow-x-auto sm:overflow-auto custom-scrollbar">
@@ -548,81 +505,60 @@
             </div>
         </div>
 
-        <!-- ======================================================= -->
-        <!-- VIEW 5: SPRINTS (2.10.0): one sprint's tasks as a board -->
-        <!-- ======================================================= -->
-        <div id="sprints-view" class="hidden max-w-6xl mx-auto w-full sm:flex-1 sm:min-h-0 sm:overflow-hidden flex-col gap-4">
-            <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm shrink-0 space-y-2.5">
-                <div class="flex flex-wrap items-center gap-2">
-                    <div class="flex items-center gap-1 min-w-0">
-                        <button type="button" id="sv-prev" onclick="stepSprint(-1)" aria-label="Previous sprint" class="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none"><i class="ph-bold ph-caret-left"></i></button>
-                        <select id="sv-sprint" aria-label="Sprint" onchange="setSprintFromPicker(this.value)" class="min-w-0 max-w-[17rem] px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-800 cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"></select>
-                        <button type="button" id="sv-next" onclick="stepSprint(1)" aria-label="Next sprint" class="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none"><i class="ph-bold ph-caret-right"></i></button>
-                    </div>
-                    <div id="sv-scope" role="group" aria-label="Which roadmaps" class="flex gap-1 bg-slate-100 p-1 rounded-xl">
-                        <button type="button" data-scope="this" onclick="setSprintScope('this')" class="px-2.5 py-1 rounded-lg text-xs font-semibold">This roadmap</button>
-                        <button type="button" data-scope="all" onclick="setSprintScope('all')" class="px-2.5 py-1 rounded-lg text-xs font-semibold">All roadmaps</button>
-                    </div>
-                    <select id="sv-person" aria-label="Filter by person" onchange="setSprintPerson(this.value)" class="sm:ml-auto max-w-[12rem] px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium outline-none text-xs cursor-pointer"><option value="ALL">All people</option></select>
-                </div>
-                <div id="sv-summary" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" aria-live="polite"></div>
-            </div>
-            <div id="sprints-board" class="sm:flex-1 sm:min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm p-3 sm:overflow-y-auto custom-scrollbar"></div>
-        </div>
+    </main>
 
-        <!-- ======================================================= -->
-        <!-- VIEW 4: ACTIVITY (2.2.0, Editors + Admins)              -->
-        <!-- ======================================================= -->
-        <div id="activity-view" class="hidden max-w-6xl mx-auto w-full sm:flex-1 sm:min-h-0 sm:overflow-hidden flex-col gap-4">
-            <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm shrink-0 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
-                <div id="activity-scope" role="group" aria-label="Activity scope" class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0 max-w-full overflow-x-auto">
-                    <button type="button" data-scope="this" onclick="setActivityScope('this')" class="px-3 py-1 rounded-lg text-xs font-semibold transition-all">This<span class="hidden sm:inline"> roadmap</span></button>
-                    <button type="button" data-scope="all" onclick="setActivityScope('all')" class="px-3 py-1 rounded-lg text-xs font-semibold transition-all">All<span class="hidden sm:inline"> roadmaps</span></button>
-                    <button type="button" data-scope="deleted" onclick="setActivityScope('deleted')" class="px-3 py-1 rounded-lg text-xs font-semibold transition-all">Deleted<span class="hidden sm:inline"> roadmaps</span></button>
+    <!-- Activity panel (2.11.0, D-2): opened from the bell; Editors + Admins -->
+    <div id="activity-view" role="dialog" aria-modal="true" aria-labelledby="activity-panel-title" class="hidden fixed inset-0 z-[55] bg-slate-900/20 justify-end">
+        <section class="h-full w-full sm:w-[28rem] bg-white sm:border-l border-slate-200 shadow-2xl flex flex-col min-h-0">
+            <header class="h-14 shrink-0 flex items-center gap-2 px-4 border-b border-slate-100">
+                <i class="ph-bold ph-bell text-brand-600" aria-hidden="true"></i>
+                <h2 id="activity-panel-title" class="text-sm font-bold text-slate-900">Activity</h2>
+                <button type="button" onclick="closeActivityPanel()" data-dialog-close aria-label="Close Activity" class="ml-auto ctl ctl-icon ctl-quiet bg-white"><i class="ph-bold ph-x" aria-hidden="true"></i></button>
+            </header>
+            <div class="shrink-0 px-4 py-2.5 border-b border-slate-100 space-y-2 text-xs">
+                <div class="flex flex-wrap items-center gap-2">
+                    <div id="activity-scope" role="group" aria-label="Activity scope" class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
+                        <button type="button" data-scope="this" onclick="setActivityScope('this')" class="px-2.5 h-6 rounded-lg text-xs font-semibold transition-all">This roadmap</button>
+                        <button type="button" data-scope="all" onclick="setActivityScope('all')" class="px-2.5 h-6 rounded-lg text-xs font-semibold transition-all">All</button>
+                        <button type="button" data-scope="deleted" onclick="setActivityScope('deleted')" class="px-2.5 h-6 rounded-lg text-xs font-semibold transition-all">Deleted</button>
+                    </div>
+                    <button type="button" id="activity-mine" role="switch" aria-checked="false" onclick="toggleActivityMine()" title="Only deliverables you're Owner or team on" class="sw"><span class="track" aria-hidden="true"><span class="knob"></span></span>Mine</button>
+                    <button type="button" id="activity-export" onclick="exportActivityCSV()" aria-label="Download the audit log (CSV)" title="Download CSV" class="ml-auto ctl ctl-quiet bg-white"><i class="ph-bold ph-download-simple" aria-hidden="true"></i> CSV</button>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <label for="activity-area" class="text-slate-500 font-medium">Area:</label>
-                    <select id="activity-area" onchange="applyActivityFilters()" class="text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 cursor-pointer outline-none">
-                        <option value="ALL">All</option>
+                <div class="flex items-center gap-2">
+                    <select id="activity-area" aria-label="Area" onchange="applyActivityFilters()" class="ctl ctl-quiet flex-1 min-w-0 cursor-pointer outline-none">
+                        <option value="ALL">All areas</option>
                         <option value="roadmap">Roadmap</option>
-                        <option value="milestone">Milestones</option>
+                        <option value="milestone">Deliverables</option>
                         <option value="feedback">Feedback</option>
                         <option value="comment">Comments</option>
                         <option value="bin">Recycle Bin</option>
                         <option value="people">People</option>
                     </select>
-                    <label for="activity-person" class="text-slate-500 font-medium">Person:</label>
-                    <select id="activity-person" onchange="applyActivityFilters()" class="max-w-[180px] truncate text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 cursor-pointer outline-none">
+                    <select id="activity-person" aria-label="Person" onchange="applyActivityFilters()" class="ctl ctl-quiet flex-1 min-w-0 truncate cursor-pointer outline-none">
                         <option value="ALL">Anyone</option>
                     </select>
-                    <button type="button" id="activity-mine" role="switch" aria-checked="false" onclick="toggleActivityMine()" title="Only deliverables you're Owner or team on" class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-semibold bg-white border-slate-200 text-slate-600 hover:bg-slate-50">
-                        <span class="mine-track relative w-7 h-4 rounded-full bg-slate-300 transition-colors" aria-hidden="true"><span class="mine-knob absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-all"></span></span>Mine
-                    </button>
-                    <button type="button" id="activity-clear" onclick="clearActivityFilters()" class="hidden px-2 py-1.5 text-xs font-semibold text-brand-700 hover:underline">Clear filters</button>
-                    <button type="button" id="activity-export" onclick="exportActivityCSV()" class="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all">
-                        <i class="ph-bold ph-download-simple"></i> CSV
-                    </button>
+                    <button type="button" id="activity-clear" onclick="clearActivityFilters()" class="hidden shrink-0 text-xs font-semibold text-brand-700 hover:underline">Clear</button>
                 </div>
             </div>
-
-            <div id="activity-scroll" class="sm:flex-1 sm:min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm sm:overflow-y-auto custom-scrollbar relative">
+            <div id="activity-scroll" class="flex-1 min-h-0 overflow-y-auto custom-scrollbar relative">
                 <div class="sticky top-0 z-10 flex justify-center h-0">
                     <button type="button" id="activity-new-pill" onclick="showNewActivity()" aria-live="polite" class="hidden mt-3 px-3 py-1 rounded-full bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-bold shadow-md"></button>
                 </div>
-                <div class="p-4 md:p-5">
+                <div class="p-4">
                     <div id="activity-notice" class="hidden mb-3"></div>
                     <div id="activity-list"></div>
                     <div class="text-center mt-3">
                         <button type="button" id="activity-more" onclick="loadMoreActivity()" class="hidden px-4 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700">Show more</button>
                     </div>
-                    <p id="activity-end-note" class="hidden mt-4 text-center text-[11px] text-slate-500">Activity before 2.0 isn't in the log. Older milestone history is still on each milestone's History tab.</p>
+                    <p id="activity-end-note" class="hidden mt-4 text-center text-[11px] text-slate-500">Activity before 2.0 isn't in the log. Older history is still on each deliverable's History tab.</p>
                 </div>
             </div>
-        </div>
-
-    </main>
+        </section>
+    </div>
 
     <div id="rank-announcer" class="sr-only" aria-live="polite"></div>
+    <div id="filter-scrim" class="hidden sm:hidden fixed inset-0 z-[59] bg-slate-900/30" onclick="closeFilterSheet()"></div>
 
     <!-- Phone bottom tab bar (below sm; hidden until authenticated) -->
     <nav id="mobile-nav" aria-label="Main" class="hidden grid grid-cols-3 sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 shadow-[0_-1px_3px_rgba(0,0,0,0.04)]">
@@ -634,14 +570,6 @@
         </button>
         <button id="mob-nav-feedback" onclick="switchView('feedback')" class="flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold text-slate-500">
             <span class="relative"><i class="ph ph-chat-centered-text text-lg"></i><span id="mob-nav-feedback-count" class="absolute -top-1 -right-3 px-1 rounded-full text-[9px] bg-slate-200 text-slate-700 font-bold">0</span></span> Feedback
-        </button>
-        <span class="role-editor-only contents">
-            <button id="mob-nav-activity" onclick="switchView('activity')" class="flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold text-slate-500">
-                <span class="relative"><i class="ph ph-clock-counter-clockwise text-lg"></i><span id="mob-nav-activity-count" class="hidden absolute -top-1 -right-3 px-1 rounded-full text-[9px] bg-rose-500 text-white font-bold"></span></span> Activity
-            </button>
-        </span>
-        <button id="mob-nav-sprints" onclick="switchView('sprints')" class="flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold text-slate-500">
-            <i class="ph ph-kanban text-lg"></i> Sprints
         </button>
     </nav>
 
@@ -796,8 +724,8 @@
                     <i class="ph-bold ph-sliders"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <h3 id="edit-milestone-title" class="text-base font-bold text-slate-900 leading-tight">Edit milestone</h3>
-                    <p id="edit-milestone-summary" class="text-[11px] text-slate-500 truncate"></p>
+                    <h3 id="edit-milestone-title" class="text-base font-bold text-slate-900 leading-tight">Edit deliverable</h3>
+                    <div class="flex items-center gap-2 min-w-0"><p id="edit-milestone-summary" class="text-[11px] text-slate-500 truncate min-w-0"></p><span id="edit-milestone-sprints" class="shrink-0 flex items-center"></span></div>
                 </div>
                 <button type="button" onclick="closeEditMilestoneModal()" data-dialog-close aria-label="Close" class="shrink-0 text-slate-500 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all">
                     <i class="ph-bold ph-x text-lg"></i>
@@ -894,7 +822,7 @@
                                 Cancel
                             </button>
                             <button type="submit" class="editor-only px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
-                                <i class="ph-bold ph-check"></i> Save Changes
+                                <i class="ph-bold ph-check"></i> Save changes
                             </button>
                         </div>
                     </div>
@@ -902,7 +830,7 @@
 
                 <!-- History / Timeline / Comments: one-line tabs; the open tab fills the height left and scrolls -->
                 <div class="md:col-span-5 bg-slate-50/80 border-t md:border-t-0 border-slate-100 p-3 flex flex-col md:min-h-0">
-                    <div role="tablist" aria-label="Milestone activity" id="milestone-tabs" class="milestone-tabs grid grid-cols-4 gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold shrink-0">
+                    <div role="tablist" aria-label="Deliverable activity" id="milestone-tabs" class="milestone-tabs grid grid-cols-4 gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold shrink-0">
                         <button type="button" role="tab" id="tab-btn-logs" aria-controls="milestone-logs-panel" onclick="switchMilestoneSideTab('logs')"><i class="ph-bold ph-clock-counter-clockwise text-sm" aria-hidden="true"></i><span>History</span><span id="milestone-history-count" class="tab-badge">0</span></button>
                         <button type="button" role="tab" id="tab-btn-stages" aria-controls="milestone-stages-panel" onclick="switchMilestoneSideTab('stages')"><i class="ph-bold ph-flow-arrow text-sm" aria-hidden="true"></i><span>Timeline</span><span id="milestone-stage-pct" class="tab-badge"></span></button>
                         <button type="button" role="tab" id="tab-btn-comments" aria-controls="milestone-comments-panel" onclick="switchMilestoneSideTab('comments')"><i class="ph-bold ph-chat-teardrop-text text-sm" aria-hidden="true"></i><span>Comments</span><span id="milestone-comments-count" class="tab-badge">0</span></button>
@@ -972,8 +900,8 @@
                     <i class="ph-bold ph-plus-circle"></i>
                 </div>
                 <div>
-                    <h3 id="add-milestone-title" class="text-lg font-bold text-slate-900 leading-snug">Add New Deliverable</h3>
-                    <p class="text-xs text-slate-500">Create a new milestone on this roadmap.</p>
+                    <h3 id="add-milestone-title" class="text-lg font-bold text-slate-900 leading-snug">Add deliverable</h3>
+                    <p class="text-xs text-slate-500">Add a deliverable to this roadmap.</p>
                 </div>
             </div>
 
@@ -1045,7 +973,7 @@
                         Cancel
                     </button>
                     <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
-                        <i class="ph-bold ph-plus"></i> Add Deliverable
+                        <i class="ph-bold ph-plus"></i> Add deliverable
                     </button>
                 </div>
             </form>
@@ -1063,7 +991,7 @@
                     <i class="ph-bold ph-chat-centered-text"></i>
                 </div>
                 <div>
-                    <h3 id="feedback-modal-title" class="text-lg font-bold text-slate-900 leading-snug">New Feedback / Suggestion</h3>
+                    <h3 id="feedback-modal-title" class="text-lg font-bold text-slate-900 leading-snug">Add feedback</h3>
                     <p class="text-xs text-slate-500">Log customer requests and user feedback.</p>
                 </div>
             </div>
@@ -1101,7 +1029,7 @@
                         Cancel
                     </button>
                     <button type="submit" id="feedback-save-btn" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
-                        <i class="ph-bold ph-check"></i> Save Suggestion
+                        <i class="ph-bold ph-check"></i> Save feedback
                     </button>
                 </div>
             </form>
@@ -1126,24 +1054,22 @@
                     <i class="ph-bold ph-tree-structure"></i>
                 </div>
                 <div>
-                    <h3 id="new-roadmap-title" class="text-lg font-bold text-slate-900">New Roadmap</h3>
-                    <p class="text-xs text-slate-500">Create another roadmap view.</p>
+                    <h3 id="new-roadmap-title" class="text-lg font-bold text-slate-900">New roadmap</h3>
+                    <p id="new-roadmap-sub" class="text-xs text-slate-500">Create another roadmap.</p>
                 </div>
             </div>
 
             <form id="new-roadmap-form" class="space-y-4">
                 <div class="space-y-1">
-                    <label for="new-roadmap-title-input" class="text-xs font-semibold text-slate-700">Roadmap Title</label>
-                    <input type="text" id="new-roadmap-title-input" required placeholder="e.g. 2027 Core Architecture" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
+                    <label for="new-roadmap-title-input" class="text-xs font-semibold text-slate-700">Roadmap title</label>
+                    <input type="text" id="new-roadmap-title-input" required maxlength="200" placeholder="e.g. 2027 Core Architecture" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all">
                 </div>
 
                 <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                     <button type="button" onclick="closeNewRoadmapModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
                         Cancel
                     </button>
-                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all">
-                        Create Roadmap
-                    </button>
+                    <button type="submit" id="new-roadmap-submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all">Create roadmap</button>
                 </div>
             </form>
         </div>
@@ -1160,7 +1086,7 @@
                     <i class="ph-bold ph-warning"></i>
                 </div>
                 <div>
-                    <h3 id="delete-roadmap-title" class="text-base font-bold text-slate-900">Delete Roadmap</h3>
+                    <h3 id="delete-roadmap-title" class="text-base font-bold text-slate-900">Move roadmap to the Recycle Bin</h3>
                     <p class="text-xs text-slate-500">Only its creator or an admin can do this.</p>
                 </div>
             </div>
@@ -1328,7 +1254,7 @@
             <div class="shrink-0 flex flex-wrap items-center gap-2 mb-3">
                 <div role="tablist" aria-label="Item type" class="flex bg-slate-100 rounded-xl p-1">
                     <button type="button" role="tab" data-bin-tab="roadmap" onclick="setBinTab('roadmap')">Roadmaps <span data-bin-count class="ml-0.5 text-[10px] font-bold">0</span></button>
-                    <button type="button" role="tab" data-bin-tab="milestone" onclick="setBinTab('milestone')">Milestones <span data-bin-count class="ml-0.5 text-[10px] font-bold">0</span></button>
+                    <button type="button" role="tab" data-bin-tab="milestone" onclick="setBinTab('milestone')">Deliverables <span data-bin-count class="ml-0.5 text-[10px] font-bold">0</span></button>
                     <button type="button" role="tab" data-bin-tab="feedback" onclick="setBinTab('feedback')">Feedback <span data-bin-count class="ml-0.5 text-[10px] font-bold">0</span></button>
                 </div>
                 <div class="relative flex-1 min-w-[160px]">
@@ -1570,28 +1496,49 @@
         // =======================================================
         // CORE NAVIGATION & PERSPECTIVE HELPERS
         // =======================================================
+        let currentView = 'roadmap';
+        window.openActivityPanel = function() {
+            if (!canEdit() || !activityView) return;
+            closeAccountMenu();
+            closeRoadmapMenu();
+            activityView.classList.remove('hidden');
+            activityView.classList.add('flex');
+            document.getElementById('activity-bell')?.setAttribute('aria-expanded', 'true');
+            document.body.classList.add('overflow-hidden');
+            if (!useCloudPersistence || activityKey !== activityKeyNow() || !activityUnsub) loadActivity();
+            else renderActivity();
+            markActivitySeen();
+        };
+        // What was on screen while the panel was open counts as read
+        window.closeActivityPanel = function(seen = true, focusBell = true) {
+            if (!activityViewOpen()) return;
+            activityView.classList.add('hidden');
+            activityView.classList.remove('flex');
+            document.getElementById('activity-bell')?.setAttribute('aria-expanded', 'false');
+            document.body.classList.remove('overflow-hidden');
+            if (seen) markActivitySeen();
+            const bell = document.getElementById('activity-bell');
+            if (focusBell && bell?.offsetParent) setTimeout(() => bell.focus(), 0);
+        };
+        window.toggleActivityPanel = function() { if (activityViewOpen()) closeActivityPanel(); else openActivityPanel(); };
         window.switchView = function(viewName) {
-            // Activity is for Editors and Admins (activity-view FR-1)
-            if (viewName === 'activity' && !canEdit()) viewName = 'roadmap';
+            // Activity is a panel for Editors and Admins (2.11.0, D-2); the old tab name opens it
+            if (viewName === 'activity') { if (canEdit()) openActivityPanel(); else switchView('roadmap'); return; }
+            // The old Sprints tab is now the Roadmap's Sprint view (D-5)
+            if (viewName === 'sprints') { switchView('roadmap'); setPerspective('sprint'); return; }
+            closeActivityPanel(true, false);
+            currentView = viewName;
             if (viewName !== 'feedback') closeFeedbackPanel(false);
-            const leavingActivity = activityViewOpen() && viewName !== 'activity';
-            document.getElementById('roadmap-bar-actions')?.classList.toggle('hidden', viewName !== 'roadmap');
             if (roadmapView) roadmapView.classList.add('hidden');
             if (editorView) editorView.classList.add('hidden');
             if (feedbackView) feedbackView.classList.add('hidden');
-            if (activityView) { activityView.classList.add('hidden'); activityView.classList.remove('flex'); }
-            const sprintsView = document.getElementById('sprints-view');
-            if (sprintsView) { sprintsView.classList.add('hidden'); sprintsView.classList.remove('flex'); }
-            if (viewName !== 'sprints') stopSprintBoard();
-            // What was on screen while Activity was open counts as read
-            if (leavingActivity) markActivitySeen();
+            if (viewName !== 'roadmap') stopSprintBoard();
+            closeFilterSheet(false);
 
             const navButtons = [
                 { el: navRoadmap, id: 'roadmap' },
                 { el: navEditor, id: 'editor' },
-                { el: navFeedback, id: 'feedback' },
-                { el: document.getElementById('nav-activity'), id: 'activity' },
-                { el: document.getElementById('nav-sprints'), id: 'sprints' }
+                { el: navFeedback, id: 'feedback' }
             ];
 
             navButtons.forEach(item => {
@@ -1605,7 +1552,7 @@
                 else item.el.removeAttribute('aria-current');
             });
 
-            ['roadmap', 'editor', 'feedback', 'activity', 'sprints'].forEach(id => {
+            ['roadmap', 'editor', 'feedback'].forEach(id => {
                 const mobBtn = document.getElementById('mob-nav-' + id);
                 if (!mobBtn) return;
                 mobBtn.classList.toggle('text-brand-700', id === viewName);
@@ -1637,6 +1584,7 @@
                     }
                     // Existing deliverables get their starting stage from their status (once per roadmap per session)
                     if (canEditActive() && !stageInitDone.has(active.id)) ensureStages(active).then(() => scheduleRender());
+                    if (canEditActive() && !sprintIdsInitDone.has(active.id)) ensureSprintIds(active).then(() => scheduleRender());
                 }
             } else if (viewName === 'feedback') {
                 if (feedbackView) {
@@ -1648,49 +1596,112 @@
                     populateFeedbackCategoryOptions(active.feedback || []);
                     renderFeedbackTable();
                 }
-            } else if (viewName === 'activity') {
-                activityView?.classList.remove('hidden');
-                activityView?.classList.add('flex');
-                if (!useCloudPersistence || activityKey !== activityKeyNow() || !activityUnsub) loadActivity();
-                else renderActivity();
-                markActivitySeen();
-            } else if (viewName === 'sprints') {
-                sprintsView?.classList.remove('hidden');
-                sprintsView?.classList.add('flex');
-                loadSprintBoard();
             }
             if (!getActiveRoadmap()) renderWorkspaceEmpty();
         };
 
+        const PERSPECTIVES = ['year', 'quarter', 'month', 'module', 'sprint'];
         window.setPerspective = function(perspective) {
+            if (!PERSPECTIVES.includes(perspective)) perspective = 'year';
+            if (activePerspective === 'sprint' && perspective !== 'sprint') stopSprintBoard();
             activePerspective = perspective;
             activeSubfilter = 'ALL';
-
-            const btnYear = document.getElementById('view-btn-year');
-            const btnQuarter = document.getElementById('view-btn-quarter');
-            const btnMonth = document.getElementById('view-btn-month');
-            const btnModule = document.getElementById('view-btn-module');
-
-            const pBtns = [
-                { el: btnYear, id: 'year' },
-                { el: btnQuarter, id: 'quarter' },
-                { el: btnMonth, id: 'month' },
-                { el: btnModule, id: 'module' }
-            ];
-
-            pBtns.forEach(btn => {
-                if (!btn.el) return;
-                if (btn.id === perspective) {
-                    btn.el.className = "px-3 py-1 rounded-lg text-xs font-semibold bg-white text-brand-700 shadow-sm transition-all";
-                } else {
-                    btn.el.className = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all";
-                }
-            });
-
+            renderPerspectiveButtons();
             updateSubfilterOptions();
             const active = getActiveRoadmap();
             if (active) renderTimeline(active.items || []);
+            else applyPerspectiveLayout();
         };
+        function renderPerspectiveButtons() {
+            PERSPECTIVES.forEach(id => {
+                const b = document.getElementById('view-btn-' + id);
+                if (!b) return;
+                const on = id === activePerspective;
+                b.className = `h-6 px-2.5 rounded-lg text-xs font-semibold transition-all inline-flex items-center gap-1 ${on ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`;
+                b.setAttribute('aria-pressed', String(on));
+            });
+            const select = document.getElementById('perspective-select');
+            if (select) select.value = activePerspective;
+        }
+        // Timeline or Sprint view, and which toolbar controls / filters apply
+        function applyPerspectiveLayout() {
+            const sprint = activePerspective === 'sprint';
+            document.getElementById('roadmap-scroll-wrapper')?.classList.toggle('hidden', sprint);
+            const sv = document.getElementById('sprints-view');
+            sv?.classList.toggle('hidden', !sprint); sv?.classList.toggle('flex', sprint);
+            const controls = document.getElementById('sv-controls');
+            controls?.classList.toggle('hidden', !sprint); controls?.classList.toggle('flex', sprint);
+            ['timeline-stage-wrap', 'timeline-person-wrap'].forEach(id => document.getElementById(id)?.classList.toggle('hidden', sprint));
+            document.getElementById('sv-person-wrap')?.classList.toggle('hidden', !sprint);
+            if (sprint) ['annual-expand-toggle', 'show-load-toggle'].forEach(id => { const el = document.getElementById(id); el?.classList.add('hidden'); el?.classList.remove('flex'); });
+            updateFilterCounts();
+        }
+
+        // ---- Filters (2.11.0, R-6 / D-4): a popover (Roadmap) or a bottom sheet (phones) ----
+        let openSheet = null;
+        const isPhone = () => window.matchMedia('(max-width: 639px)').matches;
+        window.toggleFilterSheet = function(id) { if (openSheet === id) closeFilterSheet(); else openFilterSheet(id); };
+        function openFilterSheet(id) {
+            closeFilterSheet(false);
+            const box = document.getElementById(id + '-filters');
+            if (!box) return;
+            openSheet = id;
+            box.classList.remove('hidden');
+            document.getElementById(id + '-filters-btn')?.setAttribute('aria-expanded', 'true');
+            if (isPhone()) { document.getElementById('filter-scrim')?.classList.remove('hidden'); document.body.classList.add('overflow-hidden'); }
+            else box.querySelector('select:not([disabled])')?.focus();
+        }
+        window.closeFilterSheet = function(returnFocus = true) {
+            if (!openSheet) return;
+            const id = openSheet;
+            openSheet = null;
+            document.getElementById(id + '-filters')?.classList.add('hidden');
+            const btn = document.getElementById(id + '-filters-btn');
+            btn?.setAttribute('aria-expanded', 'false');
+            document.getElementById('filter-scrim')?.classList.add('hidden');
+            if (!activityViewOpen()) document.body.classList.remove('overflow-hidden');
+            if (returnFocus && btn?.offsetParent) btn.focus();
+        };
+        document.addEventListener('click', e => {
+            if (!openSheet || isPhone()) return;
+            if (!e.target.closest?.(`#${openSheet}-filters, #${openSheet}-filters-btn`)) closeFilterSheet(false);
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && openSheet && !visibleDialogs().length) { e.preventDefault(); closeFilterSheet(); }
+        });
+        window.resetFilters = function(id) {
+            const set = (elId, v = 'ALL') => { const el = document.getElementById(elId); if (el) el.value = v; };
+            if (id === 'timeline') {
+                set('timeline-stage-filter');
+                if (activePerspective === 'sprint') { svPerson = 'ALL'; set('sv-person'); }
+                else if (personFilter !== 'ALL') setPersonFilter('ALL');
+                applySubfilter('ALL');
+            } else if (id === 'editor') {
+                ['editor-module-filter', 'editor-status-filter', 'editor-stage-filter'].forEach(x => set(x));
+                if (personFilter !== 'ALL') setPersonFilter('ALL'); else applyEditorFilters();
+            } else if (id === 'feedback') {
+                ['feedback-status-filter', 'feedback-category-filter', 'feedback-submitter-filter'].forEach(x => set(x));
+                renderFeedbackTable();
+            }
+            updateFilterCounts();
+        };
+        // "Filters (n)": how many filters are narrowing each list
+        function updateFilterCounts() {
+            const v = id => document.getElementById(id)?.value || 'ALL';
+            const sprint = activePerspective === 'sprint';
+            const counts = {
+                timeline: (v('perspective-subfilter') !== 'ALL') + (!sprint && v('timeline-stage-filter') !== 'ALL') + (sprint ? svPerson !== 'ALL' : personFilter !== 'ALL'),
+                editor: ['editor-module-filter', 'editor-status-filter', 'editor-stage-filter'].filter(x => v(x) !== 'ALL').length + (personFilter !== 'ALL'),
+                feedback: ['feedback-status-filter', 'feedback-category-filter', 'feedback-submitter-filter'].filter(x => v(x) !== 'ALL').length
+            };
+            Object.entries(counts).forEach(([id, n]) => {
+                const el = document.getElementById(id + '-filters-count');
+                if (!el) return;
+                el.textContent = n ? String(n) : '';
+                el.classList.toggle('hidden', !n);
+                document.getElementById(id + '-filters-btn')?.setAttribute('aria-label', n ? `Filters, ${n} on` : 'Filters');
+            });
+        }
 
         // Card click: open the next, finer view scrolled to that period. The filter stays "Show All",
         // so the whole roadmap remains scrollable; the target is briefly highlighted.
@@ -1719,7 +1730,9 @@
                 const padTop = parseFloat(getComputedStyle(wrapper).scrollPaddingTop) || 0;
                 const top = target.getBoundingClientRect().top - wrapper.getBoundingClientRect().top + wrapper.scrollTop - padTop;
                 // Periods near the end can't reach the top: add just enough space below (gone on the next redraw)
-                const needed = top + wrapper.clientHeight - wrapper.scrollHeight;
+                // The content can be shorter than the box (no overflow): measure the content itself, not scrollHeight
+                const contentHeight = () => Math.max(wrapper.scrollHeight > wrapper.clientHeight ? wrapper.scrollHeight : 0, roadmapContainer.parentElement.getBoundingClientRect().bottom - wrapper.getBoundingClientRect().top + wrapper.scrollTop + (parseFloat(getComputedStyle(wrapper).paddingBottom) || 0));
+                const needed = top + wrapper.clientHeight - contentHeight();
                 if (needed > 0) {
                     const spacer = document.createElement('div');
                     spacer.id = 'drill-spacer';
@@ -1735,7 +1748,7 @@
                     if (!target.isConnected) return;
                     const again = target.getBoundingClientRect().top - wrapper.getBoundingClientRect().top + wrapper.scrollTop - padTop;
                     if (Math.abs(again - wrapper.scrollTop) > 4) {
-                        const more = again + wrapper.clientHeight - wrapper.scrollHeight;
+                        const more = again + wrapper.clientHeight - contentHeight();
                         const spacer = document.getElementById('drill-spacer');
                         if (more > 0) { if (spacer) spacer.style.height = (parseFloat(spacer.style.height) || 0) + Math.ceil(more) + 'px'; else { const sp = document.createElement('div'); sp.id = 'drill-spacer'; sp.setAttribute('aria-hidden', 'true'); sp.style.height = Math.ceil(more) + 'px'; roadmapContainer.appendChild(sp); } }
                         wrapper.style.scrollSnapType = 'none';
@@ -1763,6 +1776,8 @@
 
         function updateSubfilterOptions() {
             if (!perspectiveSubfilter) return;
+            const label = document.getElementById('subfilter-label');
+            if (label) label.textContent = { year: 'Year', quarter: 'Quarter', month: 'Month', module: 'Module', sprint: 'Module' }[activePerspective] || 'Filter';
             perspectiveSubfilter.innerHTML = '<option value="ALL">Show All</option>';
             const active = getActiveRoadmap();
             if (!active) return;
@@ -1797,7 +1812,7 @@
                     opt.textContent = formatMonthYear(m);
                     perspectiveSubfilter.appendChild(opt);
                 });
-            } else if (activePerspective === 'module') {
+            } else if (activePerspective === 'module' || activePerspective === 'sprint') {
                 const modules = Array.from(new Set(items.map(i => i.module).filter(Boolean))).sort();
                 modules.forEach(mod => {
                     const opt = document.createElement('option');
@@ -1808,7 +1823,7 @@
             }
 
             const hasUnscheduled = items.some(i => !i.date);
-            if (hasUnscheduled && activePerspective !== 'module') {
+            if (hasUnscheduled && activePerspective !== 'module' && activePerspective !== 'sprint') {
                 const opt = document.createElement('option');
                 opt.value = 'Unscheduled';
                 opt.textContent = 'Backlog / TBD';
@@ -1845,6 +1860,12 @@
             return `<span class="w-2 h-2 rounded-full shrink-0 ${color}" title="${label}" aria-hidden="true"></span><span class="sr-only">Status: ${label}</span>`;
         }
 
+        // 2.11.0 (R-4): one status badge everywhere: a dot and the word in sentence case
+        const STATUS_DOT = { done: 'bg-emerald-500', 'in-progress': 'bg-brand-500', planned: 'bg-amber-400', backlog: 'bg-slate-400' };
+        function statusBadge(status, label) {
+            return `<span class="st-badge inline-flex items-center gap-1.5 text-xs text-slate-700 whitespace-nowrap" data-status="${escapeHtml(status)}"><span class="w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[status] || STATUS_DOT.backlog}" aria-hidden="true"></span>${escapeHtml(label)}</span>`;
+        }
+
         function formatMonthFull(m) {
             const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
             return months[m - 1] || `Month ${m}`;
@@ -1852,21 +1873,21 @@
 
         function getFeedbackDerivedStatus(feedbackId, roadmap) {
             if (!roadmap || !roadmap.items) {
-                return { status: 'backlog', label: 'Backlog / Unlinked', milestones: [] };
+                return { status: 'backlog', label: 'Backlog', milestones: [] };
             }
 
             const linkedMilestones = roadmap.items.filter(item => (item.feedbackIds || []).includes(feedbackId));
 
             if (linkedMilestones.length === 0) {
-                return { status: 'backlog', label: 'Backlog / Unlinked', milestones: [] };
+                return { status: 'backlog', label: 'Backlog', milestones: [] };
             }
 
             if (linkedMilestones.some(m => m.status === 'in-progress')) {
-                return { status: 'in-progress', label: 'In Progress', milestones: linkedMilestones };
+                return { status: 'in-progress', label: 'In progress', milestones: linkedMilestones };
             }
 
             if (linkedMilestones.every(m => m.status === 'done')) {
-                return { status: 'done', label: 'Completed / Done', milestones: linkedMilestones };
+                return { status: 'done', label: 'Done', milestones: linkedMilestones };
             }
 
             return { status: 'planned', label: 'Planned', milestones: linkedMilestones };
@@ -1885,7 +1906,8 @@
                 roadmapSelect.innerHTML =
                     (previewRoadmap ? `<option value="" selected>Preview: ${escapeHtml(previewRoadmap.title)}</option>` : '') +
                     (sorted.length ? sorted.map(option).join('') : '<option value="">No roadmaps yet</option>') +
-                    (activeRoadmap?.deletedAt ? `<option value="" selected>In the Recycle Bin: ${escapeHtml(activeRoadmap.title)}</option>` : '');
+                    (activeRoadmap?.deletedAt ? `<option value="" selected>In the Recycle Bin: ${escapeHtml(activeRoadmap.title)}</option>` : '') +
+                    (canEdit() ? '<option disabled>──────────</option><option value="__new__">+ New roadmap…</option>' : '');
                 const progress = document.getElementById('roadmap-select-progress');
                 if (progress) progress.innerHTML = activeRoadmap && !activeRoadmap.deletedAt && !previewRoadmap
                     ? `<span class="hidden sm:inline-flex">${pctBar(pctOf(activeRoadmap))}</span><span>${pctOf(activeRoadmap)}%<span class="hidden sm:inline"> done</span></span>` : '';
@@ -1897,7 +1919,7 @@
             if (navFeedbackCount) navFeedbackCount.textContent = feedbackCount;
             const mobFeedbackCount = document.getElementById('mob-nav-feedback-count');
             if (mobFeedbackCount) mobFeedbackCount.textContent = feedbackCount;
-            if (feedbackTotalBadge) feedbackTotalBadge.textContent = pluralize(feedbackCount, 'item');
+            if (feedbackTotalBadge && !feedbackTotalBadge.dataset.filtered) feedbackTotalBadge.textContent = `${feedbackCount} feedback`;
 
             if (!activeRoadmap) {
                 renderWorkspaceEmpty();
@@ -1906,6 +1928,7 @@
             }
 
             updateSubfilterOptions();
+            if (canEditActive() && !sprintIdsInitDone.has(activeRoadmap.id)) ensureSprintIds(activeRoadmap).then(() => scheduleRender());
 
             if (!roadmapView.classList.contains('hidden')) {
                 renderTimeline(activeRoadmap.items || []);
@@ -1940,9 +1963,6 @@
             document.body.classList.toggle('no-edit-role', !canEdit());
             document.body.classList.toggle('not-admin', !isAdmin());
             document.body.classList.toggle('can-add-feedback', canAddFeedback());
-            document.getElementById('mobile-nav')?.classList.toggle('grid-cols-5', canEdit());
-            document.getElementById('mobile-nav')?.classList.toggle('grid-cols-4', !canEdit());
-            document.getElementById('mobile-nav')?.classList.remove('grid-cols-3');
 
             const badge = document.getElementById('header-role-badge');
             if (badge) {
@@ -1961,7 +1981,7 @@
             }
 
             const active = getActiveRoadmap();
-            document.getElementById('delete-roadmap-btn')?.classList.toggle('hidden', !canDeleteRoadmap(active));
+            applyRoadmapMenuRoles();
             const privateBtn = document.getElementById('private-roadmaps-btn');
             if (privateBtn) privateBtn.classList.toggle('hidden', !privateRoadmaps.length);
             const unmoved = privateRoadmaps.filter(r => !r.movedToWorkspace).length;
@@ -1979,6 +1999,7 @@
             const binCount = binEntries().length;
             const binVisible = !!myRole && (canEdit() || binCount > 0);
             document.getElementById('recycle-bin-btn')?.classList.toggle('hidden', !binVisible);
+            document.getElementById('account-workspace-label')?.classList.toggle('hidden', !(isAdmin() || canEditWorkflow() || canEditSprints() || binVisible || privateRoadmaps.length));
             const binCountEl = document.getElementById('account-bin-count');
             if (binCountEl) { binCountEl.textContent = binCount || ''; binCountEl.classList.toggle('hidden', !binCount); }
             // The divider above Sign out only when Users / Private roadmaps / Recycle Bin are shown
@@ -2296,6 +2317,16 @@
             }
         }
 
+        // The dropdown's last option opens the New roadmap window and keeps the current roadmap selected
+        window.onRoadmapSelect = function(select) {
+            if (select.value === '__new__') {
+                const active = getActiveRoadmap();
+                select.value = previewRoadmap || active?.deletedAt ? '' : active?.id || '';
+                openNewRoadmapModal();
+                return;
+            }
+            selectRoadmap(select.value);
+        };
         window.selectRoadmap = function(id) {
             if (!id) return;
             previewRoadmap = null;
@@ -2341,6 +2372,8 @@
         // =======================================================
         function renderTimeline(items) {
             if (!roadmapContainer) return;
+            applyPerspectiveLayout();
+            if (activePerspective === 'sprint') { loadSprintBoard(); return; }
             roadmapContainer.innerHTML = '';
             listKeys = new Map();
             listBodies.clear();
@@ -2357,10 +2390,8 @@
                     <div class="text-center py-20 text-slate-500">
                         <i class="ph-bold ph-git-commit rotate-90 text-4xl mb-2 text-slate-300"></i>
                         <p class="font-bold text-sm text-slate-700">No deliverables added yet</p>
-                        <p class="text-xs text-slate-500 mt-1">Switch to the Editor tab or click "+ Add Milestone" to build your timeline.</p>
-                        <button onclick="switchView('editor')" class="editor-only mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all">
-                            Open Editor
-                        </button>
+                        <p class="text-xs text-slate-500 mt-1">Add the first deliverable to build your timeline.</p>
+                        <button onclick="openAddMilestoneModal()" class="editor-only mt-4 ctl ctl-primary"><i class="ph-bold ph-plus" aria-hidden="true"></i> Add deliverable</button>
                     </div>
                 `;
                 return;
@@ -2447,7 +2478,7 @@
                     class="list-row group/row flex flex-wrap items-center gap-x-2 gap-y-0.5 xl:grid ${LIST_COLS} xl:gap-2 px-3 py-2 text-xs border-t border-slate-100 border-l-2 border-l-transparent ${tint || 'hover:bg-slate-50'} cursor-pointer">
                     <span class="hidden xl:block">${reorder ? reorderHtml(item) : ''}</span>
                     <span class="flex items-center gap-1 shrink-0">${rankChipHtml(roadmap, item, withPlace ? n + 1 : 0)}</span>
-                    <span class="list-name font-bold text-slate-900 truncate min-w-0 flex-1 xl:flex-none">${escapeHtml(item.name)}</span>
+                    <span class="list-name font-bold text-slate-900 truncate min-w-0 flex-1 xl:flex-none flex items-center gap-1.5"><span class="truncate min-w-0">${escapeHtml(item.name)}</span>${sprintChipsHtml(roadmap, item, 2)}</span>
                     <span class="hidden xl:block text-brand-600 font-semibold truncate">${escapeHtml(item.module)}</span>
                     <span class="hidden xl:block ${effort ? 'text-slate-700' : 'text-slate-400'}" ${effort ? '' : 'title="Not estimated"'}>${effort ? fmtDays(effort) : '—'}</span>
                     <span class="hidden xl:flex min-w-0">${statusCellHtml(roadmap, item)}</span>
@@ -2689,7 +2720,7 @@
         function populateEditorModuleFilterOptions(items) {
             if (!editorModuleFilter) return;
             const currentSelected = editorModuleFilter.value;
-            editorModuleFilter.innerHTML = '<option value="ALL">All Modules</option>';
+            editorModuleFilter.innerHTML = '<option value="ALL">All modules</option>';
 
             const modules = Array.from(new Set(items.map(i => i.module).filter(Boolean))).sort();
             modules.forEach(m => {
@@ -2775,18 +2806,15 @@
             editorTableBody.setAttribute('data-rank-list', 'editor');
 
             if (editorFilterCountBadge) {
-                if (searchVal || modVal !== 'ALL' || statusVal !== 'ALL' || stageVal !== 'ALL' || personFilter !== 'ALL') {
-                    editorFilterCountBadge.textContent = `${filtered.length} of ${items.length} matched`;
-                    editorFilterCountBadge.classList.remove('hidden');
-                } else {
-                    editorFilterCountBadge.classList.add('hidden');
-                }
+                const narrowed = searchVal || modVal !== 'ALL' || statusVal !== 'ALL' || stageVal !== 'ALL' || personFilter !== 'ALL';
+                editorFilterCountBadge.textContent = narrowed ? `${filtered.length} of ${pluralize(items.length, 'deliverable')}` : pluralize(filtered.length, 'deliverable');
             }
+            updateFilterCounts();
 
             if (filtered.length === 0) {
                 editorTableBody.innerHTML = `
                     <tr>
-                        <td colspan="10" class="text-center py-12 text-slate-500">
+                        <td colspan="11" class="text-center py-12 text-slate-500">
                             <i class="ph ph-sliders text-3xl mb-1 text-slate-300"></i>
                             <p class="font-medium text-xs">${hiddenDone ? `All ${pluralize(hiddenDone, 'matching deliverable')} ${hiddenDone === 1 ? 'is' : 'are'} done. <button type="button" onclick="toggleShowDone()" class="text-brand-700 font-bold hover:underline">Show done</button>` : 'No deliverables match your search or filter.'}</p>
                             <button onclick="openAddMilestoneModal()" class="editor-only mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
@@ -2830,6 +2858,7 @@
                             ${effort ? `<span class="shrink-0">· ${fmtDays(effort)}</span>` : ''}
                             <span class="shrink-0 flex items-center gap-1">${statusShortHtml(item)}</span>
                             ${item.owner?.email || (item.team || []).length ? `<span class="shrink-0">${peopleStackHtml(item, 1, 'sm')}</span>` : ''}
+                            ${sprintChipsHtml(roadmap, item, 1)}
                             ${overFlagHtml(roadmap, item) ? `<span class="shrink-0">${overFlagHtml(roadmap, item)}</span>` : ''}
                         </div>
                     </td>
@@ -2839,6 +2868,7 @@
                     <td class="people-cell hidden lg:table-cell py-3 px-3 whitespace-nowrap">${peopleStackHtml(item)}</td>
                     <td class="hidden lg:table-cell py-3 px-3 text-slate-600 whitespace-nowrap">
                         <span class="text-xs font-medium">${escapeHtml(formatMonthYear(item.date))}</span>
+                        <span class="sprints-cell flex mt-0.5 h-5">${sprintChipsHtml(roadmap, item, 2)}</span>
                     </td>
                     <td class="effort-cell hidden lg:table-cell py-3 px-3 whitespace-nowrap text-xs ${effort ? 'text-slate-700' : 'text-slate-400'}" ${canEditActive() ? `onclick="event.stopPropagation(); editEffortInline('${escapeHtml(item.id)}', this)" tabindex="0" role="button" aria-label="Effort for ${escapeHtml(item.name)}: ${effort ? fmtDays(effort) : 'not estimated'}. Click to change."` : ''} title="${effort ? '' : 'Not estimated'}">${effort ? fmtDays(effort) : '—'}</td>
                     <td class="hidden lg:table-cell py-3 px-3">
@@ -2864,7 +2894,7 @@
         function populateFeedbackCategoryOptions(feedbackList) {
             if (!feedbackCategoryFilter) return;
             const currentSelected = feedbackCategoryFilter.value;
-            feedbackCategoryFilter.innerHTML = '<option value="ALL">All Categories</option>';
+            feedbackCategoryFilter.innerHTML = '<option value="ALL">All categories</option>';
 
             const categories = Array.from(new Set(feedbackList.map(f => f.category).filter(Boolean))).sort();
             categories.forEach(c => {
@@ -2907,13 +2937,13 @@
             { key: 'category', label: 'Category', cls: 'hidden lg:table-cell py-3 px-3' },
             { key: 'sub', label: 'Submitted By', cls: 'fb-col-sub hidden xl:table-cell py-3 px-3' },
             { key: 'date', label: 'Date', cls: 'hidden lg:table-cell py-3 px-3' },
-            { key: 'status', label: 'Status', cls: 'hidden lg:table-cell py-3 px-3', title: 'Status is taken from the linked milestones' },
-            { key: 'rel', label: 'Related Milestone(s)', cls: 'fb-col-rel hidden lg:table-cell py-3 px-3' }
+            { key: 'status', label: 'Status', cls: 'hidden lg:table-cell py-3 px-3', title: 'Status is taken from the linked deliverables' },
+            { key: 'rel', label: 'Deliverables', cls: 'fb-col-rel hidden lg:table-cell py-3 px-3' }
         ];
         const FEEDBACK_SORT_OPTIONS = [
             ['date|desc', 'Newest first'], ['date|asc', 'Oldest first'], ['title|asc', 'Title A–Z'], ['title|desc', 'Title Z–A'],
             ['category|asc', 'Category A–Z'], ['category|desc', 'Category Z–A'], ['sub|asc', 'Submitted by A–Z'], ['sub|desc', 'Submitted by Z–A'],
-            ['status|asc', 'Status: Backlog → Done'], ['status|desc', 'Status: Done → Backlog'], ['rel|desc', 'Most milestones'], ['rel|asc', 'Fewest milestones']
+            ['status|asc', 'Status: Backlog → Done'], ['status|desc', 'Status: Done → Backlog'], ['rel|desc', 'Most deliverables'], ['rel|asc', 'Fewest deliverables']
         ];
 
         // Submission date in PHT: "Nov 17, 2026", or "Nov 17" for this year (short)
@@ -3040,15 +3070,21 @@
 
             sortFeedback(filtered, activeRoadmap);
             feedbackOrder = filtered.map(f => f.id);
+            if (feedbackTotalBadge) {
+                const narrowed = query || statusFilter !== 'ALL' || catFilter !== 'ALL' || submitterFilter !== 'ALL';
+                feedbackTotalBadge.textContent = narrowed ? `${filtered.length} of ${allFeedback.length} feedback` : `${allFeedback.length} feedback`;
+                feedbackTotalBadge.dataset.filtered = narrowed ? '1' : '';
+            }
+            updateFilterCounts();
 
             if (filtered.length === 0) {
                 feedbackTableBody.innerHTML = `
                     <tr>
                         <td colspan="7" class="text-center py-12 text-slate-500">
                             <i class="ph ph-chat-centered-text text-3xl mb-1 text-slate-300"></i>
-                            <p class="font-medium text-xs">No feedback or suggestions found.</p>
+                            <p class="font-medium text-xs">No feedback found.</p>
                             <button onclick="openAddFeedbackModal()" class="feedback-add-only mt-3 text-xs text-brand-600 hover:underline font-bold inline-flex items-center gap-1">
-                                <i class="ph-bold ph-plus"></i> Add new suggestion
+                                <i class="ph-bold ph-plus"></i> Add feedback
                             </button>
                         </td>
                     </tr>
@@ -3065,10 +3101,7 @@
                 tr.tabIndex = 0;
                 tr.setAttribute('aria-selected', String(selected));
 
-                let statusBadge = 'bg-slate-100 text-slate-500 border border-slate-200';
-                if (item.derivedStatus === 'done') statusBadge = 'bg-emerald-50 text-emerald-600 border border-emerald-200';
-                else if (item.derivedStatus === 'in-progress') statusBadge = 'bg-brand-50 text-brand-600 border border-brand-200';
-                else if (item.derivedStatus === 'planned') statusBadge = 'bg-amber-50 text-amber-700 border border-amber-200';
+                const badgeHtml = statusBadge(item.derivedStatus, item.statusLabel);
 
                 const firstMilestones = item.linkedMilestones.slice(0, 1);
                 const moreMilestones = item.linkedMilestones.slice(1);
@@ -3078,7 +3111,7 @@
                             <i class="ph-bold ph-git-commit rotate-90 text-[10px] shrink-0"></i><span class="truncate">${escapeHtml(m.name)}</span>
                         </button>
                       `).join(' ') + (moreMilestones.length ? `<span class="shrink-0 px-1.5 py-0.5 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-semibold border border-slate-200 cursor-default" title="${escapeHtml('Also linked: ' + moreMilestones.map(m => m.name).join(', '))}" aria-label="${escapeHtml(`and ${moreMilestones.length} more: ${moreMilestones.map(m => m.name).join(', ')}`)}">+${moreMilestones.length}</span>` : '')
-                    : `<span class="text-slate-500 italic text-[11px] whitespace-nowrap" title="Not linked to any milestone">Unlinked</span>`;
+                    : `<span class="text-slate-500 italic text-[11px] whitespace-nowrap" title="Not linked to any deliverable">Unlinked</span>`;
 
                 const submitter = feedbackSubmitter(item);
                 const submitterHtml = submitter
@@ -3105,7 +3138,7 @@
                         <p class="feedback-desc text-[11px] font-normal text-slate-500 mt-0.5 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem] lg:max-w-[13rem] xl:max-w-[16rem]">${item.description ? escapeHtml(item.description) : '&nbsp;'}</p>
                         <div class="fb-subline lg:hidden mt-1.5 flex flex-nowrap items-center gap-1.5 font-normal max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem]">
                             <span class="hidden min-[400px]:inline-block min-w-0 max-w-[6rem] truncate align-middle px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700">${escapeHtml(item.category)}</span>
-                            <span class="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap ${statusBadge}">${escapeHtml(item.statusLabel)}</span>
+                            <span class="shrink-0">${badgeHtml}</span>
                             ${item.linkedMilestones.length ? `<span class="shrink-0 text-[11px] text-brand-700 font-semibold" title="${escapeHtml(item.linkedMilestones.map(m => m.name).join(', '))}"><i class="ph-bold ph-git-commit rotate-90 text-[10px]" aria-hidden="true"></i> ${item.linkedMilestones.length}</span>` : ''}
                             ${toMillis(item.createdAt) ? `<span class="fb-subline-date min-w-0 truncate text-[11px] text-slate-500">· ${escapeHtml(feedbackDate(item.createdAt, true))}</span>` : ''}
                         </div>
@@ -3119,9 +3152,7 @@
                     </td>
                     <td class="fb-date hidden lg:table-cell py-3 px-3 text-slate-600 whitespace-nowrap">${dateHtml}</td>
                     <td class="hidden lg:table-cell py-3 px-3 whitespace-nowrap">
-                        <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${statusBadge}">
-                            ${escapeHtml(item.statusLabel)}
-                        </span>
+                        ${badgeHtml}
                     </td>
                     <td class="fb-col-rel hidden lg:table-cell py-3 px-3">
                         <div class="flex flex-nowrap gap-1.5 items-center max-w-[12rem]">
@@ -3158,7 +3189,7 @@
             const cancel = document.getElementById('feedback-cancel-btn');
             if (cancel) cancel.textContent = readOnly ? 'Close' : 'Cancel';
             const titleEl = document.getElementById('feedback-modal-title');
-            if (titleEl) titleEl.textContent = mode === 'new' ? 'New Feedback / Suggestion' : mode === 'edit' ? 'Edit Feedback / Suggestion' : 'Feedback Details';
+            if (titleEl) titleEl.textContent = mode === 'new' ? 'Add feedback' : mode === 'edit' ? 'Edit feedback' : 'Feedback details';
         }
 
         function stopFeedbackHistory() {
@@ -3286,6 +3317,8 @@
             panel.classList.toggle('hidden', !open);
             panel.classList.toggle('flex', open);
             document.body.classList.toggle('overflow-hidden', open && window.innerWidth < 640);
+            // R-10: the card ends after its last row, but takes the full height while the panel is open
+            document.getElementById('feedback-card')?.classList.toggle('sm:flex-1', open);
             if (!open) { panel.innerHTML = ''; feedbackPanelHtml = ''; fitFeedbackTable(); return; }
 
             const item = (roadmap.feedback || []).find(f => f.id === feedbackPanel.id);
@@ -3333,7 +3366,7 @@
                             <h3 id="feedback-panel-title" tabindex="-1" class="text-base font-bold text-slate-900 leading-snug break-words outline-none">${escapeHtml(item.title)}</h3>
                             <div class="mt-2 flex flex-wrap items-center gap-1.5">
                                 <span class="px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700 break-all">${escapeHtml(item.category)}</span>
-                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${badge}">${escapeHtml(derived.label)}</span>
+                                ${statusBadge(derived.status, derived.label)}
                             </div>
                         </div>
                         ${canCopyFeedbackLink(roadmap) ? `<div class="relative shrink-0">
@@ -3351,7 +3384,7 @@
                             <dt class="text-slate-500">Date</dt><dd class="text-slate-800">${toMillis(item.createdAt) ? escapeHtml(formatPHT(item.createdAt)) : '<span class="text-slate-400">—</span>'}</dd>
                         </dl>
                         ${feedbackPanelSection('Description', item.description ? `<p class="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap break-words">${escapeHtml(item.description)}</p>` : '<p class="text-xs text-slate-400 italic">No description</p>')}
-                        ${feedbackPanelSection(`Linked milestones (${derived.milestones.length})`, derived.milestones.length ? `<div class="space-y-1.5">${milestones}</div>` : '<p class="text-xs text-slate-500 italic">Not linked to any milestone</p>')}
+                        ${feedbackPanelSection(`Linked deliverables (${derived.milestones.length})`, derived.milestones.length ? `<div class="space-y-1.5">${milestones}</div>` : '<p class="text-xs text-slate-500 italic">Not linked to any milestone</p>')}
                         ${feedbackPanelSection('History', '<div id="feedback-panel-history" class="space-y-2"></div>')}
                     </div>
                     <footer class="px-4 py-3 border-t border-slate-200 bg-slate-50/70 flex items-center gap-2 shrink-0">
@@ -3663,7 +3696,7 @@
             document.getElementById('modal-target-date').textContent = formatMonthYear(item.date);
 
             const rankEffort = document.getElementById('modal-rank-effort');
-            if (rankEffort) rankEffort.innerHTML = `${rankChipHtml(activeRoadmap, item)}${effortOf(item) ? `<span>Effort ${fmtDays(effortOf(item))}</span>` : ''}`;
+            if (rankEffort) rankEffort.innerHTML = `${rankChipHtml(activeRoadmap, item)}${effortOf(item) ? `<span>Effort ${fmtDays(effortOf(item))}</span>` : ''}${itemSprints(item).length ? `<span class="inline-flex items-center gap-1" aria-label="Sprints"><span class="text-slate-500">Sprints</span>${sprintChipsHtml(activeRoadmap, item, 6)}</span>` : ''}`;
             const overNote = document.getElementById('modal-over-note');
             if (overNote) {
                 const m = item.date ? monthLoads(activeRoadmap).get(item.date) : null;
@@ -3916,7 +3949,7 @@
                 ${legacy.map(h => row({ lines: [h.action || 'Change'], who: h.user || 'Member', whoTitle: '', when: formatRelativeTime(h.timestamp), whenTitle: formatPHT(h.timestamp), legacyRow: true })).join('')}` : '');
             if (!html) return '<div class="py-8 text-center text-slate-500 text-xs italic">No activity recorded yet.</div>';
             const created = toDate(item.createdAt);
-            return html + `<p class="py-2 text-center text-[11px] text-slate-500">That's everything since this milestone was created${created ? ` (${escapeHtml(shortDay(item.createdAt))})` : ''}.</p>`;
+            return html + `<p class="py-2 text-center text-[11px] text-slate-500">That's everything since this deliverable was created${created ? ` (${escapeHtml(shortDay(item.createdAt))})` : ''}.</p>`;
         }
 
         // One line under the Edit window title: rank, status, who changed it last
@@ -3929,6 +3962,8 @@
             if (item.updatedBy?.name && toMillis(item.updatedAt)) parts.push(`last changed ${formatRelativeTime(item.updatedAt).replace(/^Just now$/, 'just now')} by ${item.updatedBy.name}`);
             el.textContent = parts.filter(Boolean).join(' · ');
             el.title = item.updatedAt ? formatPHT(item.updatedAt) : '';
+            const chips = document.getElementById('edit-milestone-sprints');
+            if (chips) chips.innerHTML = sprintChipsHtml(roadmap, item, 4);
         }
 
         let shownCommentCount = 0;
@@ -4264,10 +4299,7 @@
             const b = document.getElementById('activity-mine');
             if (!b) return;
             b.setAttribute('aria-checked', String(activityMine));
-            b.className = `inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-semibold ${activityMine ? 'bg-brand-50 border-brand-200 text-brand-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`;
-            const track = b.querySelector('.mine-track'), knob = b.querySelector('.mine-knob');
-            track?.classList.toggle('bg-brand-600', activityMine); track?.classList.toggle('bg-slate-300', !activityMine);
-            knob?.classList.toggle('left-3.5', activityMine); knob?.classList.toggle('left-0.5', !activityMine);
+            b.className = 'sw';
         }
 
         // ---- Demo: five sample people and a few assignments on the sample roadmap ----
@@ -4299,7 +4331,77 @@
         let taskState = { mid: null, roadmapId: null, tasks: [], loaded: false, error: '' };
         let taskUnsub = null;
         let taskOpenId = null, taskMenuId = null, taskFilter = 'ALL', taskDeletedOpen = false;
+        let taskAddSprintId;                    // undefined = the current sprint; set by "+ Add task to this sprint" (null = no sprint)
         const demoTasks = new Map();            // demo mode: milestone id -> tasks
+
+        // ---- Sprint chips (2.11.0, D-5): which sprints a deliverable's tasks are in (milestone.sprintIds) ----
+        function itemSprints(item) { return [...new Set(item?.sprintIds || [])].map(sprintById).filter(Boolean).sort((a, b) => a.start.localeCompare(b.start)); }
+        function sprintChipsHtml(roadmap, item, max = 2, empty = '') {
+            const list = itemSprints(item);
+            if (!list.length) return empty;
+            const today = phtToday();
+            const shown = list.slice(-max), rest = list.slice(0, list.length - shown.length);
+            const rid = escapeHtml(roadmap?.id || ''), mid = escapeHtml(item.id);
+            return `<span class="sprint-chips inline-flex items-center gap-1 shrink-0">${rest.length ? `<span class="text-[10px] text-slate-400" title="${escapeHtml('Also: ' + rest.map(x => x.name).join(', '))}">+${rest.length}</span>` : ''}${shown.map(x => {
+                const cur = x.start <= today && today <= x.end, past = x.end < today;
+                return `<button type="button" onclick="event.stopPropagation(); openSprintChip('${escapeHtml(x.id)}', '${rid}', '${mid}')" data-sprint="${escapeHtml(x.id)}" title="${escapeHtml(`${x.name} · ${shortDate(x.start)} – ${shortDate(x.end)}${cur ? ' (current)' : ''}: open in the Sprint view`)}" class="sprint-chip h-5 px-1.5 rounded-md text-[10px] font-bold border ${cur ? 'bg-brand-50 text-brand-700 border-brand-200' : past ? 'bg-slate-50 text-slate-400 border-slate-200' : 'bg-white text-slate-600 border-slate-300'} hover:ring-2 hover:ring-brand-200">${escapeHtml(sprintShort(x))}</button>`;
+            }).join('')}</span>`;
+        }
+        // A chip opens the Sprint view at that sprint with the deliverable's row open
+        window.openSprintChip = async function(sid, rid, mid) {
+            const editOpen = !document.getElementById('edit-milestone-modal')?.classList.contains('hidden');
+            if (editOpen && Object.keys(EDIT_FIELDS).some(fl => formFieldValue(fl) !== editBaseline[fl])
+                && !(await confirmAction({ title: 'Unsaved changes', messageHtml: 'Your changes to this deliverable aren\'t saved. Leave without saving?', confirmLabel: 'Leave' }))) return;
+            if (editOpen) closeEditMilestoneModal();
+            if (!document.getElementById('detail-modal')?.classList.contains('hidden')) closeModal();
+            if (rid && getActiveRoadmap()?.id !== rid) selectRoadmap(rid);
+            svSprint = sid;
+            svMode = 'list';
+            try { localStorage.setItem(SV_MODE_KEY, svMode); } catch (e) { /* private mode */ }
+            svExpanded.add(`${sid}|${rid}/${mid}`);
+            if (currentView !== 'roadmap') switchView('roadmap');
+            setPerspective('sprint');
+            setTimeout(() => document.querySelector(`#sprints-board [data-row-key="${CSS.escape(`${sid}|${rid}/${mid}`)}"]`)?.scrollIntoView({ block: 'center' }), 50);
+        };
+        // A deliverable's sprints after these task writes (live tasks only)
+        function nextSprintIds(ops) {
+            const tasks = taskState.tasks.map(t => ({ ...t }));
+            ops.forEach(op => {
+                if (op.kind === 'set') tasks.push({ ...op.data, id: op.id });
+                else if (op.kind === 'update') Object.assign(tasks.find(t => t.id === op.id) || {}, op.data);
+                else { const i = tasks.findIndex(t => t.id === op.id); if (i >= 0) tasks.splice(i, 1); }
+            });
+            return [...new Set(tasks.filter(t => !t.deletedAt && t.sprintId).map(t => t.sprintId))].sort();
+        }
+        const sameIds = (a, b) => JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
+        // Once per roadmap (Editors): deliverables from before 2.11.0 get their sprintIds from their tasks
+        const sprintIdsInitDone = new Set();
+        async function ensureSprintIds(roadmap) {
+            if (!roadmap || roadmap.isPreview || roadmap.deletedAt || !canEditActive() || sprintIdsInitDone.has(roadmap.id)) return;
+            sprintIdsInitDone.add(roadmap.id);
+            const todo = (roadmap.items || []).filter(i => !Array.isArray(i.sprintIds));
+            if (!todo.length) return;
+            if (!useCloudPersistence) {
+                todo.forEach(i => { i.sprintIds = [...new Set((demoTasks.get(i.id) || []).filter(t => !t.deletedAt && t.sprintId).map(t => t.sprintId))].sort(); });
+                return;
+            }
+            const found = [];
+            for (const item of todo) {
+                try {
+                    const snap = await getDocs(wsCollection('roadmaps', roadmap.id, 'milestones', item.id, 'tasks'));
+                    found.push({ item, ids: [...new Set(snap.docs.map(d => d.data()).filter(t => !t.deletedAt && t.sprintId).map(t => t.sprintId))].sort() });
+                } catch (e) { console.warn('Could not read tasks for the sprint chips:', e); return; }
+            }
+            for (let i = 0; i < found.length; i += 20) {
+                const part = found.slice(i, i + 20);
+                const aid = newId('a');
+                const ok = await commitBatch(batch => {
+                    part.forEach(({ item, ids }) => batch.update(itemRef(roadmap.id, 'milestones', item.id), { sprintIds: ids, ...stamp(aid) }));
+                    batch.set(auditRef(aid), auditEntry(roadmap, 'roadmap.sprints_indexed', { type: 'roadmap', id: roadmap.id, label: roadmap.title }, [{ f: 'items', to: part.length }]));
+                }, 'list the sprints of each deliverable');
+                if (!ok) return;
+            }
+        }
 
         // ---- Sprints ----
         function phtToday() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date()); }
@@ -4359,6 +4461,7 @@
             taskUnsub = null;
             taskState = { mid: null, roadmapId: null, tasks: [], loaded: false, error: '' };
             taskOpenId = null; taskMenuId = null; taskFilter = 'ALL'; taskDeletedOpen = false;
+            taskAddSprintId = undefined;
         }
         function openTaskItem() { return getActiveRoadmap()?.items.find(i => i.id === taskState.mid) || null; }
         const liveTasks = () => taskState.tasks.filter(t => !t.deletedAt).sort((a, b) => (a.orderKey ?? 0) - (b.orderKey ?? 0) || toMillis(a.createdAt) - toMillis(b.createdAt));
@@ -4436,13 +4539,23 @@
                 <option value="ALL">All sprints</option><option value="CUR" ${cur ? '' : 'disabled'}>Current sprint${cur ? ` (${escapeHtml(sprintShort(cur))})` : ''}</option>
                 ${sprints.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('')}<option value="NONE">No sprint</option></select>`;
             const emptyMsg = all.length ? 'No tasks in this sprint.' : ed ? 'No tasks yet. Add the first one below.' : 'No tasks yet.';
+            const target = taskAddSprintId !== undefined ? sprintById(taskAddSprintId) : cur;
+            const addPlaceholder = `Add task… (Enter)${taskAddSprintId === null ? ' · no sprint' : target ? ` · goes to ${target.name}${target.id === cur?.id ? ' (current)' : ''}` : ''}`;
+            const groupKey = t => sprintById(t.sprintId) ? t.sprintId : 'NONE';
+            const grouped = taskFilter === 'ALL' && shown.length && sprints.length
+                ? [...new Set(shown.map(groupKey))].sort((a, b) => a === 'NONE' ? 1 : b === 'NONE' ? -1 : sprintById(b).start.localeCompare(sprintById(a).start)).map(k => {
+                    const ts = shown.filter(t => groupKey(t) === k), sp = sprintById(k), today = phtToday();
+                    const when = !sp ? '' : sp.start <= today && today <= sp.end ? ' · current' : sp.end < today ? ' · closed' : ' · next';
+                    return `<div class="task-group" data-sprint="${escapeHtml(k)}"><p class="task-group-head flex items-center gap-2 px-2 pt-2 pb-1 text-[11px] font-bold text-slate-500">${sp ? escapeHtml(sp.name) : 'No sprint'}${when}<span class="font-semibold text-slate-400">${ts.filter(t => t.status === 'done').length}/${ts.length} done</span></p>${ts.map(t => taskRowHtml(t, item)).join('')}</div>`;
+                }).join('')
+                : '';
             const bin = binnedTasks();
             return `<div class="flex items-center justify-between gap-2 mb-1.5 text-[11px] text-slate-600">
                     <span class="task-summary"><b class="text-slate-800">${done.length} of ${shown.length} done</b>${blocked ? ` · <span class="text-rose-700 font-semibold">${blocked} blocked</span>` : ''}${pd ? ` · ${fmtDays(pdDone)} of ${fmtDays(pd)} done` : ''}</span>${filter}</div>
                 ${effort || totalPd ? `<div class="task-effort mb-1.5 text-[11px] ${effort && totalPd > effort ? 'text-amber-700' : 'text-slate-500'}">Tasks: ${fmtDays(totalPd)}${effort ? ` of ${fmtDays(effort)} effort` : ''}</div>` : ''}
                 ${!sprints.length && canEditSprints() ? '<p class="mb-1.5 text-[11px] text-slate-500">No sprints yet. <button type="button" onclick="openSprintsWindow()" class="font-semibold text-brand-700 hover:underline">Set up sprints</button></p>' : ''}
-                <div class="space-y-0.5">${shown.map(t => taskRowHtml(t, item)).join('') || `<p class="py-5 text-center text-xs text-slate-500 italic">${emptyMsg}</p>`}</div>
-                ${ed ? `<div class="mt-1.5 flex items-center gap-2 px-2 py-1.5 rounded-lg border border-dashed border-slate-300 bg-white focus-within:border-brand-400"><i class="ph-bold ph-plus text-slate-400" aria-hidden="true"></i><input id="${where}-task-add" aria-label="Add task" maxlength="200" class="task-add flex-1 text-xs outline-none bg-transparent" placeholder="Add task… (Enter)${cur ? ` · goes to ${escapeHtml(cur.name)} (current)` : ''}" onkeydown="if (event.key === 'Enter') { event.preventDefault(); addTask(this); }"></div>` : ''}
+                <div class="space-y-0.5">${grouped || shown.map(t => taskRowHtml(t, item)).join('') || `<p class="py-5 text-center text-xs text-slate-500 italic">${emptyMsg}</p>`}</div>
+                ${ed ? `<div class="mt-1.5 flex items-center gap-2 px-2 py-1.5 rounded-lg border border-dashed border-slate-300 bg-white focus-within:border-brand-400"><i class="ph-bold ph-plus text-slate-400" aria-hidden="true"></i><input id="${where}-task-add" aria-label="Add task" maxlength="200" class="task-add flex-1 text-xs outline-none bg-transparent" placeholder="${escapeHtml(addPlaceholder)}" onkeydown="if (event.key === 'Enter') { event.preventDefault(); addTask(this); }"></div>` : ''}
                 ${bin.length ? `<div class="mt-3 border-t border-slate-200 pt-2"><button type="button" onclick="toggleDeletedTasks()" aria-expanded="${taskDeletedOpen}" class="task-bin-toggle text-[11px] font-semibold text-slate-500 hover:text-slate-800"><i class="ph-bold ${taskDeletedOpen ? 'ph-caret-down' : 'ph-caret-right'}" aria-hidden="true"></i> Deleted tasks (${bin.length})</button>
                     ${taskDeletedOpen ? bin.map(t => `<div class="task-binned mt-1 flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-100/70 text-xs" data-task-id="${escapeHtml(t.id)}"><i class="ph-bold ph-trash text-slate-400" aria-hidden="true"></i><span class="flex-1 min-w-0 truncate text-slate-600" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
                         <span class="shrink-0 text-[10px] text-slate-500">by ${escapeHtml(t.deletedBy?.name || 'Member')} · ${pluralize(Math.max(0, Math.ceil((toMillis(t.purgeAt) - Date.now()) / DAY_MS)), 'day')} left</span>
@@ -4492,7 +4605,10 @@
             const roadmap = getActiveRoadmap(), item = openTaskItem();
             if (!roadmap || !item) return false;
             const entry = auditEntry(roadmap, action, { type: 'milestone', id: item.id, label: item.name }, changes);
+            const sprintIds = nextSprintIds(ops);
+            const sprintIdsChanged = canEditActive() && !sameIds(sprintIds, item.sprintIds);
             if (!useCloudPersistence || roadmap.isPreview) {
+                if (sprintIdsChanged) item.sprintIds = sprintIds;
                 ops.forEach(op => {
                     if (op.kind === 'set') taskState.tasks.push({ ...op.data, id: op.id });
                     else if (op.kind === 'update') Object.assign(taskState.tasks.find(t => t.id === op.id) || {}, op.data);
@@ -4512,6 +4628,7 @@
                     else if (op.kind === 'update') batch.update(taskRef(op.id), { ...op.data, ...stamp(aid) });
                     else batch.delete(taskRef(op.id));
                 });
+                if (sprintIdsChanged) batch.update(itemRef(roadmap.id, 'milestones', item.id), { sprintIds, ...stamp(aid) });
                 batch.set(auditRef(aid), entry);
             }, label);
         }
@@ -4523,7 +4640,7 @@
             if (!title || !canEditActive() || !taskState.mid) return;
             input.value = '';
             const keys = liveTasks().map(t => t.orderKey ?? 0);
-            const data = { title: clip(title, 200), status: 'todo', assignee: null, sprintId: currentSprint()?.id || null, estimateDays: null, notes: '', link: '',
+            const data = { title: clip(title, 200), status: 'todo', assignee: null, sprintId: taskAddSprintId !== undefined ? taskAddSprintId : currentSprint()?.id || null, estimateDays: null, notes: '', link: '',
                 orderKey: (keys.length ? Math.max(...keys) : 0) + 1000, createdBy: actor(), deletedAt: null };
             if (!useCloudPersistence) data.createdAt = new Date().toISOString();
             const boxId = input.id;
@@ -4581,7 +4698,8 @@
         };
         window.moveTask = async function(id, dir) {
             if (!canEditActive()) return;
-            const list = liveTasks(), i = list.findIndex(t => t.id === id), j = i + dir;
+            const me = taskById(id), key = t => sprintById(t.sprintId) ? t.sprintId : 'NONE';
+            const list = liveTasks().filter(t => !me || key(t) === key(me)), i = list.findIndex(t => t.id === id), j = i + dir;
             if (i < 0 || j < 0 || j >= list.length) return;
             const a = list[i], b = list[j];
             const ka = a.orderKey ?? i * 1000, kb = b.orderKey ?? j * 1000;
@@ -4732,10 +4850,7 @@
             const b = document.getElementById(id);
             if (!b) return;
             b.setAttribute('aria-checked', String(showDone));
-            b.className = `show-done-toggle inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-semibold whitespace-nowrap transition-colors ${showDone ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'} ${!showDone && !hidden ? 'opacity-60' : ''}`;
-            b.querySelector('.track')?.classList.toggle('bg-emerald-600', showDone);
-            b.querySelector('.track')?.classList.toggle('bg-slate-300', !showDone);
-            b.querySelector('.knob')?.classList.toggle('translate-x-3', showDone);
+            b.className = `show-done-toggle sw ${!showDone && !hidden ? 'opacity-60' : ''}`;
             const label = b.querySelector('.label');
             if (label) label.textContent = showDone || !hidden ? 'Show done' : `Show done (${hidden})`;
         }
@@ -4752,7 +4867,20 @@
         let svDoneOpen = false;
         const SV_COLS = ['todo', 'in-progress', 'blocked', 'done'];
 
-        function sprintsViewOpen() { return !document.getElementById('sprints-view')?.classList.contains('hidden'); }
+        // 2.11.0 (D-5): the Sprint view is the Roadmap tab's 5th view; List (default) or Board, remembered
+        const SV_MODE_KEY = 'mapit.sprintMode';
+        let svMode = 'list';
+        try { svMode = localStorage.getItem(SV_MODE_KEY) === 'board' ? 'board' : 'list'; } catch (e) { /* private mode */ }
+        const svExpanded = new Set();           // "sprintId|roadmapId/milestoneId" rows opened in the List
+        let svEarlierOpen = false;
+        function sprintsViewOpen() { return currentView === 'roadmap' && activePerspective === 'sprint' && !!getActiveRoadmap(); }
+        // The List shows the chosen sprint and the one after it; the Board one sprint
+        function svLoadIds() {
+            const sid = svSprintId();
+            if (svMode === 'board' || sid === 'NONE') return [sid];
+            const i = sprints.findIndex(x => x.id === sid);
+            return [sid, sprints[i + 1]?.id].filter(Boolean);
+        }
         function defaultSprintId() {
             const today = phtToday();
             return (currentSprint() || sprints.find(s => s.start > today) || sprints[sprints.length - 1])?.id || 'NONE';
@@ -4763,23 +4891,24 @@
         }
         // Tasks of the selected sprint: Firestore listener (cloud) or the demo's in-memory tasks
         function loadSprintBoard() {
-            const sid = svSprintId();
+            const ids = svLoadIds();
             if (!useCloudPersistence) {
                 stopSprintBoard();
                 svTasks = [];
                 roadmaps.forEach(r => (r.items || []).forEach(item => (demoTasks.get(item.id) || []).forEach(t => {
-                    if (!t.deletedAt && (t.sprintId || 'NONE') === sid) svTasks.push({ ...t, key: `${r.id}/${item.id}/${t.id}`, roadmapId: r.id, milestoneId: item.id, src: t });
+                    if (!t.deletedAt && ids.includes(t.sprintId || 'NONE')) svTasks.push({ ...t, key: `${r.id}/${item.id}/${t.id}`, roadmapId: r.id, milestoneId: item.id, src: t });
                 })));
                 svLoaded = true; svError = '';
                 renderSprintBoard();
                 return;
             }
-            const key = sid;
+            const key = ids.join(',');
             if (svUnsub && svKey === key) { renderSprintBoard(); return; }
             stopSprintBoard();
             svKey = key; svLoaded = false; svError = ''; svErrorLink = '';
             renderSprintBoard();
-            svUnsub = onSnapshot(query(collectionGroup(db, 'tasks'), where('sprintId', '==', sid === 'NONE' ? null : sid)), snap => {
+            const filter = ids.length === 1 ? where('sprintId', '==', ids[0] === 'NONE' ? null : ids[0]) : where('sprintId', 'in', ids);
+            svUnsub = onSnapshot(query(collectionGroup(db, 'tasks'), filter), snap => {
                 const base = WORKSPACE_PATH.join('/') + '/roadmaps/';
                 svTasks = snap.docs.filter(d => d.ref.path.startsWith(base)).map(d => {
                     const parts = d.ref.path.slice(base.length).split('/');   // rid / milestones / mid / tasks / tid
@@ -4801,10 +4930,10 @@
         function stopSprintBoard() { svUnsub?.(); svUnsub = null; svKey = ''; }
 
         // The tasks that show: live roadmap + live deliverable + scope + person
-        function svVisibleTasks() {
+        function svVisibleTasks(sid) {
             const active = getActiveRoadmap();
             const me = myEmail();
-            return svTasks.map(t => {
+            return svTasks.filter(t => sid === undefined || (t.sprintId || 'NONE') === sid).map(t => {
                 const roadmap = roadmaps.find(r => r.id === t.roadmapId);
                 const item = roadmap && !roadmap.deletedAt ? (roadmap.items || []).find(i => i.id === t.milestoneId) : null;
                 return item ? { ...t, roadmap, item } : null;
@@ -4829,14 +4958,16 @@
             const sel = document.getElementById('sv-sprint');
             if (sel) {
                 const cur = currentSprint();
-                const html = sprints.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} · ${escapeHtml(shortDate(s.start))} – ${escapeHtml(shortDate(s.end))}${cur?.id === s.id ? ' (current)' : ''}</option>`).join('') + '<option value="NONE">No sprint (backlog)</option>';
+                const html = sprints.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} · ${escapeHtml(shortDate(s.start))} – ${escapeHtml(shortDate(s.end))}${cur?.id === s.id ? ' · now' : ''}</option>`).join('') + '<option value="NONE">No sprint (backlog)</option>';
                 if (sel.dataset.html !== html) { sel.innerHTML = html; sel.dataset.html = html; }
                 sel.value = sid;
             }
             const idx = sprints.findIndex(s => s.id === sid);
             document.getElementById('sv-prev')?.toggleAttribute('disabled', idx <= 0);
             document.getElementById('sv-next')?.toggleAttribute('disabled', idx < 0 || idx >= sprints.length - 1);
-            document.querySelectorAll('#sv-scope [data-scope]').forEach(b => { const on = b.dataset.scope === svScope; b.setAttribute('aria-pressed', String(on)); b.className = `px-2.5 py-1 rounded-lg text-xs font-semibold ${on ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'}`; });
+            const segBtn = on => `h-6 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 ${on ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'}`;
+            document.querySelectorAll('#sv-scope [data-scope]').forEach(b => { const on = b.dataset.scope === svScope; b.setAttribute('aria-pressed', String(on)); b.className = segBtn(on); });
+            document.querySelectorAll('#sv-mode [data-mode]').forEach(b => { const on = b.dataset.mode === svMode; b.setAttribute('aria-pressed', String(on)); b.className = segBtn(on); });
             const ps = document.getElementById('sv-person');
             if (ps) {
                 const html = `<option value="ALL">All people</option><option value="ME">Me (${escapeHtml(actor().name)})</option><option disabled>──────────</option>${activePeople().map(p => `<option value="${escapeHtml(p.email)}">${escapeHtml(p.name)}</option>`).join('')}<option value="NONE">Unassigned</option>`;
@@ -4844,13 +4975,14 @@
                 ps.value = svPerson;
             }
             const summary = document.getElementById('sv-summary');
+            summary?.classList.toggle('hidden', svMode === 'list');
             if (!svLoaded) { box.innerHTML = '<p class="py-16 text-center text-sm text-slate-500 italic">Loading the sprint…</p>'; if (summary) summary.innerHTML = ''; return; }
             if (svError) {
                 box.innerHTML = `<div class="py-14 text-center text-sm text-slate-600 max-w-lg mx-auto"><i class="ph-bold ph-database text-3xl text-slate-300" aria-hidden="true"></i><p class="mt-1 font-semibold">${escapeHtml(svError)}</p>${svErrorLink ? `<p class="mt-2 text-xs"><a href="${escapeHtml(svErrorLink)}" target="_blank" rel="noopener noreferrer" class="text-brand-700 font-semibold hover:underline">Open Firebase to add the index ↗</a></p>` : ''}</div>`;
                 if (summary) summary.innerHTML = '';
                 return;
             }
-            const list = svVisibleTasks();
+            const list = svVisibleTasks(sid);
             const done = list.filter(t => t.status === 'done'), blocked = list.filter(t => t.status === 'blocked').length;
             const pd = list.reduce((s, t) => s + (t.estimateDays || 0), 0), pdDone = done.reduce((s, t) => s + (t.estimateDays || 0), 0);
             const pct = pd ? Math.round(pdDone / pd * 100) : list.length ? Math.round(done.length / list.length * 100) : 0;
@@ -4866,12 +4998,24 @@
                 box.innerHTML = `<div class="py-16 text-center text-sm text-slate-500"><i class="ph-bold ph-kanban text-3xl text-slate-300" aria-hidden="true"></i><p class="font-bold text-slate-700 mt-1">No sprints yet</p>${canEditSprints() ? '<p class="text-xs mt-1"><button type="button" onclick="openSprintsWindow()" class="text-brand-700 font-semibold hover:underline">Set up sprints</button></p>' : '<p class="text-xs mt-1">A MapIt admin can set up the sprint calendar.</p>'}</div>`;
                 return;
             }
+            updateFilterCounts();
+            if (svMode === 'list') {
+                const focusKey = document.activeElement?.dataset?.rowKey;
+                box.innerHTML = sprintListHtml();
+                renderShowDoneSwitch('timeline-show-done', showDone ? 0 : svLoadIds().reduce((n, id) => n + svGroups(id).filter(g => isDoneItem(g.item)).length, 0));
+                if (focusKey) box.querySelector(`[data-row-key="${CSS.escape(focusKey)}"]`)?.focus();
+                return;
+            }
+            renderShowDoneSwitch('timeline-show-done', showDone ? 0 : done.length);
             if (!list.length) {
                 box.innerHTML = `<div class="py-16 text-center text-sm text-slate-500"><i class="ph-bold ph-kanban text-3xl text-slate-300" aria-hidden="true"></i><p class="font-bold text-slate-700 mt-1">No tasks in ${escapeHtml(sprint ? sprint.name : 'the backlog')}${svScope === 'this' ? ' for this roadmap' : ''}${svPerson !== 'ALL' ? ' for this person' : ''}</p>
                     <p class="text-xs mt-1">${svScope === 'this' ? '<button type="button" onclick="setSprintScope(\'all\')" class="text-brand-700 font-semibold hover:underline">Show all roadmaps</button>, or add' : 'Add'} tasks from a deliverable's Tasks tab.</p></div>`;
                 return;
             }
-            box.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">${SV_COLS.map(k => {
+            // Show done off: the Done column is hidden (D-5)
+            const cols = showDone ? SV_COLS : SV_COLS.filter(k => k !== 'done');
+            box.innerHTML = (showDone || !done.length ? '' : `<p class="sv-done-hidden mb-2 text-[11px] text-slate-500">${pluralize(done.length, 'done task')} hidden · <button type="button" onclick="toggleShowDone()" class="font-semibold text-brand-700 hover:underline">Show</button></p>`)
+                + `<div class="grid grid-cols-1 sm:grid-cols-2 ${cols.length === 4 ? 'xl:grid-cols-4' : 'xl:grid-cols-3'} gap-3">${cols.map(k => {
                 const [label] = TASK_STATUS[k];
                 const items = list.filter(t => t.status === k);
                 const p = items.reduce((s, t) => s + (t.estimateDays || 0), 0);
@@ -4898,6 +5042,110 @@
                 <div class="flex items-center gap-2 text-[11px]"><span class="${t.estimateDays ? 'text-slate-600' : 'text-slate-300'}">${t.estimateDays ? fmtDays(t.estimateDays) : '—'}</span>${t.link ? '<i class="ph-bold ph-link text-slate-400" aria-label="Has a link"></i>' : ''}<span class="ml-auto">${t.assignee?.email ? avatarHtml(t.assignee, 'Assignee', 'sm') : '<span class="w-5 h-5 rounded-full inline-flex items-center justify-center text-[9px] font-bold bg-slate-50 text-slate-400 border border-dashed border-slate-300" title="Unassigned" role="img" aria-label="Unassigned">–</span>'}</span></div>
             </div>`;
         }
+        // ---- List (D-5): one card per sprint; a row = a deliverable with tasks in that sprint ----
+        function svTag(sp) {
+            if (!sp) return null;
+            const today = phtToday();
+            if (sp.start <= today && today <= sp.end) return ['Current', 'bg-brand-50 text-brand-700 border-brand-200'];
+            if (sp.end < today) return ['Closed', 'bg-slate-50 text-slate-500 border-slate-200'];
+            return [sprints.find(x => x.start > today)?.id === sp.id ? 'Next' : 'Upcoming', 'bg-white text-slate-600 border-slate-300'];
+        }
+        function svGroups(sid) {
+            const groups = new Map();
+            svVisibleTasks(sid).forEach(t => {
+                const k = `${t.roadmapId}/${t.item.id}`;
+                if (!groups.has(k)) groups.set(k, { key: k, roadmap: t.roadmap, item: t.item, tasks: [] });
+                groups.get(k).tasks.push(t);
+            });
+            const rows = [...groups.values()];
+            return activeSubfilter === 'ALL' ? rows : rows.filter(g => g.item.module === activeSubfilter);
+        }
+        function svTaskLineHtml(t) {
+            const [label, cls, icon] = TASK_STATUS[t.status] || TASK_STATUS.todo;
+            const ok = canBoardStatus(t), key = escapeHtml(t.key);
+            return `<div class="sv-task flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-50 text-xs" data-key="${key}">
+                <button type="button" class="task-status shrink-0 inline-flex items-center gap-1 pl-1 pr-1 sm:pr-1.5 py-0.5 rounded-full border text-[10px] font-bold ${cls} ${ok ? 'hover:shadow-sm' : 'opacity-70 cursor-default'}" ${ok ? `onclick="boardNextStatus('${key}')"` : 'disabled'} aria-label="Status: ${label}${ok ? ', change' : ''}" title="${ok ? `${label}: click for the next status` : 'Only the assignee or an Editor can change this'}"><i class="ph-bold ${icon} text-xs" aria-hidden="true"></i><span class="hidden sm:inline">${label}</span></button>
+                <button type="button" onclick="openSprintTask('${key}')" class="sv-task-title flex-1 min-w-0 truncate text-left ${t.status === 'done' ? 'line-through text-slate-400' : 'text-slate-800 hover:text-brand-700'}">${escapeHtml(t.title)}</button>
+                <span class="shrink-0 w-10 text-right text-[11px] ${t.estimateDays ? 'text-slate-600' : 'text-slate-300'}">${t.estimateDays ? fmtDays(t.estimateDays) : '—'}</span>
+                ${t.assignee?.email ? avatarHtml(t.assignee, 'Assignee', 'sm') : '<span class="w-5 h-5 rounded-full inline-flex items-center justify-center text-[9px] font-bold bg-white text-slate-400 border border-dashed border-slate-300 shrink-0" title="Unassigned" role="img" aria-label="Unassigned">–</span>'}
+            </div>`;
+        }
+        function svListRowHtml(sid, g) {
+            const k = `${sid}|${g.key}`, open = svExpanded.has(k);
+            const done = g.tasks.filter(t => t.status === 'done').length, total = g.tasks.length;
+            const pd = g.tasks.reduce((m, t) => m + (t.estimateDays || 0), 0);
+            const pct = total ? Math.round(done / total * 100) : 0;
+            const status = g.item.status || 'planned';
+            const canAdd = canEdit() && !g.roadmap.deletedAt && !g.roadmap.isPreview;
+            return `<div class="sv-row border-b border-slate-100 last:border-0" data-key="${escapeHtml(g.key)}">
+                <button type="button" data-row-key="${escapeHtml(k)}" onclick="toggleSprintRow(this.dataset.rowKey)" aria-expanded="${open}" class="sv-row-btn w-full text-left flex items-center gap-2 px-3 py-2 text-xs hover:bg-slate-50 focus:outline-none focus-visible:bg-brand-50/60">
+                    <i class="ph-bold ${open ? 'ph-caret-down' : 'ph-caret-right'} text-slate-400 shrink-0" aria-hidden="true"></i>
+                    ${rankChipHtml(g.roadmap, g.item)}
+                    ${svScope === 'all' ? `<span class="sv-roadmap shrink-0 max-w-[7rem] truncate px-1.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-semibold" title="${escapeHtml(g.roadmap.title)}">${escapeHtml(g.roadmap.title)}</span>` : ''}
+                    <span class="sv-name flex-1 min-w-0 truncate font-bold text-slate-900">${escapeHtml(g.item.name)}</span>
+                    <span class="hidden md:inline-flex shrink-0">${peopleStackHtml(g.item, 2, 'sm')}</span>
+                    <span class="shrink-0 flex items-center gap-1.5 w-20 sm:w-28" title="${done} of ${pluralize(total, 'task')} done"><span class="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden" aria-hidden="true"><span class="block h-full bg-emerald-500" style="width:${pct}%"></span></span><span class="sv-progress text-[11px] text-slate-500 tabular-nums">${done}/${total}</span></span>
+                    <span class="sv-pd hidden sm:block shrink-0 w-12 text-right text-[11px] ${pd ? 'text-slate-600' : 'text-slate-300'}">${pd ? fmtDays(pd) : '—'}</span>
+                    <span class="hidden sm:inline-flex shrink-0 w-24">${statusBadge(status, STATUS_LABELS[status] || status)}</span>
+                </button>
+                ${open ? `<div class="sv-tasks pl-8 sm:pl-10 pr-3 pb-2 space-y-1">${g.tasks.map(svTaskLineHtml).join('')}
+                    <div class="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-[11px] font-semibold">
+                        ${canAdd ? `<button type="button" onclick="addTaskToSprint('${escapeHtml(g.key)}', '${escapeHtml(sid)}')" class="sv-add-task text-brand-700 hover:underline"><i class="ph-bold ph-plus" aria-hidden="true"></i> Add task to this sprint</button>` : ''}
+                        <button type="button" onclick="openSprintItem('${escapeHtml(g.key)}')" class="sv-open-item text-slate-600 hover:text-brand-700 hover:underline"><i class="ph-bold ph-arrow-square-out" aria-hidden="true"></i> Open deliverable</button>
+                    </div></div>` : ''}
+            </div>`;
+        }
+        function svCardListHtml(sid) {
+            const sp = sprintById(sid);
+            const all = svGroups(sid);
+            const rows = showDone ? all : all.filter(g => !isDoneItem(g.item));
+            const hidden = all.length - rows.length;
+            const tasks = rows.reduce((n, g) => n + g.tasks.length, 0);
+            const pd = rows.reduce((n, g) => n + g.tasks.reduce((m, t) => m + (t.estimateDays || 0), 0), 0);
+            const [tag, tagCls] = svTag(sp) || [];
+            return `<section class="sv-sprint mb-3 rounded-xl border ${tag === 'Current' ? 'border-brand-200' : 'border-slate-200'} overflow-hidden" data-sprint="${escapeHtml(sid)}" aria-label="${escapeHtml(sp ? sp.name : 'No sprint')}">
+                <header class="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2.5 bg-slate-50/70 border-b border-slate-100">
+                    <b class="text-sm text-slate-900">${sp ? `${escapeHtml(sp.name)} · ${escapeHtml(shortDate(sp.start))} – ${escapeHtml(shortDate(sp.end))}` : 'No sprint'}</b>
+                    ${tag ? `<span class="sv-tag text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${tagCls}">${tag}</span>` : ''}
+                    <span class="sv-card-counts ml-auto text-[11px] text-slate-500">${pluralize(rows.length, 'deliverable')} · ${pluralize(tasks, 'task')}${pd ? ` · ${fmtDays(pd)}` : ''}</span>
+                </header>
+                ${rows.map(g => svListRowHtml(sid, g)).join('') || `<p class="px-3 py-3 text-xs text-slate-500 italic">${hidden ? 'Only done deliverables here.' : `No tasks in ${escapeHtml(sp ? sp.name : 'the backlog')}${svScope === 'this' ? ' for this roadmap' : ''}${svPerson !== 'ALL' ? ' for this person' : ''} yet.`}</p>`}
+                ${hidden ? `<p class="sv-hidden-done px-3 py-2 text-[11px] text-slate-500 border-t border-slate-100">${pluralize(hidden, 'done deliverable')} hidden · <button type="button" onclick="toggleShowDone()" class="font-semibold text-brand-700 hover:underline">Show</button></p>` : ''}
+            </section>`;
+        }
+        function sprintListHtml() {
+            const ids = svLoadIds();
+            const first = sprintById(ids[0]);
+            const earlier = first ? sprints.filter(x => x.start < first.start) : [];
+            return ids.map(svCardListHtml).join('')
+                + (earlier.length ? `<div class="sv-earlier mb-3 rounded-xl border border-slate-200 overflow-hidden">
+                    <button type="button" onclick="toggleSprintEarlier()" aria-expanded="${svEarlierOpen}" class="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-slate-50"><i class="ph-bold ${svEarlierOpen ? 'ph-caret-down' : 'ph-caret-right'} text-slate-400" aria-hidden="true"></i><b class="text-slate-800">Earlier sprints</b><span class="ml-auto text-[11px] text-slate-500">${pluralize(earlier.length, 'sprint')}</span></button>
+                    ${svEarlierOpen ? `<div class="border-t border-slate-100">${earlier.slice().reverse().map(x => `<button type="button" onclick="setSprintFromPicker('${escapeHtml(x.id)}')" class="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-slate-50 border-b border-slate-50 last:border-0"><b class="text-slate-800">${escapeHtml(x.name)}</b><span class="text-slate-500">${escapeHtml(shortDate(x.start))} – ${escapeHtml(shortDate(x.end))}</span><span class="ml-auto font-semibold text-brand-700">Open</span></button>`).join('')}</div>` : ''}
+                </div>` : '')
+                + (ids[0] !== 'NONE' ? `<button type="button" onclick="setSprintFromPicker('NONE')" class="sv-no-sprint w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-slate-300 text-sm text-left hover:bg-slate-50"><i class="ph-bold ph-tray text-slate-400" aria-hidden="true"></i><b class="text-slate-800">No sprint</b><span class="ml-auto text-[11px] text-slate-500">Tasks not planned in a sprint yet</span></button>` : '');
+        }
+        window.toggleSprintRow = function(k) { if (svExpanded.has(k)) svExpanded.delete(k); else svExpanded.add(k); renderSprintBoard(); };
+        window.toggleSprintEarlier = function() { svEarlierOpen = !svEarlierOpen; renderSprintBoard(); };
+        window.setSprintMode = function(mode) {
+            svMode = mode === 'board' ? 'board' : 'list';
+            try { localStorage.setItem(SV_MODE_KEY, svMode); } catch (e) { /* private mode */ }
+            loadSprintBoard();
+        };
+        // "Open deliverable" / "+ Add task to this sprint" from a List row
+        function openSprintDeliverable(key) {
+            const [rid, mid] = String(key).split('/');
+            if (getActiveRoadmap()?.id !== rid) selectRoadmap(rid);
+            if (canEditActive()) { selectMilestoneForEdit(mid); switchMilestoneSideTab('tasks'); }
+            else { openItemDetails(mid); switchDetailTab('tasks'); }
+        }
+        window.openSprintItem = function(key) { openSprintDeliverable(key); renderTaskPanels(); };
+        window.addTaskToSprint = function(key, sid) {
+            openSprintDeliverable(key);
+            taskAddSprintId = sid === 'NONE' ? null : sid;
+            renderTaskPanels();
+            setTimeout(() => document.getElementById('edit-task-add')?.focus(), 0);
+        };
+
         // Toolbar actions
         window.setSprintFromPicker = function(value) { svSprint = value || 'NONE'; loadSprintBoard(); };
         window.stepSprint = function(dir) {
@@ -4988,7 +5236,7 @@
             document.querySelectorAll('#edit-detail-form input, #edit-detail-form select, #edit-detail-form textarea, #edit-milestone-feedback-list input')
                 .forEach(el => { el.disabled = readOnly; });
             const title = document.getElementById('edit-milestone-title');
-            if (title) title.textContent = readOnly ? 'Milestone details' : 'Edit milestone';
+            if (title) title.textContent = readOnly ? 'Deliverable details' : 'Edit deliverable';
             if (readOnly) { toggleFeedbackPicker(false); togglePeoplePicker(false); }
             renderFeedbackChips();
             renderEditPeople();
@@ -5052,8 +5300,8 @@
                 closeEditMilestoneModal();
                 const by = change.deletedBy?.name;
                 showSaveStatus('info', change.deletedBy
-                    ? `This milestone was moved to the Recycle Bin by ${by || 'someone else'}.`
-                    : 'This milestone was removed by someone else.');
+                    ? `This deliverable was moved to the Recycle Bin by ${by || 'someone else'}.`
+                    : 'This deliverable was removed by someone else.');
                 return;
             }
             if (change.type !== 'modified' || change.doc.metadata.hasPendingWrites) return;
@@ -5077,7 +5325,7 @@
             const notice = document.getElementById('edit-remote-notice');
             const text = document.getElementById('edit-remote-notice-text');
             if (notice && text) {
-                text.textContent = `${data.updatedBy?.name || 'Someone'} changed this milestone just now: ${changedLabels.join(', ')}.` +
+                text.textContent = `${data.updatedBy?.name || 'Someone'} changed this deliverable just now: ${changedLabels.join(', ')}.` +
                     (keptLabels.length ? ` Your unsaved ${keptLabels.join(', ')} ${keptLabels.length === 1 ? 'edit was' : 'edits were'} kept; saving will replace theirs.` : '');
                 notice.classList.remove('hidden');
             }
@@ -5324,12 +5572,39 @@
             });
         }
 
+        let roadmapModalMode = 'new';
+        function setRoadmapModalMode(mode, value) {
+            roadmapModalMode = mode;
+            const rename = mode === 'rename';
+            document.getElementById('new-roadmap-title').textContent = rename ? 'Rename roadmap' : 'New roadmap';
+            document.getElementById('new-roadmap-sub').textContent = rename ? 'Everyone sees the new name.' : 'Create another roadmap.';
+            document.getElementById('new-roadmap-submit').textContent = rename ? 'Save' : 'Create roadmap';
+            const titleInput = document.getElementById('new-roadmap-title-input');
+            if (titleInput) titleInput.value = value;
+            if (newRoadmapModal) newRoadmapModal.classList.remove('hidden');
+            setTimeout(() => { titleInput?.focus(); titleInput?.select(); }, 0);
+        }
         window.openNewRoadmapModal = function() {
             if (!canEdit()) return;
-            const titleInput = document.getElementById('new-roadmap-title-input');
-            if (titleInput) titleInput.value = '';
-            if (newRoadmapModal) newRoadmapModal.classList.remove('hidden');
+            setRoadmapModalMode('new', '');
         };
+        window.openRenameRoadmapModal = function() {
+            const roadmap = getActiveRoadmap();
+            if (!roadmap || roadmap.deletedAt || roadmap.isPreview || !canEditActive()) return;
+            setRoadmapModalMode('rename', roadmap.title || '');
+        };
+        async function renameRoadmap(title) {
+            const roadmap = getActiveRoadmap();
+            if (!roadmap || !canEditActive() || title === roadmap.title) return;
+            const entry = auditEntry(roadmap, 'roadmap.updated', { type: 'roadmap', id: roadmap.id, label: roadmap.title }, [{ f: 'title', from: clip(roadmap.title), to: clip(title) }]);
+            if (!useCloudPersistence) { roadmap.title = title; logDemo(entry); updateUI(); return; }
+            const aid = newId('a');
+            const ok = await commitBatch(batch => {
+                batch.update(roadmapRef(roadmap.id), { title, ...stamp(aid) });
+                batch.set(auditRef(aid), entry);
+            }, 'rename the roadmap');
+            if (ok) { roadmap.title = title; scheduleRender(); }
+        }
 
         window.closeNewRoadmapModal = function() {
             if (newRoadmapModal) newRoadmapModal.classList.add('hidden');
@@ -5340,10 +5615,11 @@
             newRoadmapForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const titleInput = document.getElementById('new-roadmap-title-input');
-                const title = titleInput?.value.trim();
+                const title = clip(titleInput?.value.trim() || '', 200);
                 if (!title || !canEdit()) return;
                 closeNewRoadmapModal();
-                await createRoadmap(title);
+                if (roadmapModalMode === 'rename') await renameRoadmap(title);
+                else await createRoadmap(title);
             });
         }
 
@@ -5622,7 +5898,7 @@
             if (!optionsContainer) return;
 
             if (context === 'editor') {
-                if (titleEl) titleEl.textContent = 'Export Milestones';
+                if (titleEl) titleEl.textContent = 'Export deliverables';
                 if (subtitleEl) subtitleEl.textContent = 'Export deliverables and roadmap schedule.';
                 
                 optionsContainer.innerHTML = `
@@ -5642,7 +5918,7 @@
                         </div>
                         <div>
                             <span class="text-xs font-bold text-slate-900 block group-hover:text-brand-700">JSON File</span>
-                            <span class="text-[11px] text-slate-500 leading-tight block mt-0.5">Full milestone structure including comments and audit history.</span>
+                            <span class="text-[11px] text-slate-500 leading-tight block mt-0.5">Every deliverable with its comments and history.</span>
                         </div>
                     </button>
                 `;
@@ -5657,7 +5933,7 @@
                         </div>
                         <div>
                             <span class="text-xs font-bold text-slate-900 block group-hover:text-brand-700">CSV Spreadsheet (Excel Compatible)</span>
-                            <span class="text-[11px] text-slate-500 leading-tight block mt-0.5">Suggestions, source/requester, derived status, and linked milestones.</span>
+                            <span class="text-[11px] text-slate-500 leading-tight block mt-0.5">Feedback, source / requester, status and linked deliverables.</span>
                         </div>
                     </button>
 
@@ -5775,7 +6051,7 @@
             if (!activeRoadmap) return;
 
             const feedbackList = activeRoadmap.feedback || [];
-            const headers = ['"Suggestion / Title"', '"Category"', '"Source"', '"Submitted By"', '"Submitter Email"', '"Status (from Milestone)"', '"Linked Milestone(s)"', '"Description"'];
+            const headers = ['"Suggestion / Title"', '"Category"', '"Source"', '"Submitted By"', '"Submitter Email"', '"Status (from deliverable)"', '"Linked deliverable(s)"', '"Description"'];
 
             const rows = feedbackList.map(f => {
                 const derivation = getFeedbackDerivedStatus(f.id, activeRoadmap);
@@ -6118,7 +6394,7 @@
             return writeInChunks(roadmap, [
                 ...items.map(({ id: mid, ...fields }) => (batch, chunkAid) => batch.set(itemRef(id, 'milestones', mid), { ...fields, createdBy: actor(), createdAt: serverTimestamp(), ...stamp(chunkAid) })),
                 ...feedback.map(({ id: fid, ...fields }) => (batch, chunkAid) => batch.set(itemRef(id, 'feedback', fid), { ...fields, createdBy: actor(), createdAt: serverTimestamp(), ...stamp(chunkAid) }))
-            ], 'sample', 'add the sample milestones');
+            ], 'sample', 'add the sample deliverables');
         }
 
         // Move to the Recycle Bin (recycle-bin FR-1): hidden for everyone, restorable for 30 days by its creator or an admin
@@ -6164,7 +6440,7 @@
             return commitBatch(batch => {
                 batch.set(itemRef(roadmap.id, 'milestones', id), { ...milestoneFields(fields), createdBy: actor(), createdAt: serverTimestamp(), ...stamp(aid) });
                 batch.set(auditRef(aid), entry);
-            }, 'add the milestone');
+            }, 'add the deliverable');
         }
 
         // updates: only the fields this user changed; changes: [{ f, from, to }] for the audit log
@@ -6181,7 +6457,7 @@
             return commitBatch(batch => {
                 batch.update(itemRef(roadmap.id, 'milestones', item.id), { ...updates, ...stamp(aid) });
                 batch.set(auditRef(aid), entry);
-            }, 'save the milestone');
+            }, 'save the deliverable');
         }
 
         // Move to the Recycle Bin; comments, history and feedback links stay with it
@@ -6200,7 +6476,7 @@
                 const ok = await commitBatch(batch => {
                     batch.update(itemRef(roadmap.id, 'milestones', item.id), { deletedAt: serverTimestamp(), deletedBy: actor(), purgeAt: purgeAtValue(), ...stamp(aid) });
                     batch.set(auditRef(aid), entry);
-                }, 'delete the milestone');
+                }, 'delete the deliverable');
                 if (!ok) return false;
             }
             showUndo(`"${item.name}" moved to the Recycle Bin.`, () => restoreItem('milestone', roadmap.id, item.id));
@@ -6293,7 +6569,7 @@
         const isExpired = x => !!x?.purgeAt && toMillis(x.purgeAt) <= Date.now();
         const daysLeft = x => x?.purgeAt ? Math.max(0, Math.ceil((toMillis(x.purgeAt) - Date.now()) / DAY_MS)) : null;
         const binFieldsCleared = () => ({ deletedAt: null, deletedBy: null, purgeAt: null });
-        const BIN_LABELS = { roadmap: 'roadmap', milestone: 'milestone', feedback: 'feedback item' };
+        const BIN_LABELS = { roadmap: 'roadmap', milestone: 'deliverable', feedback: 'feedback item' };
         const binName = (kind, item) => kind === 'roadmap' ? item.title : kind === 'milestone' ? item.name : item.title;
 
         function canRestoreRoadmap(roadmap) {
@@ -7133,7 +7409,7 @@
             const t = document.getElementById('show-load-toggle');
             if (!t) return;
             const active = getActiveRoadmap();
-            const show = !!active && hasLoadData(active) && activePerspective !== 'module';
+            const show = !!active && hasLoadData(active) && activePerspective !== 'module' && activePerspective !== 'sprint';
             t.classList.toggle('hidden', !show);
             t.classList.toggle('flex', show);
             t.setAttribute('aria-checked', String(showLoad));
@@ -7443,7 +7719,6 @@
         function pctBar(pct, width = 'w-16') {
             return `<span class="${width} bg-slate-100 h-1.5 rounded-full overflow-hidden shrink-0" aria-hidden="true"><span class="block h-full rounded-full ${pct >= 100 ? 'bg-emerald-500' : 'bg-brand-600'}" style="width: ${pct}%"></span></span>`;
         }
-        const STATUS_DOT = { planned: 'bg-amber-400', 'in-progress': 'bg-brand-500', done: 'bg-emerald-500' };
         // The "Status" cell: status + %, the bar in the phase colour, the stage as a small line, the over-capacity badge
         function statusCellHtml(roadmap, item) {
             const id = currentStageId(item);
@@ -8006,7 +8281,7 @@
             const noun = { milestone: 'milestone', feedback: 'feedback', roadmap: 'roadmap' }[kind] || '';
             let text;
             switch (e.action) {
-                case 'milestone.created': text = `${who} added milestone ${q(label)}`; break;
+                case 'milestone.created': text = `${who} added deliverable ${q(label)}`; break;
                 case 'task.created': text = `${who} added task ${q(changes[0]?.to)} to ${q(label)}`; break;
                 case 'task.updated': case 'task.reordered': text = `${who} updated ${q(label)}: ${escapeHtml(describeAudit(e)[0] || 'task changed')}`; break;
                 case 'task.deleted': text = `${who} moved task ${q(changes[0]?.to)} of ${q(label)} to the Recycle Bin`; break;
@@ -8015,6 +8290,7 @@
                 case 'workspace.sprints_changed': text = `${who} changed the sprint calendar (${escapeHtml(changes[0]?.to || '')})`; break;
                 case 'feedback.created': text = `${who} added feedback ${q(label)}`; break;
                 case 'roadmap.created': text = `${who} created roadmap ${q(label)}`; break;
+                case 'roadmap.updated': text = `${who} renamed roadmap ${q(changes[0]?.from ?? label)} to ${q(changes[0]?.to)}`; break;
                 case 'milestone.updated':
                 case 'feedback.updated': {
                     const c = changes[0];
@@ -8047,6 +8323,7 @@
                 case 'roadmap.items_added': text = `${who} added ${escapeHtml(pluralize(Number(changes[0]?.to) || 0, 'item'))} to ${q(label)}`; break;
                 case 'roadmap.retention_set': text = `${who} set the Recycle Bin removal date of ${q(label)}`; break;
                 case 'roadmap.capacity_changed': text = `${who} changed the monthly capacity of ${q(label)}`; break;
+                case 'roadmap.sprints_indexed': text = `${who} listed the sprints of ${escapeHtml(pluralize(Number(changes[0]?.to) || 0, 'deliverable'))} in ${q(label)}`; break;
                 case 'roadmap.stages_initialized': text = `${who} set the starting stages of ${q(label)} (${escapeHtml(pluralize(Number(changes[0]?.to) || 0, 'deliverable'))})`; break;
                 case 'workspace.workflow_changed': text = `${who} changed the delivery workflow`; break;
                 case 'roadmap.ranking_initialized': text = `${who} ${changes.some(c => c.f === 'reason') ? 're-spaced' : 'saved'} the ranking of ${q(label)} (${escapeHtml(pluralize(Number(changes[0]?.to) || 0, 'deliverable'))})`; break;
@@ -8372,6 +8649,7 @@
         window.openActivityTarget = function(id) {
             const e = activityEntries.find(x => x.id === id);
             if (!e) return;
+            closeActivityPanel(true, false);
             const type = e.target?.type;
             const state = activityTargetState(e);
             if (type === 'member' || type === 'workspace') { if (isAdmin()) openUsersModal(); return; }
@@ -8413,7 +8691,7 @@
                 if (btn) { btn.disabled = false; btn.lastChild.textContent = ' CSV'; }
             }
             entries = entries.filter(activityVisible);
-            const AREA_NAMES = { roadmap: 'Roadmap', milestone: 'Milestones', feedback: 'Feedback', comment: 'Comments', bin: 'Recycle Bin', people: 'People' };
+            const AREA_NAMES = { roadmap: 'Roadmap', milestone: 'Deliverables', feedback: 'Feedback', comment: 'Comments', bin: 'Recycle Bin', people: 'People' };
             const headers = ['Time (PHT)', 'Roadmap', 'Area', 'Action', 'Target', 'Changes', 'Name', 'Email'].map(h => `"${h}"`);
             const rows = entries.map(e => [
                 csvCell(phtIso(e.at)),
@@ -8440,14 +8718,14 @@
         // ---- Unread badge (FR-14): entries by other people since I last opened Activity ----
         function setUnreadBadge(n) {
             const text = n > 99 ? '99+' : String(n);
-            ['nav-activity-count', 'mob-nav-activity-count'].forEach(id => {
+            ['nav-activity-count'].forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 el.textContent = n ? text : '';
                 el.classList.toggle('hidden', !n);
             });
-            const nav = document.getElementById('nav-activity');
-            if (nav) nav.setAttribute('aria-label', n ? `Activity, ${text} unread` : 'Activity');
+            const bell = document.getElementById('activity-bell');
+            if (bell) { bell.setAttribute('aria-label', n ? `Activity, ${text} unread` : 'Activity'); bell.title = n ? `Activity: ${text} new` : 'Activity'; }
         }
         function stopUnread() { unreadUnsub?.(); unreadUnsub = null; unreadSince = null; setUnreadBadge(0); }
         function watchUnread() {
@@ -8607,7 +8885,7 @@
                 <div class="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-slate-200 bg-white">
                     <div class="flex-1 min-w-0">
                         <div class="text-xs font-bold text-slate-900 truncate">${escapeHtml(r.title || 'Untitled roadmap')}</div>
-                        <div class="text-[11px] text-slate-500">${pluralize((r.items || []).length, 'milestone')} · ${escapeHtml(String((r.feedback || []).length))} feedback</div>
+                        <div class="text-[11px] text-slate-500">${pluralize((r.items || []).length, 'deliverable')} · ${escapeHtml(String((r.feedback || []).length))} feedback</div>
                     </div>
                     ${r.movedToWorkspace
                         ? '<span class="text-[11px] font-bold text-emerald-700 flex items-center gap-1"><i class="ph-bold ph-check-circle"></i> Moved</span>'
@@ -8805,6 +9083,56 @@
         // A click anywhere outside the chip and menu closes it
         document.addEventListener('click', (e) => {
             if (!e.target.closest?.('#account-menu-wrap')) closeAccountMenu();
+            if (!e.target.closest?.('#roadmap-bar-actions')) closeRoadmapMenu();
+        });
+
+        // ---- ⚙ Roadmap settings (2.11.0, D-3): Rename, Capacity, Export, Sprints / Workflow (workspace for now), Move to Recycle Bin ----
+        function roadmapMenuItems() {
+            return [...document.querySelectorAll('#roadmap-menu [role="menuitem"]')].filter(el => el.offsetParent !== null);
+        }
+        function applyRoadmapMenuRoles() {
+            const active = getActiveRoadmap();
+            const live = !!active && !active.deletedAt && !active.isPreview;
+            document.getElementById('roadmap-bar-actions')?.classList.toggle('hidden', !active);
+            document.getElementById('rename-roadmap-btn')?.classList.toggle('hidden', !live || !canEditActive());
+            document.getElementById('roadmap-sprints-btn')?.classList.toggle('hidden', !canEditSprints());
+            document.getElementById('roadmap-workflow-btn')?.classList.toggle('hidden', !canEditWorkflow());
+            document.getElementById('delete-roadmap-wrap')?.classList.toggle('hidden', !canDeleteRoadmap(active));
+        }
+        window.openRoadmapMenu = function() {
+            const menu = document.getElementById('roadmap-menu');
+            if (!menu) return;
+            closeAccountMenu();
+            applyRoadmapMenuRoles();
+            menu.classList.remove('hidden');
+            document.getElementById('roadmap-settings-btn')?.setAttribute('aria-expanded', 'true');
+            roadmapMenuItems()[0]?.focus();
+        };
+        window.closeRoadmapMenu = function(returnFocus = false) {
+            const menu = document.getElementById('roadmap-menu');
+            if (!menu || menu.classList.contains('hidden')) return;
+            menu.classList.add('hidden');
+            const btn = document.getElementById('roadmap-settings-btn');
+            btn?.setAttribute('aria-expanded', 'false');
+            if (returnFocus) btn?.focus();
+        };
+        window.toggleRoadmapMenu = function() {
+            if (document.getElementById('roadmap-menu')?.classList.contains('hidden')) openRoadmapMenu(); else closeRoadmapMenu();
+        };
+        document.getElementById('roadmap-menu')?.addEventListener('keydown', (e) => {
+            const items = roadmapMenuItems();
+            const i = items.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                items[e.key === 'ArrowDown' ? (i + 1) % items.length : (i - 1 + items.length) % items.length]?.focus();
+            } else if (e.key === 'Home' || e.key === 'End') {
+                e.preventDefault();
+                (e.key === 'Home' ? items[0] : items[items.length - 1])?.focus();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                closeRoadmapMenu(true);
+            } else if (e.key === 'Tab') closeRoadmapMenu();
         });
 
         // =======================================================
