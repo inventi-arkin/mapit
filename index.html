@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.10.0" data-released="2026-11-25">
+    <meta name="mapit-version" content="2.10.1" data-released="2026-11-26">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -455,14 +455,14 @@
                             <tr>
                                 <th class="hidden sm:table-cell w-6 pl-3" aria-label="Drag to reorder"></th>
                                 <th class="py-3 px-2"><button type="button" onclick="setEditorSort('rank')" data-sort="rank" class="uppercase tracking-wider font-bold hover:text-slate-800">Rank</button></th>
-                                <th class="py-3 px-4">Deliverable / Feature</th>
-                                <th class="hidden sm:table-cell py-3 px-4">Module</th>
-                                <th class="hidden lg:table-cell py-3 px-4">People</th>
-                                <th class="hidden sm:table-cell py-3 px-4"><button type="button" onclick="setEditorSort('date')" data-sort="date" class="uppercase tracking-wider font-bold hover:text-slate-800">Target Date</button></th>
-                                <th class="hidden sm:table-cell py-3 px-4"><button type="button" onclick="setEditorSort('effort')" data-sort="effort" class="uppercase tracking-wider font-bold hover:text-slate-800">Effort</button></th>
-                                <th class="hidden sm:table-cell py-3 px-4">Status</th>
-                                <th class="hidden xl:table-cell py-3 px-4">Scope / Inclusions</th>
-                                <th class="py-3 px-4 text-right">Actions</th>
+                                <th class="py-3 px-3">Deliverable / Feature</th>
+                                <th class="hidden lg:table-cell py-3 px-3">Module</th>
+                                <th class="hidden lg:table-cell py-3 px-3">People</th>
+                                <th class="hidden lg:table-cell py-3 px-3"><button type="button" onclick="setEditorSort('date')" data-sort="date" class="uppercase tracking-wider font-bold hover:text-slate-800">Target Date</button></th>
+                                <th class="hidden lg:table-cell py-3 px-3"><button type="button" onclick="setEditorSort('effort')" data-sort="effort" class="uppercase tracking-wider font-bold hover:text-slate-800">Effort</button></th>
+                                <th class="hidden lg:table-cell py-3 px-3">Status</th>
+                                <th class="hidden xl:table-cell py-3 px-3">Scope</th>
+                                <th class="py-3 px-3 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="editor-table-body" class="divide-y divide-slate-100 text-xs">
@@ -2811,44 +2811,41 @@
                 else if (item.status === 'in-progress') statusBadge = 'bg-brand-50 text-brand-600 border border-brand-200';
                 else if (item.status === 'planned') statusBadge = 'bg-amber-50 text-amber-700 border border-amber-200';
 
-                const inclusionsHtml = (item.inclusions || []).length > 0
-                    ? item.inclusions.map(inc => `<span class="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-[10px] text-slate-600">${escapeHtml(inc)}</span>`).join(' ')
-                    : '<span class="text-slate-500 italic text-[11px]">None</span>';
+                // 2.10.1: one line; the first scope item + "+N" (hover lists them all)
+                const scope = (item.inclusions || []).map(x => String(x).trim()).filter(Boolean);
+                const inclusionsHtml = scope.length
+                    ? `<span class="inline-flex items-center gap-1 min-w-0 max-w-full" title="${escapeHtml(scope.join(', '))}"><span class="min-w-0 max-w-[6rem] truncate px-1.5 py-0.5 rounded bg-slate-100 text-[10px] text-slate-600">${escapeHtml(scope[0])}</span>${scope.length > 1 ? `<span class="shrink-0 px-1 py-0.5 rounded bg-slate-50 border border-slate-200 text-[10px] font-semibold text-slate-500">+${scope.length - 1}</span>` : ''}</span>`
+                    : '<span class="text-slate-400 text-[11px]" title="No scope inclusions">—</span>';
                 const effort = effortOf(item);
 
                 tr.innerHTML = `
                     <td class="hidden sm:table-cell pl-3 w-6">${canReorder ? reorderHtml(item) : ''}</td>
                     <td class="py-3 px-2 whitespace-nowrap">${rankChipHtml(roadmap, item)}</td>
-                    <td class="py-3 px-4 font-bold text-slate-900">
-                        <div class="text-xs font-bold text-slate-900">${escapeHtml(item.name)}</div>
-                        ${item.description ? `<p class="text-[11px] font-normal text-slate-500 mt-0.5 max-w-[9rem] sm:max-w-xs truncate">${escapeHtml(item.description)}</p>` : ''}
-                        <div class="sm:hidden mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] font-normal text-slate-500">
-                            <span class="text-brand-600 font-semibold">${escapeHtml(item.module)}</span>
-                            <span>· ${escapeHtml(formatMonthYear(item.date))}</span>
-                            <span>· ${effort ? fmtDays(effort) : 'Not estimated'}</span>
-                            <span class="flex items-center gap-1">${statusShortHtml(item)}</span>
-                            ${overFlagHtml(roadmap, item)}
-                            ${item.owner?.email || (item.team || []).length ? `<span>· ${peopleStackHtml(item, 2, 'sm')}</span>` : ''}
+                    <td class="editor-name-cell py-3 px-3 font-bold text-slate-900">
+                        <div class="editor-name text-xs font-bold text-slate-900 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[26rem] md:max-w-[32rem] lg:max-w-[11rem] xl:max-w-[12rem]">${escapeHtml(item.name)}</div>
+                        <p class="editor-desc text-[11px] font-normal text-slate-500 mt-0.5 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[26rem] md:max-w-[32rem] lg:max-w-[11rem] xl:max-w-[12rem]">${item.description ? escapeHtml(item.description) : '&nbsp;'}</p>
+                        <div class="editor-subline lg:hidden mt-1 h-5 flex flex-nowrap items-center gap-x-1.5 text-[11px] font-normal text-slate-500 max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[26rem] md:max-w-[32rem] overflow-hidden">
+                            <span class="min-w-0 truncate text-brand-600 font-semibold">${escapeHtml(item.module)}</span>
+                            <span class="shrink-0">· ${escapeHtml(formatMonthYear(item.date))}</span>
+                            ${effort ? `<span class="shrink-0">· ${fmtDays(effort)}</span>` : ''}
+                            <span class="shrink-0 flex items-center gap-1">${statusShortHtml(item)}</span>
+                            ${item.owner?.email || (item.team || []).length ? `<span class="shrink-0">${peopleStackHtml(item, 1, 'sm')}</span>` : ''}
+                            ${overFlagHtml(roadmap, item) ? `<span class="shrink-0">${overFlagHtml(roadmap, item)}</span>` : ''}
                         </div>
-                        ${item.owner?.email || (item.team || []).length ? `<div class="hidden sm:flex lg:hidden mt-1">${peopleStackHtml(item, 2, 'sm')}</div>` : ''}
                     </td>
-                    <td class="hidden sm:table-cell py-3 px-4 text-brand-600 font-semibold whitespace-nowrap">
-                        <span class="text-xs">${escapeHtml(item.module)}</span>
+                    <td class="hidden lg:table-cell py-3 px-3 text-brand-600 font-semibold whitespace-nowrap">
+                        <span class="editor-module block text-xs truncate max-w-[8rem]">${escapeHtml(item.module)}</span>
                     </td>
-                    <td class="people-cell hidden lg:table-cell py-3 px-4 whitespace-nowrap">${peopleStackHtml(item)}</td>
-                    <td class="hidden sm:table-cell py-3 px-4 text-slate-600 whitespace-nowrap">
+                    <td class="people-cell hidden lg:table-cell py-3 px-3 whitespace-nowrap">${peopleStackHtml(item)}</td>
+                    <td class="hidden lg:table-cell py-3 px-3 text-slate-600 whitespace-nowrap">
                         <span class="text-xs font-medium">${escapeHtml(formatMonthYear(item.date))}</span>
                     </td>
-                    <td class="effort-cell hidden sm:table-cell py-3 px-4 whitespace-nowrap text-xs ${effort ? 'text-slate-700' : 'text-slate-400'}" ${canEditActive() ? `onclick="event.stopPropagation(); editEffortInline('${escapeHtml(item.id)}', this)" tabindex="0" role="button" aria-label="Effort for ${escapeHtml(item.name)}: ${effort ? fmtDays(effort) : 'not estimated'}. Click to change."` : ''} title="${effort ? '' : 'Not estimated'}">${effort ? fmtDays(effort) : '—'}</td>
-                    <td class="hidden sm:table-cell py-3 px-4">
-                        <span class="block w-44" onclick="event.stopPropagation(); selectMilestoneForEdit('${escapeHtml(item.id)}'); switchMilestoneSideTab('stages')">${statusCellHtml(roadmap, item)}</span>
+                    <td class="effort-cell hidden lg:table-cell py-3 px-3 whitespace-nowrap text-xs ${effort ? 'text-slate-700' : 'text-slate-400'}" ${canEditActive() ? `onclick="event.stopPropagation(); editEffortInline('${escapeHtml(item.id)}', this)" tabindex="0" role="button" aria-label="Effort for ${escapeHtml(item.name)}: ${effort ? fmtDays(effort) : 'not estimated'}. Click to change."` : ''} title="${effort ? '' : 'Not estimated'}">${effort ? fmtDays(effort) : '—'}</td>
+                    <td class="hidden lg:table-cell py-3 px-3">
+                        <span class="block w-40" onclick="event.stopPropagation(); selectMilestoneForEdit('${escapeHtml(item.id)}'); switchMilestoneSideTab('stages')">${statusCellHtml(roadmap, item)}</span>
                     </td>
-                    <td class="hidden xl:table-cell py-3 px-4">
-                        <div class="flex flex-wrap gap-1 max-w-xs">
-                            ${inclusionsHtml}
-                        </div>
-                    </td>
-                    <td class="py-3 px-4 text-right whitespace-nowrap">
+                    <td class="editor-scope hidden xl:table-cell py-3 px-3 whitespace-nowrap">${inclusionsHtml}</td>
+                    <td class="py-3 px-3 text-right whitespace-nowrap">
                         <span class="inline-flex items-center justify-end gap-0.5">
                         ${canReorder ? moveButtonsHtml(item) : ''}
                         <button onclick="event.stopPropagation(); selectMilestoneForEdit('${escapeHtml(item.id)}')" class="editor-only p-1.5 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all" title="Edit Milestone" aria-label="Edit Milestone">
