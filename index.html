@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.11.0" data-released="2026-11-26">
+    <meta name="mapit-version" content="2.12.0" data-released="2026-11-26">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -103,6 +103,9 @@
         .rm-item:hover, .rm-item:focus { background: #f8fafc; }
         .rm-item > i { font-size: 1rem; color: #64748b; }
         .rm-item.text-rose-600 > i { color: inherit; }
+        /* 2.12.0: own / workspace tags in the ⚙ menu */
+        .settings-tag { font-size: 10px; font-weight: 700; padding: 0 .375rem; border-radius: .375rem; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; }
+        .settings-tag.own { border-color: #bae0fd; background: #f0f7ff; color: #0359a1; }
         /* R-5: one switch (Show done, Show load, Mine) */
         .sw { display: inline-flex; align-items: center; gap: .5rem; height: 2rem; padding: 0 .65rem; border-radius: .75rem; border: 1px solid #e2e8f0; background: #fff; font-size: .75rem; font-weight: 600; color: #475569; white-space: nowrap; }
         .sw:hover { background: #f8fafc; }
@@ -315,8 +318,8 @@
                     <button type="button" role="menuitem" id="capacity-btn" onclick="closeRoadmapMenu(); openCapacityModal()" class="rm-item"><i class="ph-bold ph-gauge" aria-hidden="true"></i> Capacity…</button>
                     <button type="button" role="menuitem" id="export-pdf-btn" onclick="closeRoadmapMenu(); exportRoadmapPDF()" class="rm-item"><i class="ph-bold ph-file-pdf" aria-hidden="true"></i> <span id="export-pdf-text">Export PDF</span></button>
                     <button type="button" role="menuitem" id="export-data-btn" onclick="closeRoadmapMenu(); openDataExportModal('editor')" class="rm-item"><i class="ph-bold ph-download-simple" aria-hidden="true"></i> Export CSV / Excel / JSON</button>
-                    <button type="button" role="menuitem" id="roadmap-sprints-btn" onclick="closeRoadmapMenu(); openSprintsWindow()" class="rm-item"><i class="ph-bold ph-calendar-dots" aria-hidden="true"></i> Sprints… <span class="ml-auto text-[10px] text-slate-400">workspace</span></button>
-                    <button type="button" role="menuitem" id="roadmap-workflow-btn" onclick="closeRoadmapMenu(); openWorkflowSettings()" class="rm-item"><i class="ph-bold ph-flow-arrow" aria-hidden="true"></i> Workflow… <span class="ml-auto text-[10px] text-slate-400">workspace</span></button>
+                    <button type="button" role="menuitem" id="roadmap-sprints-btn" onclick="closeRoadmapMenu(); openRoadmapSprints()" class="rm-item"><i class="ph-bold ph-calendar-dots" aria-hidden="true"></i> Sprints… <span id="roadmap-sprints-tag" class="settings-tag ml-auto">workspace</span></button>
+                    <button type="button" role="menuitem" id="roadmap-workflow-btn" onclick="closeRoadmapMenu(); openRoadmapWorkflow()" class="rm-item"><i class="ph-bold ph-flow-arrow" aria-hidden="true"></i> Workflow… <span id="roadmap-workflow-tag" class="settings-tag ml-auto">workspace</span></button>
                     <div id="delete-roadmap-wrap" class="border-t border-slate-100 mt-1 pt-1">
                         <button type="button" role="menuitem" id="delete-roadmap-btn" onclick="closeRoadmapMenu(); confirmDeleteCurrentRoadmap()" class="rm-item text-rose-600 hover:bg-rose-50 focus:bg-rose-50"><i class="ph-bold ph-trash" aria-hidden="true"></i> Move to Recycle Bin</button>
                     </div>
@@ -642,18 +645,19 @@
     <div id="sprints-modal" role="dialog" aria-modal="true" aria-labelledby="sprints-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4">
         <div class="bg-white sm:rounded-2xl max-w-3xl w-full h-full sm:h-auto sm:max-h-[92vh] border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
             <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
-                <h3 id="sprints-title" class="text-sm font-black text-slate-900 flex items-center gap-2"><span class="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center" aria-hidden="true"><i class="ph-bold ph-calendar-dots"></i></span>Sprints <span class="text-[11px] font-semibold text-slate-500">· shared by every roadmap</span></h3>
+                <h3 id="sprints-title" class="text-sm font-black text-slate-900 flex items-center gap-2"><span class="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center" aria-hidden="true"><i class="ph-bold ph-calendar-dots"></i></span>Sprints <span id="sprints-subtitle" class="text-[11px] font-semibold text-slate-500"></span></h3>
                 <button type="button" onclick="closeSprintsWindow()" data-dialog-close aria-label="Close" class="text-slate-500 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100"><i class="ph-bold ph-x text-base"></i></button>
             </div>
+            <div id="sprints-scope" class="hidden px-5 pt-4 space-y-2 text-xs shrink-0"></div>
             <div class="p-5 overflow-y-auto custom-scrollbar flex-1 grid grid-cols-1 md:grid-cols-5 gap-5 text-xs">
                 <div class="md:col-span-3 min-w-0">
                     <table class="w-full">
                         <thead class="text-[10px] uppercase tracking-wider text-slate-500"><tr><th class="text-left py-1">Name</th><th class="text-left">Start</th><th class="text-left">End</th><th></th><th></th></tr></thead>
                         <tbody id="sprints-rows" class="divide-y divide-slate-100"></tbody>
                     </table>
-                    <button type="button" onclick="addSprintRow()" class="mt-2 text-[11px] font-semibold text-brand-700 hover:underline"><i class="ph-bold ph-plus" aria-hidden="true"></i> Add sprint</button>
+                    <button type="button" id="sprint-add-btn" onclick="addSprintRow()" class="mt-2 text-[11px] font-semibold text-brand-700 hover:underline"><i class="ph-bold ph-plus" aria-hidden="true"></i> Add sprint</button>
                 </div>
-                <div class="md:col-span-2 rounded-xl border border-slate-200 p-3 space-y-2 bg-slate-50/60 self-start">
+                <div id="sprint-gen-panel" class="md:col-span-2 rounded-xl border border-slate-200 p-3 space-y-2 bg-slate-50/60 self-start">
                     <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Generate sprints</h4>
                     <div><label for="sprint-gen-start" class="block text-[11px] font-semibold text-slate-600 mb-0.5">First start date</label><input type="date" id="sprint-gen-start" class="w-full px-2 py-1.5 border border-slate-200 rounded-lg bg-white"></div>
                     <div class="grid grid-cols-2 gap-2">
@@ -668,7 +672,7 @@
             <div class="flex flex-wrap justify-between items-center gap-2 px-5 py-3 border-t border-slate-100 shrink-0">
                 <span class="text-[11px]"><span id="sprints-overlap" class="hidden text-amber-700"><i class="ph-bold ph-warning" aria-hidden="true"></i> Some sprints overlap. That's allowed, but check the dates.</span><span id="sprints-error" class="hidden text-rose-700"></span></span>
                 <span class="flex gap-2"><button type="button" onclick="closeSprintsWindow()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
-                <button type="button" onclick="saveSprints()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold">Save</button></span>
+                <button type="button" id="sprints-save" onclick="saveSprints()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold">Save</button></span>
             </div>
         </div>
     </div>
@@ -677,12 +681,13 @@
     <div id="workflow-modal" role="dialog" aria-modal="true" aria-labelledby="workflow-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4">
         <div class="bg-white sm:rounded-2xl max-w-3xl w-full h-full sm:h-auto sm:max-h-[92vh] border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
             <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
-                <h3 id="workflow-title" class="text-sm font-black text-slate-900 flex items-center gap-2"><span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center" aria-hidden="true"><i class="ph-bold ph-flow-arrow"></i></span>Workflow settings</h3>
+                <h3 id="workflow-title" class="text-sm font-black text-slate-900 flex items-center gap-2"><span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center" aria-hidden="true"><i class="ph-bold ph-flow-arrow"></i></span>Workflow <span id="workflow-subtitle" class="text-[11px] font-semibold text-slate-500"></span></h3>
                 <button type="button" onclick="closeWorkflowSettings()" data-dialog-close aria-label="Close" class="text-slate-500 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100"><i class="ph-bold ph-x text-base"></i></button>
             </div>
+            <div id="workflow-scope" class="hidden px-5 pt-4 space-y-2 text-xs shrink-0"></div>
             <div id="workflow-body" class="p-5 space-y-2 overflow-y-auto custom-scrollbar flex-1"></div>
             <div class="flex flex-wrap justify-between gap-2 px-5 py-3 border-t border-slate-100 shrink-0">
-                <button type="button" onclick="wfReset()" class="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">Reset to defaults</button>
+                <button type="button" id="workflow-reset" onclick="wfReset()" class="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">Reset to defaults</button>
                 <span class="flex gap-2"><button type="button" onclick="closeWorkflowSettings()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
                 <button type="button" id="workflow-save" onclick="saveWorkflowSettings()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold">Save</button></span>
             </div>
@@ -1894,13 +1899,14 @@
         }
 
         window.updateUI = function() {
+            applyRoadmapSettings();
             applyRoleUI();
             renderNotices();
             const activeRoadmap = getActiveRoadmap();
             const liveRoadmaps = roadmaps.filter(r => !r.deletedAt);
 
             if (roadmapSelect) {
-                const pctOf = r => itemsProgress(r.items || []);
+                const pctOf = r => withSettings(r, () => itemsProgress(r.items || []));
                 const option = r => `<option value="${escapeHtml(r.id)}" ${activeRoadmap && r.id === activeRoadmap.id ? 'selected' : ''}>${escapeHtml(r.title)}</option>`;
                 const sorted = liveRoadmaps.slice().sort((a, b) => String(a.title).localeCompare(String(b.title), undefined, { sensitivity: 'base', numeric: true }));
                 roadmapSelect.innerHTML =
@@ -4415,7 +4421,8 @@
                 .sort((a, b) => a.start.localeCompare(b.start) || a.name.localeCompare(b.name));
         }
         function onSprintsSnapshot(snap) {
-            sprints = normalizeSprints(snap.data()?.sprints);
+            workspaceSprints = normalizeSprints(snap.data()?.sprints);
+            applyRoadmapSettings();
             renderTaskPanels();
             if (sprintsViewOpen()) loadSprintBoard();
         }
@@ -4424,11 +4431,12 @@
             const d = new Date(phtToday() + 'T00:00:00');
             d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 14);      // Monday two weeks ago
             const ymd = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
-            sprints = Array.from({ length: 6 }, (_, i) => {
+            workspaceSprints = Array.from({ length: 6 }, (_, i) => {
                 const s = new Date(d); s.setDate(d.getDate() + i * 14);
                 const e = new Date(s); e.setDate(s.getDate() + 11);
                 return { id: `sp-demo-${i}`, name: `Sprint ${23 + i}`, start: ymd(s), end: ymd(e) };
             });
+            sprints = workspaceSprints;
         }
 
         // ---- Loading the open deliverable's tasks ----
@@ -4733,10 +4741,25 @@
 
         // ---- Sprints window (Admins; demo can try it) ----
         let sprintsDraft = [];
+        let spRoadmapId = null;
+        const spScopeRoadmap = () => spRoadmapId ? roadmaps.find(r => r.id === spRoadmapId) || null : null;
+        const spBase = () => { const r = spScopeRoadmap(); return r ? sprintsFor(r) : workspaceSprints; };
+        const spReadOnly = () => { const r = spScopeRoadmap(); return r ? !ownSprints(r) || !canEditActive() || !!r.deletedAt || !!r.isPreview : !canEditSprints(); };
+        window.openRoadmapSprints = function() {
+            const r = getActiveRoadmap();
+            if (!r) return;
+            spRoadmapId = r.id;
+            openSprintsEditor();
+        };
         window.openSprintsWindow = function() {
             closeAccountMenu();
             if (!canEditSprints()) return;
-            sprintsDraft = sprints.map(s => ({ ...s }));
+            spRoadmapId = null;
+            openSprintsEditor();
+        };
+        function openSprintsEditor() {
+            closeAccountMenu();
+            sprintsDraft = spBase().map(s => ({ ...s }));
             const gs = document.getElementById('sprint-gen-start');
             if (gs) {
                 const last = sprintsDraft[sprintsDraft.length - 1];
@@ -4749,7 +4772,7 @@
             }
             renderSprintsWindow();
             document.getElementById('sprints-modal')?.classList.remove('hidden');
-        };
+        }
         window.closeSprintsWindow = function() { document.getElementById('sprints-modal')?.classList.add('hidden'); };
         function sprintOverlaps() {
             const list = sprintsDraft.slice().sort((a, b) => a.start.localeCompare(b.start));
@@ -4771,8 +4794,84 @@
             }).join('') || '<tr><td colspan="5" class="py-6 text-center text-slate-500 italic">No sprints yet. Add one or generate a series.</td></tr>';
             document.getElementById('sprints-overlap')?.classList.toggle('hidden', !sprintOverlaps());
             document.getElementById('sprints-error')?.classList.add('hidden');
+            renderSprintsScope();
             const preview = document.getElementById('sprint-gen-preview');
             if (preview) { const g = generatedSprints(); preview.textContent = g.length ? `${g.slice(0, 3).map(s => `${s.name} (${shortDate(s.start)} – ${shortDate(s.end)})`).join(', ')}${g.length > 3 ? ` … ${g.length} sprints` : ''}` : 'Nothing to add: those dates are already covered.'; }
+        }
+        function renderSprintsScope() {
+            const r = spScopeRoadmap(), ro = spReadOnly();
+            const sub = document.getElementById('sprints-subtitle');
+            if (sub) sub.textContent = r ? `· ${r.title}` : `· workspace default · ${usedByText('sprints')}`;
+            const box = document.getElementById('sprints-scope');
+            if (box) { box.classList.toggle('hidden', !r); box.innerHTML = r ? scopeSwitchHtml('sprints', r) : ''; }
+            document.querySelectorAll('#sprints-rows input, #sprints-rows button').forEach(el => { el.disabled = ro; });
+            ['sprint-add-btn', 'sprint-gen-panel', 'sprints-save'].forEach(id => document.getElementById(id)?.classList.toggle('hidden', ro));
+            // Copied sprints are marked in a roadmap's own calendar
+            if (r && ownSprints(r)) { const ws = new Set(workspaceSprints.map(x => x.id)); document.querySelectorAll('#sprints-rows tr[data-sprint-id]').forEach(tr => { if (ws.has(tr.dataset.sprintId)) tr.querySelector('td:nth-child(4)')?.insertAdjacentHTML('beforeend', ' <span class="sp-copied font-normal text-slate-400">· from workspace</span>'); }); }
+        }
+        // Workspace default ↔ this roadmap's own calendar (FR-4, FR-5)
+        window.setRoadmapSprintsMode = async function(mode) {
+            const r = spScopeRoadmap();
+            if (!r || !canEditActive() || r.deletedAt || r.isPreview || (mode === 'own') === ownSprints(r)) return;
+            if (mode === 'own') {
+                const list = Array.isArray(r.sprints) && r.sprints.length ? r.sprints.map(x => ({ ...x })) : workspaceSprints.map(x => ({ ...x }));
+                const ok = await writeRoadmapSettings(r, { sprintsMode: 'own', sprints: list }, 'roadmap.sprints_changed', [{ f: 'sprints', to: Array.isArray(r.sprints) && r.sprints.length ? 'own calendar (restored)' : 'own calendar (copy of the workspace)' }], 'save the sprints');
+                if (ok) { sprintsDraft = sprintsFor(r).map(x => ({ ...x })); renderSprintsWindow(); }
+                return;
+            }
+            // Back to the workspace: tasks in this roadmap's own sprints move to the workspace sprint that overlaps most
+            const wsIds = new Set(workspaceSprints.map(x => x.id));
+            const ownOnly = sprintsFor(r).filter(x => !wsIds.has(x.id));
+            const map = new Map(ownOnly.map(x => [x.id, bestOverlap(workspaceSprints, x)?.id || null]));
+            let tasks = [];
+            try { tasks = await roadmapTasksIn(r, [...map.keys()]); }
+            catch (e) { showSaveStatus('error', 'The tasks of this roadmap could not be read. Try again.'); return; }
+            const rows = ownOnly.map(x => ({ x, n: tasks.filter(t => t.sprintId === x.id).length, to: workspaceSprints.find(w => w.id === map.get(x.id)) })).filter(g => g.n);
+            const moving = rows.filter(g => g.to).reduce((a, g) => a + g.n, 0), none = rows.filter(g => !g.to).reduce((a, g) => a + g.n, 0);
+            const ok = await confirmAction({ title: 'Use the workspace calendar again?', icon: 'ph-arrows-left-right', tone: 'primary',
+                messageHtml: `<span class="block"><b>${escapeHtml(r.title)}</b> goes back to the workspace calendar.</span>${rows.length ? `<span class="block mt-2">Its tasks in its own sprints move to the workspace sprint that overlaps their dates most:</span><ul class="sp-back-moves mt-2 space-y-1">${rows.map(g => `<li class="flex justify-between gap-3"><span>${escapeHtml(g.x.name)} · ${escapeHtml(shortDate(g.x.start))} – ${escapeHtml(shortDate(g.x.end))}</span><span>${pluralize(g.n, 'task')} → <b>${g.to ? escapeHtml(g.to.name) : 'No sprint'}</b></span></li>`).join('')}</ul><span class="block mt-2"><b>${pluralize(moving, 'task')} will move</b>, ${none} will have no sprint.</span>` : '<span class="block mt-2">No task needs to move.</span>'}<span class="block mt-2 text-[11px] text-slate-500">This roadmap's own calendar is kept: switch back to it any time.</span>`,
+                confirmLabel: moving + none ? `Switch and move ${pluralize(moving + none, 'task')}` : 'Switch' });
+            if (!ok) return;
+            if (!await writeRoadmapSettings(r, { sprintsMode: 'workspace' }, 'roadmap.sprints_changed', [{ f: 'sprints', to: 'workspace default' }, ...(moving + none ? [{ f: 'moved', to: moving + none }] : [])], 'save the sprints')) return;
+            await moveRoadmapTasks(r, tasks, map);
+            sprintsDraft = workspaceSprints.map(x => ({ ...x }));
+            renderSprintsWindow();
+            renderTaskPanels();
+            if (sprintsViewOpen()) loadSprintBoard();
+        };
+        // This roadmap's live tasks in some sprints: { ref | src, sprintId, milestoneId }
+        async function roadmapTasksIn(r, ids) {
+            if (!ids.length) return [];
+            if (!useCloudPersistence || r.isPreview) return (r.items || []).flatMap(i => (demoTasks.get(i.id) || []).filter(t => !t.deletedAt && ids.includes(t.sprintId)).map(t => ({ src: t, sprintId: t.sprintId, milestoneId: i.id })));
+            const base = WORKSPACE_PATH.join('/') + '/roadmaps/' + r.id + '/';
+            const out = [];
+            for (let k = 0; k < ids.length; k += 30) {
+                const snap = await getDocs(query(collectionGroup(db, 'tasks'), where('sprintId', 'in', ids.slice(k, k + 30))));
+                snap.docs.filter(d => d.ref.path.startsWith(base) && !d.data().deletedAt).forEach(d => out.push({ ref: d.ref, sprintId: d.data().sprintId, milestoneId: d.ref.path.slice(base.length).split('/')[1] }));
+            }
+            return out;
+        }
+        // Rewrite tasks (and their deliverables' sprintIds) with a sprint map, ≤ 20 writes per batch, one audit entry each
+        async function moveRoadmapTasks(r, tasks, map) {
+            const items = (r.items || []).filter(i => (i.sprintIds || []).some(id => map.has(id)));
+            const nextIds = i => [...new Set((i.sprintIds || []).map(id => map.has(id) ? map.get(id) : id).filter(Boolean))].sort();
+            if (!useCloudPersistence || r.isPreview) {
+                tasks.forEach(t => { t.src.sprintId = map.get(t.sprintId) ?? null; });
+                items.forEach(i => { i.sprintIds = nextIds(i); });
+                updateUI();
+                return true;
+            }
+            const writes = [...tasks.map(t => (batch, aid) => batch.update(t.ref, { sprintId: map.get(t.sprintId) ?? null, ...stamp(aid) })),
+                ...items.map(i => (batch, aid) => batch.update(itemRef(r.id, 'milestones', i.id), { sprintIds: nextIds(i), ...stamp(aid) }))];
+            for (let k = 0; k < writes.length; k += 20) {
+                const part = writes.slice(k, k + 20), aid = newId('a');
+                const ok = await commitBatch(batch => {
+                    part.forEach(w => w(batch, aid));
+                    batch.set(auditRef(aid), auditEntry(r, 'roadmap.sprints_changed', { type: 'roadmap', id: r.id, label: r.title }, [{ f: 'records', to: part.length }, { f: 'reason', to: 'moved to the workspace calendar' }]));
+                }, 'move the tasks');
+                if (!ok) return false;
+            }
+            return true;
         }
         window.editSprint = function(i, key, value) { if (sprintsDraft[i]) { sprintsDraft[i][key] = value; if (key !== 'name') renderSprintsWindow(); else document.getElementById('sprints-overlap')?.classList.toggle('hidden', !sprintOverlaps()); } };
         window.addSprintRow = function() {
@@ -4810,20 +4909,26 @@
         window.previewSprints = function() { renderSprintsWindow(); };
         window.generateSprints = function() { sprintsDraft.push(...generatedSprints()); renderSprintsWindow(); };
         window.saveSprints = async function() {
-            if (!canEditSprints()) return;
+            if (spReadOnly()) return;
+            const scopeR = spScopeRoadmap(), base = spBase();
             const err = document.getElementById('sprints-error');
             const bad = sprintsDraft.find(s => !String(s.name).trim() || !s.start || !s.end || s.start > s.end);
             if (bad) { err.textContent = `Check "${bad.name || 'Unnamed sprint'}": it needs a name, and a start date on or before its end date.`; err.classList.remove('hidden'); return; }
             const next = normalizeSprints(sprintsDraft.map(s => ({ ...s, name: String(s.name).trim() })));
-            const before = new Map(sprints.map(s => [s.id, s]));
+            const before = new Map(base.map(s => [s.id, s]));
             const added = next.filter(s => !before.has(s.id)).length;
-            const removed = sprints.filter(s => !next.some(n => n.id === s.id)).length;
+            const removed = base.filter(s => !next.some(n => n.id === s.id)).length;
             const changed = next.filter(s => before.has(s.id) && JSON.stringify(before.get(s.id)) !== JSON.stringify(s)).length;
             closeSprintsWindow();
             if (!added && !removed && !changed) return;
             const summary = [added && `${added} added`, removed && `${removed} removed`, changed && `${changed} changed`].filter(Boolean).join(', ');
+            if (scopeR) {
+                await writeRoadmapSettings(scopeR, { sprintsMode: 'own', sprints: next }, 'roadmap.sprints_changed', [{ f: 'sprints', to: summary }], 'save the sprints');
+                renderTaskPanels();
+                return;
+            }
             const entry = auditEntry(null, 'workspace.sprints_changed', { type: 'workspace', id: 'sprints', label: 'Sprint calendar' }, [{ f: 'sprints', to: summary }]);
-            if (!useCloudPersistence) { sprints = next; logDemo(entry); renderTaskPanels(); return; }
+            if (!useCloudPersistence) { workspaceSprints = next; applyRoadmapSettings(); logDemo(entry); renderTaskPanels(); return; }
             const aid = newId('a');
             await commitBatch(batch => {
                 batch.set(wsRef('settings', 'sprints'), { sprints: next, ...stamp(aid) });
@@ -4881,6 +4986,32 @@
             const i = sprints.findIndex(x => x.id === sid);
             return [sid, sprints[i + 1]?.id].filter(Boolean);
         }
+        // 2.12.0 (FR-10): another roadmap's sprint for one of this roadmap's sprints: the same one, or its sprint that overlaps the dates most
+        function svMatch(r, sid) {
+            if (sid === 'NONE') return 'NONE';
+            const cal = sprintsFor(r);
+            if (cal.some(x => x.id === sid)) return sid;
+            const chosen = sprintById(sid);
+            return chosen ? bestOverlap(cal, chosen)?.id || null : null;
+        }
+        // What to read: the shown sprints, plus (All roadmaps) each other roadmap's matching sprint (at most 30 ids)
+        function svQueryIds() {
+            const base = svLoadIds();
+            if (svScope !== 'all' || base[0] === 'NONE') return base;
+            const active = getActiveRoadmap(), ids = new Set(base);
+            liveRoadmaps().filter(r => r.id !== active?.id).forEach(r => base.forEach(id => { const m = svMatch(r, id); if (m && m !== 'NONE') ids.add(m); }));
+            return [...ids].slice(0, 30);
+        }
+        // A row / card from a roadmap on another calendar names its own sprint
+        function svOtherSprintHtml(r, sid) {
+            if (!r || r.id === getActiveRoadmap()?.id) return '';
+            const m = svMatch(r, sid);
+            if (!m || m === sid || m === 'NONE') return '';
+            const x = sprintsFor(r).find(y => y.id === m);
+            if (!x) return '';
+            const chosen = sprintById(sid);
+            return `<span class="sv-other-sprint shrink-0 max-w-[10rem] truncate px-1.5 rounded-md border border-slate-300 bg-white text-slate-600 text-[10px] font-bold" title="${escapeHtml(`${r.title}'s own sprint that overlaps ${chosen?.name || 'this sprint'}`)}">${escapeHtml(x.name)} · ${escapeHtml(shortDate(x.start))} – ${escapeHtml(shortDate(x.end))}</span>`;
+        }
         function defaultSprintId() {
             const today = phtToday();
             return (currentSprint() || sprints.find(s => s.start > today) || sprints[sprints.length - 1])?.id || 'NONE';
@@ -4891,7 +5022,7 @@
         }
         // Tasks of the selected sprint: Firestore listener (cloud) or the demo's in-memory tasks
         function loadSprintBoard() {
-            const ids = svLoadIds();
+            const ids = svQueryIds();
             if (!useCloudPersistence) {
                 stopSprintBoard();
                 svTasks = [];
@@ -4933,7 +5064,11 @@
         function svVisibleTasks(sid) {
             const active = getActiveRoadmap();
             const me = myEmail();
-            return svTasks.filter(t => sid === undefined || (t.sprintId || 'NONE') === sid).map(t => {
+            return svTasks.filter(t => {
+                if (sid === undefined) return true;
+                const r = t.roadmapId === active?.id ? null : roadmaps.find(x => x.id === t.roadmapId);
+                return (t.sprintId || 'NONE') === (r ? svMatch(r, sid) : sid);
+            }).map(t => {
                 const roadmap = roadmaps.find(r => r.id === t.roadmapId);
                 const item = roadmap && !roadmap.deletedAt ? (roadmap.items || []).find(i => i.id === t.milestoneId) : null;
                 return item ? { ...t, roadmap, item } : null;
@@ -5038,7 +5173,7 @@
                     <button type="button" class="task-status shrink-0 inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-full border text-[10px] font-bold ${cls} ${ok ? 'hover:shadow-sm' : 'opacity-70 cursor-default'}" ${ok ? `onclick="boardNextStatus('${key}')"` : 'disabled'} aria-label="Status: ${label}${ok ? ', change' : ''}" title="${ok ? 'Click: next status' : 'Only the assignee or an Editor can change this'}"><i class="ph-bold ${icon} text-xs" aria-hidden="true"></i>${label}</button>
                     <button type="button" onclick="openSprintTask('${key}')" class="sv-title text-left text-xs font-semibold leading-snug break-words min-w-0 ${t.status === 'done' ? 'line-through text-slate-400' : 'text-slate-800 hover:text-brand-700'}">${escapeHtml(t.title)}</button>
                 </div>
-                <div class="flex items-center gap-1.5 text-[11px] text-slate-500 min-w-0"><i class="ph-bold ph-git-commit rotate-90 text-[10px] shrink-0" aria-hidden="true"></i><button type="button" onclick="openSprintTask('${key}')" class="sv-deliverable truncate hover:text-brand-700 hover:underline" title="${escapeHtml(t.item.name)}">${escapeHtml(t.item.name)}</button>${svScope === 'all' ? `<span class="sv-roadmap shrink-0 max-w-[8rem] truncate px-1.5 rounded bg-slate-100 text-[10px] font-semibold" title="${escapeHtml(t.roadmap.title)}">${escapeHtml(t.roadmap.title)}</span>` : ''}</div>
+                <div class="flex items-center gap-1.5 text-[11px] text-slate-500 min-w-0"><i class="ph-bold ph-git-commit rotate-90 text-[10px] shrink-0" aria-hidden="true"></i><button type="button" onclick="openSprintTask('${key}')" class="sv-deliverable truncate hover:text-brand-700 hover:underline" title="${escapeHtml(t.item.name)}">${escapeHtml(t.item.name)}</button>${svScope === 'all' ? `<span class="sv-roadmap shrink-0 max-w-[8rem] truncate px-1.5 rounded bg-slate-100 text-[10px] font-semibold" title="${escapeHtml(t.roadmap.title)}">${escapeHtml(t.roadmap.title)}</span>${svOtherSprintHtml(t.roadmap, svSprintId())}` : ''}</div>
                 <div class="flex items-center gap-2 text-[11px]"><span class="${t.estimateDays ? 'text-slate-600' : 'text-slate-300'}">${t.estimateDays ? fmtDays(t.estimateDays) : '—'}</span>${t.link ? '<i class="ph-bold ph-link text-slate-400" aria-label="Has a link"></i>' : ''}<span class="ml-auto">${t.assignee?.email ? avatarHtml(t.assignee, 'Assignee', 'sm') : '<span class="w-5 h-5 rounded-full inline-flex items-center justify-center text-[9px] font-bold bg-slate-50 text-slate-400 border border-dashed border-slate-300" title="Unassigned" role="img" aria-label="Unassigned">–</span>'}</span></div>
             </div>`;
         }
@@ -5081,7 +5216,7 @@
                 <button type="button" data-row-key="${escapeHtml(k)}" onclick="toggleSprintRow(this.dataset.rowKey)" aria-expanded="${open}" class="sv-row-btn w-full text-left flex items-center gap-2 px-3 py-2 text-xs hover:bg-slate-50 focus:outline-none focus-visible:bg-brand-50/60">
                     <i class="ph-bold ${open ? 'ph-caret-down' : 'ph-caret-right'} text-slate-400 shrink-0" aria-hidden="true"></i>
                     ${rankChipHtml(g.roadmap, g.item)}
-                    ${svScope === 'all' ? `<span class="sv-roadmap shrink-0 max-w-[7rem] truncate px-1.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-semibold" title="${escapeHtml(g.roadmap.title)}">${escapeHtml(g.roadmap.title)}</span>` : ''}
+                    ${svScope === 'all' ? `<span class="sv-roadmap shrink-0 max-w-[7rem] truncate px-1.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-semibold" title="${escapeHtml(g.roadmap.title)}">${escapeHtml(g.roadmap.title)}</span>${svOtherSprintHtml(g.roadmap, sid)}` : ''}
                     <span class="sv-name flex-1 min-w-0 truncate font-bold text-slate-900">${escapeHtml(g.item.name)}</span>
                     <span class="hidden md:inline-flex shrink-0">${peopleStackHtml(g.item, 2, 'sm')}</span>
                     <span class="shrink-0 flex items-center gap-1.5 w-20 sm:w-28" title="${done} of ${pluralize(total, 'task')} done"><span class="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden" aria-hidden="true"><span class="block h-full bg-emerald-500" style="width:${pct}%"></span></span><span class="sv-progress text-[11px] text-slate-500 tabular-nums">${done}/${total}</span></span>
@@ -5107,6 +5242,7 @@
                 <header class="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2.5 bg-slate-50/70 border-b border-slate-100">
                     <b class="text-sm text-slate-900">${sp ? `${escapeHtml(sp.name)} · ${escapeHtml(shortDate(sp.start))} – ${escapeHtml(shortDate(sp.end))}` : 'No sprint'}</b>
                     ${tag ? `<span class="sv-tag text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${tagCls}">${tag}</span>` : ''}
+                    ${(() => { if (svScope !== 'all' || sid === 'NONE') return ''; const active = getActiveRoadmap(); const n = liveRoadmaps().filter(r => r.id !== active?.id && (() => { const m = svMatch(r, sid); return !!m && m !== sid; })()).length; return n ? `<span class="sv-matching text-[11px] text-slate-500">· and the matching sprint${n === 1 ? '' : 's'} in ${pluralize(n, 'other roadmap')}</span>` : ''; })()}
                     <span class="sv-card-counts ml-auto text-[11px] text-slate-500">${pluralize(rows.length, 'deliverable')} · ${pluralize(tasks, 'task')}${pd ? ` · ${fmtDays(pd)}` : ''}</span>
                 </header>
                 ${rows.map(g => svListRowHtml(sid, g)).join('') || `<p class="px-3 py-3 text-xs text-slate-500 italic">${hidden ? 'Only done deliverables here.' : `No tasks in ${escapeHtml(sp ? sp.name : 'the backlog')}${svScope === 'this' ? ' for this roadmap' : ''}${svPerson !== 'ALL' ? ' for this person' : ''} yet.`}</p>`}
@@ -5153,7 +5289,7 @@
             const next = sprints[i + dir];
             if (next) { svSprint = next.id; loadSprintBoard(); }
         };
-        window.setSprintScope = function(scope) { svScope = scope === 'all' ? 'all' : 'this'; renderSprintBoard(); };
+        window.setSprintScope = function(scope) { svScope = scope === 'all' ? 'all' : 'this'; loadSprintBoard(); };
         window.setSprintPerson = function(value) { svPerson = value || 'ALL'; renderSprintBoard(); };
         window.toggleSprintColumn = function(k) { if (svOpenCols.has(k)) svOpenCols.delete(k); else svOpenCols.add(k); renderSprintBoard(); };
         window.toggleSprintDone = function() { svDoneOpen = !svDoneOpen; renderSprintBoard(); };
@@ -7027,6 +7163,7 @@
             stopSprintBoard();
             svSprint = undefined;
             sprints = [];
+            workspaceSprints = [];
             stopActivity();
             stopUnread();
         }
@@ -7651,7 +7788,79 @@
             ],
             progressMethod: 'weighted'
         };
-        let workflow = structuredClone(DEFAULT_WORKFLOW);
+        let workflow = structuredClone(DEFAULT_WORKFLOW);      // the open roadmap's effective workflow (2.12.0)
+        // ---- 2.12.0 (specs/roadmap-settings.md): a roadmap uses the workspace default or its own sprints / workflow ----
+        let workspaceWorkflow = structuredClone(DEFAULT_WORKFLOW);
+        let workspaceSprints = [];
+        const wfCache = new WeakMap(), spCache = new WeakMap();
+        const ownWorkflow = r => r?.workflowMode === 'own' && !!r.workflow && typeof r.workflow === 'object';
+        const ownSprints = r => r?.sprintsMode === 'own' && Array.isArray(r.sprints);
+        function workflowFor(r) {
+            if (!ownWorkflow(r)) return workspaceWorkflow;
+            if (!wfCache.has(r.workflow)) wfCache.set(r.workflow, normalizeWorkflow(r.workflow));
+            return wfCache.get(r.workflow);
+        }
+        function sprintsFor(r) {
+            if (!ownSprints(r)) return workspaceSprints;
+            if (!spCache.has(r.sprints)) spCache.set(r.sprints, normalizeSprints(r.sprints));
+            return spCache.get(r.sprints);
+        }
+        // The rest of the app reads `workflow` / `sprints`: keep them on the open roadmap's settings
+        function applyRoadmapSettings() {
+            const r = getActiveRoadmap();
+            const wf = workflowFor(r);
+            const changed = wf !== workflow;
+            workflow = wf;
+            sprints = sprintsFor(r);
+            if (changed) refreshStageFilters();
+        }
+        // Lists across roadmaps: run fn with that roadmap's settings, then put the open roadmap's back
+        function withSettings(r, fn) {
+            const w = workflow, sp = sprints;
+            workflow = workflowFor(r); sprints = sprintsFor(r);
+            try { return fn(); } finally { workflow = w; sprints = sp; }
+        }
+        const liveRoadmaps = () => roadmaps.filter(r => !r.deletedAt);
+        function usedByText(kind) {
+            const live = liveRoadmaps();
+            const n = live.filter(r => !(kind === 'sprints' ? ownSprints(r) : ownWorkflow(r))).length;
+            return `used by ${n} of ${pluralize(live.length, 'roadmap')}`;
+        }
+        // Days two sprints share (0 when they don't overlap)
+        function overlapDays(a, b) {
+            const s = a.start > b.start ? a.start : b.start, e = a.end < b.end ? a.end : b.end;
+            return s > e ? 0 : Math.round((new Date(e + 'T00:00:00') - new Date(s + 'T00:00:00')) / 864e5) + 1;
+        }
+        function bestOverlap(list, sprint) {
+            let best = null, days = 0;
+            (list || []).forEach(x => { const d = overlapDays(x, sprint); if (d > days) { best = x; days = d; } });
+            return best;
+        }
+        // One write to a roadmap's settings + its audit entry
+        async function writeRoadmapSettings(r, data, action, changes, label) {
+            const entry = auditEntry(r, action, { type: 'roadmap', id: r.id, label: r.title }, changes);
+            if (!useCloudPersistence || r.isPreview) { Object.assign(r, data); logDemo(entry); updateUI(); return true; }
+            const aid = newId('a');
+            const ok = await commitBatch(batch => {
+                batch.update(roadmapRef(r.id), { ...data, ...stamp(aid) });
+                batch.set(auditRef(aid), entry);
+            }, label);
+            if (ok) { Object.assign(r, data); scheduleRender(); }
+            return ok;
+        }
+        // The switch at the top of a roadmap's Sprints / Workflow window
+        function scopeSwitchHtml(kind, r) {
+            const own = kind === 'sprints' ? ownSprints(r) : ownWorkflow(r);
+            const can = canEditActive() && !r.deletedAt && !r.isPreview;
+            const what = kind === 'sprints' ? 'calendar' : 'workflow';
+            const fn = kind === 'sprints' ? 'setRoadmapSprintsMode' : 'setRoadmapWorkflowMode';
+            const btn = (mode, label) => { const on = (mode === 'own') === own; return `<button type="button" data-scope-mode="${mode}" aria-pressed="${on}" ${can ? `onclick="${fn}('${mode}')"` : 'disabled'} class="h-7 px-3 rounded-lg text-xs font-semibold ${on ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'} disabled:cursor-default">${label}</button>`; };
+            const hint = own ? `Only this roadmap uses this ${what}.` : `The workspace ${what}, ${usedByText(kind)}.`;
+            const info = own
+                ? `<p class="scope-info px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600"><i class="ph-bold ph-info text-brand-600" aria-hidden="true"></i> This roadmap's own ${what}: other roadmaps don't see it.${kind === 'sprints' ? ' Sprints copied from the workspace keep their tasks.' : ' Stages copied from the workspace keep their deliverables.'}${can ? '' : ' Read only for you.'}</p>`
+                : `<p class="scope-info px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600"><i class="ph-bold ph-lock-simple" aria-hidden="true"></i> Read only here: this roadmap follows the workspace ${what}.${isAdmin() || !useCloudPersistence ? ` <button type="button" data-keep onclick="${kind === 'sprints' ? 'openSprintsWindow()' : 'openWorkflowSettings()'}" class="font-semibold text-brand-700 hover:underline">Edit the workspace default</button>` : ''}${can ? ` Switch to "This roadmap's own" to change it for this roadmap only.` : ''}</p>`;
+            return `<div class="flex flex-wrap items-center gap-3"><div role="group" aria-label="Which ${what} this roadmap uses" class="inline-flex gap-1 bg-slate-100 p-1 rounded-xl">${btn('workspace', 'Workspace default')}${btn('own', "This roadmap's own")}</div><span class="scope-hint text-[11px] text-slate-500">${hint}</span></div>${info}`;
+        }
         // Phase colours by position: violet, pink, amber, brand, then teal, indigo, orange, cyan
         const PHASE_COLORS = [
             ['bg-violet-50 text-violet-700 border-violet-200', 'bg-violet-500'], ['bg-pink-50 text-pink-700 border-pink-200', 'bg-pink-500'],
@@ -8005,13 +8214,31 @@
         let wfDraft = null;              // the workflow being edited
         let wfMoves = {};                // removed stage id -> stage id its deliverables move to
         const wfOpen = new Set();        // open phases in the settings window
+        // Deliverables at a stage, in the roadmaps the open window applies to (this roadmap, or those on the workspace workflow)
+        let wfRoadmapId = null;
+        const wfScopeRoadmap = () => wfRoadmapId ? roadmaps.find(r => r.id === wfRoadmapId) || null : null;
+        const wfBase = () => { const r = wfScopeRoadmap(); return r ? workflowFor(r) : workspaceWorkflow; };
+        const wfReadOnly = () => { const r = wfScopeRoadmap(); return r ? !ownWorkflow(r) || !canEditActive() || !!r.deletedAt || !!r.isPreview : !canEditWorkflow(); };
         function deliverablesAt(stageId) {
-            return roadmaps.filter(r => !r.deletedAt).flatMap(r => (r.items || []).map(i => ({ r, i }))).filter(({ i }) => currentStageId(i) === stageId);
+            const scope = wfRoadmapId ? roadmaps.filter(r => r.id === wfRoadmapId) : liveRoadmaps().filter(r => !ownWorkflow(r));
+            return scope.flatMap(r => withSettings(r, () => (r.items || []).filter(i => currentStageId(i) === stageId).map(i => ({ r, i }))));
         }
+        window.openRoadmapWorkflow = function() {
+            const r = getActiveRoadmap();
+            if (!r) return;
+            closeAccountMenu();
+            wfRoadmapId = r.id;
+            wfDraft = structuredClone(workflowFor(r));
+            wfMoves = {};
+            wfOpen.clear();
+            renderWorkflowSettings();
+            document.getElementById('workflow-modal')?.classList.remove('hidden');
+        };
         window.openWorkflowSettings = function() {
             if (!canEditWorkflow()) return;
             closeAccountMenu();
-            wfDraft = structuredClone(workflow);
+            wfRoadmapId = null;
+            wfDraft = structuredClone(workspaceWorkflow);
             wfMoves = {};
             wfOpen.clear();
             renderWorkflowSettings();
@@ -8053,12 +8280,12 @@
             }).join('');
             const moves = Object.entries(wfMoves).map(([removedId, target]) => {
                 const n = deliverablesAt(removedId).length;
-                const removedName = workflow.stages.find(s => s.id === removedId)?.name || removedId;
+                const removedName = wfBase().stages.find(s => s.id === removedId)?.name || removedId;
                 const options = wfDraft.stages.map(s => `<option value="${escapeHtml(s.id)}" ${s.id === target ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('');
                 return `<div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-wrap items-center gap-2 text-xs"><i class="ph-bold ph-warning"></i>${pluralize(n, 'deliverable')} ${n === 1 ? 'is' : 'are'} at <b>${escapeHtml(removedName)}</b> (removed). Move ${n === 1 ? 'it' : 'them'} to: <select onchange="wfMoves['${escapeHtml(removedId)}'] = this.value" aria-label="Move deliverables to" class="px-2 py-1 border border-amber-300 rounded-lg bg-white">${options}</select></div>`;
             }).join('');
             box.innerHTML = `
-                <p class="text-xs text-slate-500">One delivery workflow for all roadmaps. Weights set how much each stage counts toward progress.</p>
+                <p class="text-xs text-slate-500">${wfRoadmapId ? "Weights set how much each stage counts toward this roadmap's progress." : 'The workspace default workflow, for every roadmap that doesn\'t have its own. Weights set how much each stage counts toward progress.'}</p>
                 ${fixed(wfDraft.stages[0])}
                 ${phases}
                 <button type="button" onclick="wfAddPhase()" class="text-[11px] font-semibold text-brand-700">+ Add phase</button>
@@ -8071,7 +8298,54 @@
                         <label class="flex items-center gap-1"><input type="radio" name="wf-method" value="doneCount" ${wfDraft.progressMethod === 'doneCount' ? 'checked' : ''} onchange="wfDraft.progressMethod = 'doneCount'"> Done ÷ all</label></span>
                 </div>
                 <p id="wf-error" class="hidden text-xs text-rose-700 font-semibold"></p>`;
+            renderWorkflowScope();
         }
+        function renderWorkflowScope() {
+            const r = wfScopeRoadmap(), ro = wfReadOnly();
+            const sub = document.getElementById('workflow-subtitle');
+            if (sub) sub.textContent = r ? `· ${r.title}` : `· workspace default · ${usedByText('workflow')}`;
+            const box = document.getElementById('workflow-scope');
+            if (box) { box.classList.toggle('hidden', !r); box.innerHTML = r ? scopeSwitchHtml('workflow', r) : ''; }
+            document.querySelectorAll('#workflow-body input, #workflow-body select, #workflow-body button:not([data-wf-keep])').forEach(el => { if (ro) el.disabled = true; });
+            ['workflow-save', 'workflow-reset'].forEach(id => document.getElementById(id)?.classList.toggle('hidden', ro));
+        }
+        // Workspace default ↔ this roadmap's own workflow (FR-4, FR-5)
+        window.setRoadmapWorkflowMode = async function(mode) {
+            const r = wfScopeRoadmap();
+            if (!r || !canEditActive() || r.deletedAt || r.isPreview || (mode === 'own') === ownWorkflow(r)) return;
+            if (mode === 'own') {
+                const wf = r.workflow ? structuredClone(r.workflow) : structuredClone(workspaceWorkflow);
+                const ok = await writeRoadmapSettings(r, { workflowMode: 'own', workflow: wf }, 'roadmap.workflow_changed', [{ f: 'workflow', to: r.workflow ? 'own workflow (restored)' : 'own workflow (copy of the workspace)' }], 'save the workflow');
+                if (ok) { wfDraft = structuredClone(workflowFor(r)); wfMoves = {}; renderWorkflowSettings(); }
+                return;
+            }
+            // Back to the workspace: deliverables at stages it doesn't have move to the stage at the same point of the process
+            const own = workflowFor(r), ws = workspaceWorkflow, wsIds = new Set(ws.stages.map(x => x.id));
+            const pointOf = (wf, id) => { const i = wf.stages.findIndex(x => x.id === id); const total = wf.stages.reduce((a, x) => a + (Number(x.weight) || 0), 0);
+                return total > 0 ? wf.stages.slice(0, i).reduce((a, x) => a + (Number(x.weight) || 0), 0) / total * 100 : i / Math.max(1, wf.stages.length - 1) * 100; };
+            const middle = ws.stages.slice(1, -1);
+            const moves = withSettings(r, () => (r.items || []).map(i => ({ i, from: currentStageId(i) }))).filter(x => !wsIds.has(x.from)).map(x => {
+                const p = pointOf(own, x.from);
+                const to = middle.reduce((best, st) => Math.abs(pointOf(ws, st.id) - p) < Math.abs(pointOf(ws, best.id) - p) ? st : best, middle[0]);
+                return { ...x, fromName: own.stages.find(st => st.id === x.from)?.name || x.from, to: to.id, toName: to.name, pct: Math.round(p) };
+            });
+            const groups = [...new Set(moves.map(m => m.from))].map(id => { const g = moves.filter(m => m.from === id); return `<li class="flex justify-between gap-3"><span>${escapeHtml(g[0].fromName)} (${g[0].pct}%)</span><span>${pluralize(g.length, 'deliverable')} → <b>${escapeHtml(g[0].toName)}</b></span></li>`; }).join('');
+            const ok = await confirmAction({ title: 'Use the workspace workflow again?', icon: 'ph-arrows-left-right', tone: 'primary',
+                messageHtml: `<span class="block"><b>${escapeHtml(r.title)}</b> goes back to the workspace workflow.</span>${moves.length ? `<span class="block mt-2">Deliverables at stages the workspace doesn't have move to the stage at the same point of the process:</span><ul class="wf-back-moves mt-2 space-y-1">${groups}</ul><span class="block mt-2"><b>${pluralize(moves.length, 'deliverable')} will move</b>, each with a history note. Statuses follow their stage.</span>` : '<span class="block mt-2">No deliverable needs to move.</span>'}<span class="block mt-2 text-[11px] text-slate-500">This roadmap's own workflow is kept: switch back to it any time.</span>`,
+                confirmLabel: moves.length ? `Switch and move ${pluralize(moves.length, 'deliverable')}` : 'Switch' });
+            if (!ok) return;
+            const done = await writeRoadmapSettings(r, { workflowMode: 'workspace' }, 'roadmap.workflow_changed', [{ f: 'workflow', to: 'workspace default' }, ...(moves.length ? [{ f: 'moved', to: moves.length }] : [])], 'save the workflow');
+            if (!done) return;
+            for (const m of moves) {
+                const history = (m.i.stageHistory || []).concat([{ stageId: m.to, stageName: m.toName, action: 'set', at: new Date().toISOString(), by: actor(), note: 'Workflow changed to the workspace default' }]).slice(-200);
+                const updates = { stageId: m.to, stageHistory: history, skipped: (m.i.skipped || []).filter(id => wsIds.has(id)), status: statusForStage(m.to), stageSince: useCloudPersistence ? serverTimestamp() : new Date().toISOString() };
+                await updateMilestone(r, m.i, updates, [{ f: 'stage', from: m.fromName, to: m.toName }]);
+                if (useCloudPersistence) Object.assign(m.i, updates, { stageSince: new Date().toISOString() });
+            }
+            wfDraft = structuredClone(workspaceWorkflow); wfMoves = {};
+            renderWorkflowSettings();
+            scheduleRender();
+        };
         window.wfTogglePhase = id => { if (wfOpen.has(id)) wfOpen.delete(id); else wfOpen.add(id); renderWorkflowSettings(); };
         window.wfSetName = (id, v) => { const s = wfDraft.stages.find(x => x.id === id); if (s) s.name = v.slice(0, 60); };
         window.wfSetPhaseName = (id, v) => { const p = wfDraft.phases.find(x => x.id === id); if (p) p.name = v.slice(0, 60); };
@@ -8150,7 +8424,8 @@
         };
         window.wfReset = () => { wfDraft = structuredClone(DEFAULT_WORKFLOW); wfMoves = {}; renderWorkflowSettings(); };
         window.saveWorkflowSettings = async function() {
-            if (!wfDraft || !canEditWorkflow()) return;
+            if (!wfDraft || wfReadOnly()) return;
+            const scopeR = wfScopeRoadmap(), base = wfBase();
             const err = document.getElementById('wf-error');
             const problem = wfDraft.stages.some(s => !s.name.trim()) || wfDraft.phases.some(p => !p.name.trim()) ? 'Every phase and stage needs a name.'
                 : wfDraft.stages.length < 3 ? 'Keep at least one working stage.'
@@ -8158,43 +8433,50 @@
             if (problem) { err.textContent = problem; err.classList.remove('hidden'); return; }
             const next = normalizeWorkflow({ ...wfDraft, stages: wfDraft.stages.map(s => ({ ...s, name: s.name.trim() })), phases: wfDraft.phases.map(p => ({ ...p, name: p.name.trim() })) });
             // A short summary of what changed, for the audit log
-            const before = new Map(workflow.stages.map(s => [s.id, s]));
+            const before = new Map(base.stages.map(s => [s.id, s]));
             const after = new Map(next.stages.map(s => [s.id, s]));
             const changes = [];
             next.stages.forEach(s => { const b = before.get(s.id); if (!b) changes.push({ f: 'stage added', to: s.name }); else { if (b.name !== s.name) changes.push({ f: 'stage renamed', from: b.name, to: s.name }); if ((b.weight || 0) !== (s.weight || 0)) changes.push({ f: `weight ${s.name}`, from: b.weight || 0, to: s.weight || 0 }); } });
-            workflow.stages.forEach(s => { if (!after.has(s.id)) changes.push({ f: 'stage removed', to: s.name }); });
-            if (JSON.stringify(workflow.phases) !== JSON.stringify(next.phases)) changes.push({ f: 'phases', to: next.phases.map(p => p.name).join(' › ') });
-            if (JSON.stringify(workflow.stages.map(s => s.id)) !== JSON.stringify(next.stages.map(s => s.id)) && !changes.some(c => /added|removed/.test(c.f))) changes.push({ f: 'order', to: 'stages reordered' });
-            if (workflow.progressMethod !== next.progressMethod) changes.push({ f: 'progress method', from: workflow.progressMethod, to: next.progressMethod });
+            base.stages.forEach(s => { if (!after.has(s.id)) changes.push({ f: 'stage removed', to: s.name }); });
+            if (JSON.stringify(base.phases) !== JSON.stringify(next.phases)) changes.push({ f: 'phases', to: next.phases.map(p => p.name).join(' › ') });
+            if (JSON.stringify(base.stages.map(s => s.id)) !== JSON.stringify(next.stages.map(s => s.id)) && !changes.some(c => /added|removed/.test(c.f))) changes.push({ f: 'order', to: 'stages reordered' });
+            if (base.progressMethod !== next.progressMethod) changes.push({ f: 'progress method', from: base.progressMethod, to: next.progressMethod });
             const moves = { ...wfMoves };
-            const affected = Object.keys(moves).flatMap(id => deliverablesAt(id).map(x => ({ ...x, to: moves[id], fromName: workflow.stages.find(s => s.id === id)?.name || id })));
+            const affected = Object.keys(moves).flatMap(id => deliverablesAt(id).map(x => ({ ...x, to: moves[id], fromName: base.stages.find(s => s.id === id)?.name || id })));
             closeWorkflowSettings();
             if (!changes.length && !affected.length) return;
-            const entry = auditEntry(null, 'workspace.workflow_changed', { type: 'workspace', id: 'workflow', label: 'Delivery workflow' }, changes.slice(0, 60));
-            if (!useCloudPersistence) {
-                workflow = next;
-                logDemo(entry);
+            const plain = { phases: next.phases, stages: next.stages, progressMethod: next.progressMethod };
+            if (scopeR) {
+                if (!await writeRoadmapSettings(scopeR, { workflowMode: 'own', workflow: plain }, 'roadmap.workflow_changed', changes.slice(0, 60), 'save the workflow')) return;
             } else {
-                const aid = newId('a');
-                const ok = await commitBatch(batch => {
-                    batch.set(wsRef('settings', 'workflow'), { phases: next.phases, stages: next.stages, progressMethod: next.progressMethod, ...stamp(aid) });
-                    batch.set(auditRef(aid), entry);
-                }, 'save the workflow');
-                if (!ok) return;
-                workflow = next;
+                const entry = auditEntry(null, 'workspace.workflow_changed', { type: 'workspace', id: 'workflow', label: 'Delivery workflow' }, changes.slice(0, 60));
+                if (!useCloudPersistence) { workspaceWorkflow = next; logDemo(entry); }
+                else {
+                    const aid = newId('a');
+                    const ok = await commitBatch(batch => {
+                        batch.set(wsRef('settings', 'workflow'), { ...plain, ...stamp(aid) });
+                        batch.set(auditRef(aid), entry);
+                    }, 'save the workflow');
+                    if (!ok) return;
+                    workspaceWorkflow = next;
+                }
             }
+            applyRoadmapSettings();
             // Deliverables at removed stages move to the chosen stage
+            const nextIds = new Set(next.stages.map(s => s.id));
             for (const { r, i, to, fromName } of affected) {
-                const history = (i.stageHistory || []).concat([{ stageId: to, stageName: stageName(to), action: 'set', at: new Date().toISOString(), by: actor(), note: `Stage "${fromName}" was removed from the workflow` }]).slice(-200);
-                const updates = { stageId: to, stageHistory: history, skipped: (i.skipped || []).filter(id => stageIdx(id) >= 0), status: statusForStage(to), stageSince: useCloudPersistence ? serverTimestamp() : new Date().toISOString() };
-                await updateMilestone(r, i, updates, [{ f: 'stage', from: fromName, to: stageName(to) }]);
+                const toName = next.stages.find(s => s.id === to)?.name || to;
+                const history = (i.stageHistory || []).concat([{ stageId: to, stageName: toName, action: 'set', at: new Date().toISOString(), by: actor(), note: `Stage "${fromName}" was removed from the workflow` }]).slice(-200);
+                const updates = { stageId: to, stageHistory: history, skipped: (i.skipped || []).filter(id => nextIds.has(id)), status: statusForStage(to), stageSince: useCloudPersistence ? serverTimestamp() : new Date().toISOString() };
+                await updateMilestone(r, i, updates, [{ f: 'stage', from: fromName, to: toName }]);
                 if (useCloudPersistence) Object.assign(i, updates, { stageSince: new Date().toISOString() });
             }
             refreshStageFilters();
             scheduleRender();
         };
         function onWorkflowSnapshot(snap) {
-            workflow = snap.exists() ? normalizeWorkflow(snap.data()) : structuredClone(DEFAULT_WORKFLOW);
+            workspaceWorkflow = snap.exists() ? normalizeWorkflow(snap.data()) : structuredClone(DEFAULT_WORKFLOW);
+            applyRoadmapSettings();
             refreshStageFilters();
             scheduleRender();
         }
@@ -8291,6 +8573,17 @@
                 case 'feedback.created': text = `${who} added feedback ${q(label)}`; break;
                 case 'roadmap.created': text = `${who} created roadmap ${q(label)}`; break;
                 case 'roadmap.updated': text = `${who} renamed roadmap ${q(changes[0]?.from ?? label)} to ${q(changes[0]?.to)}`; break;
+                case 'roadmap.sprints_changed': case 'roadmap.workflow_changed': {
+                    const what = e.action === 'roadmap.sprints_changed' ? 'sprint calendar' : 'workflow';
+                    const c = changes[0]?.to || '';
+                    const moved = Number(changes.find(x => x.f === 'moved')?.to) || 0;
+                    text = changes[0]?.f === 'records' ? `${who} moved ${escapeHtml(pluralize(Number(c) || 0, 'record'))} of ${q(label)} to the workspace ${what}`
+                        : /^own .*\(copy/.test(c) ? `${who} gave ${q(label)} its own ${what}`
+                        : /^own .*\(restored/.test(c) ? `${who} switched ${q(label)} back to its own ${what}`
+                        : c === 'workspace default' ? `${who} switched ${q(label)} back to the workspace ${what}${moved ? ` (${escapeHtml(pluralize(moved, e.action === 'roadmap.sprints_changed' ? 'task' : 'deliverable'))} moved)` : ''}`
+                        : `${who} changed the ${what} of ${q(label)}${e.action === 'roadmap.sprints_changed' && c ? ` (${escapeHtml(c)})` : ''}`;
+                    break;
+                }
                 case 'milestone.updated':
                 case 'feedback.updated': {
                     const c = changes[0];
@@ -9003,6 +9296,7 @@
             privateRoadmaps = [];
             demoAuditLog = [];
             workflow = structuredClone(DEFAULT_WORKFLOW);
+            workspaceWorkflow = structuredClone(DEFAULT_WORKFLOW);
             stageInitDone.clear();
             pendingStageAction = null;
             activityEntries = [];
@@ -9095,8 +9389,13 @@
             const live = !!active && !active.deletedAt && !active.isPreview;
             document.getElementById('roadmap-bar-actions')?.classList.toggle('hidden', !active);
             document.getElementById('rename-roadmap-btn')?.classList.toggle('hidden', !live || !canEditActive());
-            document.getElementById('roadmap-sprints-btn')?.classList.toggle('hidden', !canEditSprints());
-            document.getElementById('roadmap-workflow-btn')?.classList.toggle('hidden', !canEditWorkflow());
+            // Everyone sees which settings this roadmap uses (Viewers read only); the tag says own / workspace
+            [['roadmap-sprints-tag', ownSprints(active)], ['roadmap-workflow-tag', ownWorkflow(active)]].forEach(([id, own]) => {
+                const tag = document.getElementById(id);
+                if (!tag) return;
+                tag.textContent = own ? 'own' : 'workspace';
+                tag.classList.toggle('own', !!own);
+            });
             document.getElementById('delete-roadmap-wrap')?.classList.toggle('hidden', !canDeleteRoadmap(active));
         }
         window.openRoadmapMenu = function() {
