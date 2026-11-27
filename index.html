@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.14.0" data-released="2026-11-27">
+    <meta name="mapit-version" content="2.14.1" data-released="2026-11-27">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -103,6 +103,39 @@
         .rm-item:hover, .rm-item:focus { background: #f8fafc; }
         .rm-item > i { font-size: 1rem; color: #64748b; }
         .rm-item.text-rose-600 > i { color: inherit; }
+        /* 2.14.1 phones: no zoom on focus, no sideways page, bar above the home indicator */
+        html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+        @media (max-width: 639px) {
+            /* iOS zooms into fields under 16 px and the page then needs sideways scrolling */
+            input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px !important; }
+            body { overflow-x: hidden; }
+            #mobile-nav { padding-bottom: env(safe-area-inset-bottom); }
+            main { padding-bottom: calc(5rem + env(safe-area-inset-bottom)) !important; }
+            /* Sprints window: each sprint on two lines (name · status · remove / start · end) */
+            #sprints-modal thead { display: none; }
+            #sprints-rows tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; grid-template-areas: "name name del" "start end state"; gap: .375rem; padding: .5rem 0; align-items: center; }
+            #sprints-rows td { padding: 0 !important; }
+            #sprints-rows td:nth-child(1) { grid-area: name; } #sprints-rows td:nth-child(2) { grid-area: start; } #sprints-rows td:nth-child(3) { grid-area: end; }
+            #sprints-rows td:nth-child(4) { grid-area: state; } #sprints-rows td:nth-child(5) { grid-area: del; }
+            #sprints-rows td[colspan] { grid-column: 1 / -1; grid-area: auto; }
+            #sprints-modal table, #sprints-rows { display: block; width: 100%; }
+            #sprints-rows input { min-width: 0; width: 100%; }
+            /* Narrow lists that are vertical scrollers anyway: never sideways */
+            #milestone-tasks-panel, #detail-tasks-panel { overflow-x: hidden; }
+            #milestone-tasks-list .task-row, #detail-tasks-list .task-row { min-width: 0; }
+            #users-table-body select { max-width: 6.5rem; }
+            #users-table-body td:first-child { width: 100%; max-width: 0; overflow-wrap: anywhere; }
+            /* Capacity: drop the deliverables count; a shorter load bar */
+            #capacity-rows td:nth-child(5), #capacity-modal thead th:nth-child(5) { display: none; }
+            #capacity-rows .w-20 { width: 2.5rem; }
+            #capacity-rows input[data-ym] { width: 4.5rem; }
+        }
+        @media (max-width: 359px) {
+            #capacity-rows .w-20 { display: none; }
+            #capacity-rows input[data-ym] { width: 3.75rem; }
+        }
+        /* Four tabs on a narrow screen: names only */
+        @media (max-width: 479px) { .milestone-tabs.grid-cols-4 .tab-badge { display: none; } }
         /* 2.14.0 comments: 💬 chips, mentions */
         .cm-chip { display: inline-flex; align-items: center; gap: .25rem; height: 1.25rem; padding: 0 .375rem; border-radius: .375rem; font-size: 10px; font-weight: 700; border: 1px solid #e2e8f0; color: #64748b; background: #fff; position: relative; flex-shrink: 0; }
         .cm-chip:hover { border-color: #7cc8fb; color: #0359a1; }
@@ -396,7 +429,7 @@
                         <button type="button" onclick="closeFilterSheet()" class="sm:hidden ctl ctl-primary w-full justify-center">Show results</button>
                     </div>
                 </div>
-                <button id="annual-expand-toggle" type="button" onclick="toggleAllAnnualModules()" aria-pressed="false" class="hidden ctl ctl-quiet"><i class="ph-bold ph-arrows-out-line-vertical" aria-hidden="true"></i><span>Expand all</span></button>
+                <button id="annual-expand-toggle" type="button" onclick="toggleAllAnnualModules()" aria-pressed="false" aria-label="Expand all" title="Expand all" class="hidden ctl ctl-quiet max-sm:w-10 max-sm:px-0 max-sm:justify-center"><i class="ph-bold ph-arrows-out-line-vertical" aria-hidden="true"></i><span class="max-sm:hidden">Expand all</span></button>
             </div>
 
             <!-- Sprint view (2.11.0, D-5): summary + List (deliverables with tasks in the sprint) or Board (the 2.10 task board) -->
@@ -1231,7 +1264,7 @@
                             <th class="py-2 px-3 font-bold">User</th>
                             <th class="py-2 px-3 font-bold">Role</th>
                             <th class="hidden sm:table-cell py-2 px-3 font-bold">Joined</th>
-                            <th class="py-2 px-3 font-bold">Last active</th>
+                            <th class="hidden sm:table-cell py-2 px-3 font-bold">Last active</th>
                         </tr>
                     </thead>
                     <tbody id="users-table-body" class="divide-y divide-slate-100"></tbody>
@@ -2504,15 +2537,15 @@
                     class="list-row group/row flex flex-wrap items-center gap-x-2 gap-y-0.5 xl:grid ${LIST_COLS} xl:gap-2 px-3 py-2 text-xs border-t border-slate-100 border-l-2 border-l-transparent ${tint || 'hover:bg-slate-50'} cursor-pointer">
                     <span class="hidden xl:block">${reorder ? reorderHtml(item) : ''}</span>
                     <span class="flex items-center gap-1 shrink-0">${rankChipHtml(roadmap, item, withPlace ? n + 1 : 0)}</span>
-                    <span class="list-name font-bold text-slate-900 truncate min-w-0 flex-1 xl:flex-none flex items-center gap-1.5"><span class="truncate min-w-0">${escapeHtml(item.name)}</span>${sprintChipsHtml(roadmap, item, 2)}${commentChipHtml('milestone', item)}</span>
+                    <span class="list-name font-bold text-slate-900 truncate min-w-0 flex-1 xl:flex-none flex items-center gap-1.5"><span class="truncate min-w-0">${escapeHtml(item.name)}</span><span class="hidden xl:inline-flex items-center gap-1.5">${sprintChipsHtml(roadmap, item, 2)}${commentChipHtml('milestone', item)}</span></span>
                     <span class="hidden xl:block text-brand-600 font-semibold truncate">${escapeHtml(item.module)}</span>
                     <span class="hidden xl:block ${effort ? 'text-slate-700' : 'text-slate-400'}" ${effort ? '' : 'title="Not estimated"'}>${effort ? fmtDays(effort) : '—'}</span>
                     <span class="hidden xl:flex min-w-0">${statusCellHtml(roadmap, item)}</span>
                     <span class="list-people hidden xl:flex items-center" onclick="event.stopPropagation()">${listPeopleHtml(item)}</span>
                     <span class="hidden xl:block text-slate-600 whitespace-nowrap">${escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD')}</span>
                     <span class="flex justify-end">${reorder ? moveButtonsHtml(item) : ''}</span>
-                    <span class="xl:hidden w-full pl-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-slate-500" aria-hidden="true">
-                        <span class="text-brand-600 font-semibold">${escapeHtml(item.module)}</span>${effort ? `<span>· ${fmtDays(effort)}</span>` : ''}
+                    <span class="xl:hidden w-full pl-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-slate-500">
+                        ${sprintChipsHtml(roadmap, item, 1)}${commentChipHtml('milestone', item)}<span class="text-brand-600 font-semibold">${escapeHtml(item.module)}</span>${effort ? `<span>· ${fmtDays(effort)}</span>` : ''}
                         <span class="flex items-center gap-1">· ${statusShortHtml(item)}</span>
                         <span>· ${escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD')}</span>${item.owner?.email ? `<span class="inline-flex items-center gap-1">· ${listPeopleHtml(item)}</span>` : ''}${badge ? `<span class="over-tag-phone">${badge}</span>` : ''}
                     </span>
@@ -2596,6 +2629,8 @@
             toggle.setAttribute('aria-pressed', String(allOpen));
             toggle.querySelector('i').className = `ph-bold ${allOpen ? 'ph-arrows-in-line-vertical' : 'ph-arrows-out-line-vertical'} text-xs`;
             toggle.querySelector('span').textContent = allOpen ? 'Collapse all' : 'Expand all';
+            toggle.setAttribute('aria-label', allOpen ? 'Collapse all' : 'Expand all');
+            toggle.title = allOpen ? 'Collapse all' : 'Expand all';
         }
         // Drilling down opens the target (and its parent)
         function openListTarget(perspective, period) {
@@ -2875,11 +2910,11 @@
                 tr.innerHTML = `
                     <td class="hidden sm:table-cell pl-3 w-6">${canReorder ? reorderHtml(item) : ''}</td>
                     <td class="py-3 px-2 whitespace-nowrap">${rankChipHtml(roadmap, item)}</td>
-                    <td class="editor-name-cell py-3 px-3 font-bold text-slate-900">
+                    <td class="editor-name-cell py-3 px-3 font-bold text-slate-900 max-lg:w-full max-lg:max-w-0">
                         <div class="editor-name text-xs font-bold text-slate-900 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[26rem] md:max-w-[32rem] lg:max-w-[11rem] xl:max-w-[12rem]">${escapeHtml(item.name)}</div>
                         <p class="editor-desc text-[11px] font-normal text-slate-500 mt-0.5 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[26rem] md:max-w-[32rem] lg:max-w-[11rem] xl:max-w-[12rem]">${item.description ? escapeHtml(item.description) : '&nbsp;'}</p>
-                        <div class="editor-subline lg:hidden mt-1 h-5 flex flex-nowrap items-center gap-x-1.5 text-[11px] font-normal text-slate-500 max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[26rem] md:max-w-[32rem] overflow-hidden">
-                            <span class="min-w-0 truncate text-brand-600 font-semibold">${escapeHtml(item.module)}</span>
+                        <div class="editor-subline lg:hidden mt-1 h-5 flex flex-nowrap items-center gap-x-1.5 text-[11px] font-normal text-slate-500 max-w-full overflow-hidden">
+                            <span class="min-w-[3rem] max-w-[7rem] truncate text-brand-600 font-semibold">${escapeHtml(item.module)}</span>
                             <span class="shrink-0">· ${escapeHtml(formatMonthYear(item.date))}</span>
                             ${effort ? `<span class="shrink-0">· ${fmtDays(effort)}</span>` : ''}
                             <span class="shrink-0 flex items-center gap-1">${statusShortHtml(item)}</span>
@@ -3159,7 +3194,7 @@
                     : '';
 
                 tr.innerHTML = `
-                    <td class="py-3 px-4 font-bold text-slate-800">
+                    <td class="py-3 px-4 font-bold text-slate-800 max-lg:w-full max-lg:max-w-0">
                         <div class="feedback-title text-xs font-bold text-slate-900 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem] lg:max-w-[13rem] xl:max-w-[16rem]">${escapeHtml(item.title)}</div>
                         <p class="feedback-desc text-[11px] font-normal text-slate-500 mt-0.5 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem] lg:max-w-[13rem] xl:max-w-[16rem]">${item.description ? escapeHtml(item.description) : '&nbsp;'}</p>
                         <div class="fb-subline lg:hidden mt-1.5 flex flex-nowrap items-center gap-1.5 font-normal max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem]">
@@ -4269,12 +4304,17 @@
             setTimeout(() => { document.getElementById('fb-comments-list')?.scrollIntoView({ block: 'start' }); document.getElementById('fb-comment-input')?.focus(); }, 50);
         };
         // 💬 chip (FR-3): count, blue with a dot when others commented since I last looked
-        function commentChipHtml(kind, item, rid) {
+        function commentChipHtml(kind, item, rid, inButton = false) {
             const n = item?.commentCount || 0;
             if (!n || (kind === 'milestone' && !canEdit())) return '';
             const unread = !!item.lastCommentAt && item.lastCommentBy !== myEmail() && toMillis(item.lastCommentAt) > (seenMap.get(cmKeyOf(kind, item.id)) || 0);
             const fn = kind === 'feedback' ? 'openFeedbackComments' : 'openItemComments';
-            return `<button type="button" class="cm-chip ${unread ? 'unread' : ''}" data-comments="${escapeHtml(item.id)}" onclick="event.stopPropagation(); ${fn}('${escapeHtml(item.id)}'${rid ? `, '${escapeHtml(rid)}'` : ''})" title="${pluralize(n, 'comment')}${unread ? ' · new since you last looked' : ''}" aria-label="${pluralize(n, 'comment')}${unread ? ', new' : ''}"><i class="ph-bold ph-chat-circle" aria-hidden="true"></i>${n}</button>`;
+            const call = `${fn}('${escapeHtml(item.id)}'${rid ? `, '${escapeHtml(rid)}'` : ''})`;
+            const attrs = `class="cm-chip ${unread ? 'unread' : ''}" data-comments="${escapeHtml(item.id)}" title="${pluralize(n, 'comment')}${unread ? ' · new since you last looked' : ''}" aria-label="${pluralize(n, 'comment')}${unread ? ', new' : ''}"`;
+            const body = `<i class="ph-bold ph-chat-circle" aria-hidden="true"></i>${n}`;
+            return inButton
+                ? `<span role="button" tabindex="0" ${attrs} onclick="event.stopPropagation(); ${call}" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); ${call}; }">${body}</span>`
+                : `<button type="button" ${attrs} onclick="event.stopPropagation(); ${call}">${body}</button>`;
         }
         // Details window and feedback panel listeners
         function cmStartDetail(roadmap, item) {
@@ -5806,10 +5846,10 @@
                 <button type="button" data-row-key="${escapeHtml(k)}" onclick="toggleSprintRow(this.dataset.rowKey)" aria-expanded="${open}" class="sv-row-btn w-full text-left flex items-center gap-2 px-3 py-2 text-xs hover:bg-slate-50 focus:outline-none focus-visible:bg-brand-50/60">
                     <i class="ph-bold ${open ? 'ph-caret-down' : 'ph-caret-right'} text-slate-400 shrink-0" aria-hidden="true"></i>
                     ${rankChipHtml(g.roadmap, g.item)}
-                    ${svScope === 'all' ? `<span class="sv-roadmap shrink-0 max-w-[7rem] truncate px-1.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-semibold" title="${escapeHtml(g.roadmap.title)}">${escapeHtml(g.roadmap.title)}</span>${svOtherSprintHtml(g.roadmap, sid)}` : ''}
-                    <span class="sv-name flex-1 min-w-0 truncate font-bold text-slate-900">${escapeHtml(g.item.name)}</span>${commentChipHtml('milestone', g.item, g.roadmap.id)}
+                    ${svScope === 'all' ? `<span class="sv-roadmap max-sm:hidden shrink-0 max-w-[7rem] truncate px-1.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-semibold" title="${escapeHtml(g.roadmap.title)}">${escapeHtml(g.roadmap.title)}</span>${svOtherSprintHtml(g.roadmap, sid)}` : ''}
+                    <span class="sv-name flex-1 min-w-[5rem] truncate font-bold text-slate-900">${escapeHtml(g.item.name)}</span>${commentChipHtml('milestone', g.item, g.roadmap.id, true)}
                     <span class="hidden md:inline-flex shrink-0">${peopleStackHtml(g.item, 2, 'sm')}</span>
-                    <span class="shrink-0 flex items-center gap-1.5 w-20 sm:w-28" title="${done} of ${pluralize(total, 'task')} done"><span class="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden" aria-hidden="true"><span class="block h-full bg-emerald-500" style="width:${pct}%"></span></span><span class="sv-progress text-[11px] text-slate-500 tabular-nums">${done}/${total}</span></span>
+                    <span class="shrink-0 flex items-center gap-1.5 w-14 sm:w-28" title="${done} of ${pluralize(total, 'task')} done"><span class="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden" aria-hidden="true"><span class="block h-full bg-emerald-500" style="width:${pct}%"></span></span><span class="sv-progress text-[11px] text-slate-500 tabular-nums">${done}/${total}</span></span>
                     <span class="sv-pd hidden sm:block shrink-0 w-12 text-right text-[11px] ${pd ? 'text-slate-600' : 'text-slate-300'}">${pd ? fmtDays(pd) : '—'}</span>
                     <span class="hidden sm:inline-flex shrink-0 w-24">${statusBadge(status, STATUS_LABELS[status] || status)}</span>
                 </button>
@@ -8771,8 +8811,8 @@
         function setDetailStatusBadge(status) {
             const badge = document.getElementById('modal-status-badge');
             if (!badge) return;
-            badge.textContent = STATUS_LABELS[status] || status;
-            badge.className = 'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ' + (status === 'done' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : status === 'in-progress' ? 'bg-brand-50 text-brand-600 border-brand-200' : 'bg-amber-50 text-amber-700 border-amber-200');
+            badge.innerHTML = statusBadge(status, STATUS_LABELS[status] || status);
+            badge.className = 'inline-flex';
         }
         function renderOpenTimelines() {
             const roadmap = getActiveRoadmap();
@@ -9692,7 +9732,8 @@
                                 ${isRecent(m) ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">New</span>' : ''}
                                 ${isMe ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">You</span>' : ''}
                             </div>
-                            <div class="text-[11px] text-slate-500">${escapeHtml(email)}</div>
+                            <div class="text-[11px] text-slate-500 break-all">${escapeHtml(email)}</div>
+                            <div class="sm:hidden text-[11px] text-slate-400">Active ${escapeHtml(formatRelativeTime(m.lastSeenAt))}</div>
                         </td>
                         <td class="py-2.5 px-3">
                             <select aria-label="Role for ${escapeHtml(m.name || email)}" data-email="${escapeHtml(email)}" onchange="changeMemberRole(this)" ${isMe ? 'disabled title="Another admin must change your role"' : ''}
@@ -9701,7 +9742,7 @@
                             </select>
                         </td>
                         <td class="hidden sm:table-cell py-2.5 px-3 text-[11px] text-slate-600 whitespace-nowrap" title="${escapeHtml(formatPHT(m.joinedAt))}">${escapeHtml(formatRelativeTime(m.joinedAt))}</td>
-                        <td class="py-2.5 px-3 text-[11px] text-slate-600 whitespace-nowrap" title="${escapeHtml(formatPHT(m.lastSeenAt))}">${escapeHtml(formatRelativeTime(m.lastSeenAt))}</td>
+                        <td class="hidden sm:table-cell py-2.5 px-3 text-[11px] text-slate-600 whitespace-nowrap" title="${escapeHtml(formatPHT(m.lastSeenAt))}">${escapeHtml(formatRelativeTime(m.lastSeenAt))}</td>
                     </tr>`;
             }).join('');
         };
