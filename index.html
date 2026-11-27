@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.13.0" data-released="2026-11-27">
+    <meta name="mapit-version" content="2.14.0" data-released="2026-11-27">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -103,6 +103,12 @@
         .rm-item:hover, .rm-item:focus { background: #f8fafc; }
         .rm-item > i { font-size: 1rem; color: #64748b; }
         .rm-item.text-rose-600 > i { color: inherit; }
+        /* 2.14.0 comments: 💬 chips, mentions */
+        .cm-chip { display: inline-flex; align-items: center; gap: .25rem; height: 1.25rem; padding: 0 .375rem; border-radius: .375rem; font-size: 10px; font-weight: 700; border: 1px solid #e2e8f0; color: #64748b; background: #fff; position: relative; flex-shrink: 0; }
+        .cm-chip:hover { border-color: #7cc8fb; color: #0359a1; }
+        .cm-chip.unread { border-color: #bae0fd; background: #f0f7ff; color: #0359a1; }
+        .cm-chip.unread::after { content: ''; position: absolute; top: -3px; right: -3px; width: 7px; height: 7px; border-radius: 9999px; background: #0c8ee9; border: 1.5px solid #fff; }
+        .cm-mention { color: #0359a1; background: #f0f7ff; border-radius: .25rem; padding: 0 .15rem; font-weight: 600; }
         /* 2.13.0 kanban board: drag on desktop, tabs + swipe on phones */
         .sv-card[draggable="true"] { cursor: grab; }
         .sv-card.sv-dragging { opacity: .35; }
@@ -247,7 +253,7 @@
         <!-- Right side (2.11.0): Activity bell + account. New roadmap is in the roadmap dropdown -->
         <div class="flex items-center gap-2">
             <button type="button" id="activity-bell" onclick="toggleActivityPanel()" aria-label="Activity" aria-haspopup="dialog" aria-expanded="false" aria-controls="activity-view" title="Activity"
-                class="role-editor-only relative w-8 h-8 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300">
+                class="relative w-8 h-8 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300">
                 <i class="ph-bold ph-bell text-base" aria-hidden="true"></i>
                 <span id="nav-activity-count" class="hidden absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold leading-4 text-center"></span>
             </button>
@@ -525,7 +531,14 @@
                 <h2 id="activity-panel-title" class="text-sm font-bold text-slate-900">Activity</h2>
                 <button type="button" onclick="closeActivityPanel()" data-dialog-close aria-label="Close Activity" class="ml-auto ctl ctl-icon ctl-quiet bg-white"><i class="ph-bold ph-x" aria-hidden="true"></i></button>
             </header>
-            <div class="shrink-0 px-4 py-2.5 border-b border-slate-100 space-y-2 text-xs">
+            <div id="bell-tabs" class="shrink-0 px-4 pt-2.5">
+                <div role="tablist" aria-label="Notifications or all activity" class="inline-flex gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                    <button type="button" role="tab" data-bell-tab="foryou" onclick="setBellTab('foryou')" class="h-6 px-2.5 rounded-lg inline-flex items-center gap-1">For you <span id="foryou-count" class="hidden text-[10px] px-1 rounded-full bg-rose-500 text-white"></span></button>
+                    <button type="button" role="tab" data-bell-tab="activity" onclick="setBellTab('activity')" class="h-6 px-2.5 rounded-lg inline-flex items-center">All activity</button>
+                </div>
+            </div>
+            <div id="foryou-panel" class="hidden flex-1 min-h-0 overflow-y-auto custom-scrollbar"><div id="foryou-list"></div></div>
+            <div id="activity-controls" class="shrink-0 px-4 py-2.5 border-b border-slate-100 space-y-2 text-xs">
                 <div class="flex flex-wrap items-center gap-2">
                     <div id="activity-scope" role="group" aria-label="Activity scope" class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
                         <button type="button" data-scope="this" onclick="setActivityScope('this')" class="px-2.5 h-6 rounded-lg text-xs font-semibold transition-all">This roadmap</button>
@@ -623,14 +636,19 @@
                     <div id="modal-linked-feedback-box"></div>
                 </div>
                 <aside class="md:col-span-6 flex flex-col md:min-h-0 bg-slate-50/80 border-t md:border-t-0 md:border-l border-slate-100 p-3">
-                    <div role="tablist" aria-label="Deliverable activity" id="detail-tabs" class="milestone-tabs grid grid-cols-3 gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold shrink-0">
+                    <div role="tablist" aria-label="Deliverable activity" id="detail-tabs" class="milestone-tabs grid grid-cols-4 gap-1 bg-slate-200/70 p-1 rounded-xl text-xs font-semibold shrink-0">
                         <button type="button" role="tab" id="detail-tab-stages" aria-controls="modal-stage-timeline" onclick="switchDetailTab('stages')"><i class="ph-bold ph-flow-arrow text-sm" aria-hidden="true"></i><span>Timeline</span><span id="detail-stage-pct" class="tab-badge"></span></button>
                         <button type="button" role="tab" id="detail-tab-logs" aria-controls="detail-history-panel" onclick="switchDetailTab('logs')"><i class="ph-bold ph-clock-counter-clockwise text-sm" aria-hidden="true"></i><span>History</span><span id="detail-history-count" class="tab-badge">0</span></button>
+                        <button type="button" role="tab" id="detail-tab-comments" aria-controls="detail-comments-panel" onclick="switchDetailTab('comments')"><i class="ph-bold ph-chat-teardrop-text text-sm" aria-hidden="true"></i><span>Comments</span><span id="detail-comments-count" class="tab-badge"></span></button>
                         <button type="button" role="tab" id="detail-tab-tasks" aria-controls="detail-tasks-panel" onclick="switchDetailTab('tasks')"><i class="ph-bold ph-list-checks text-sm" aria-hidden="true"></i><span>Tasks</span><span id="detail-tasks-count" class="tab-badge"></span></button>
                     </div>
                     <div id="modal-stage-timeline" role="tabpanel" aria-labelledby="detail-tab-stages" class="mt-3 max-h-[50vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1"></div>
                     <div id="detail-history-panel" role="tabpanel" aria-labelledby="detail-tab-logs" class="hidden mt-3 max-h-[50vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1">
                         <div id="detail-history-list" class="space-y-2 text-xs"></div>
+                    </div>
+                    <div id="detail-comments-panel" role="tabpanel" aria-labelledby="detail-tab-comments" class="hidden mt-3 md:flex-1 md:min-h-0 flex-col min-h-0">
+                        <div id="detail-comments-list" class="flex-1 min-h-0 max-h-[40vh] md:max-h-none overflow-y-auto custom-scrollbar pr-1 space-y-3 text-xs"></div>
+                        <div id="detail-comment-box" class="pt-2.5 border-t border-slate-200 mt-2 shrink-0"></div>
                     </div>
                     <div id="detail-tasks-panel" role="tabpanel" aria-labelledby="detail-tab-tasks" class="hidden mt-3 max-h-[50vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1">
                         <div id="detail-tasks-list" class="text-xs"></div>
@@ -859,7 +877,7 @@
                     </div>
 
                     <div id="milestone-comments-panel" role="tabpanel" aria-labelledby="tab-btn-comments" class="hidden mt-3 max-h-[60vh] md:max-h-none md:flex-1 md:min-h-0 overflow-y-auto custom-scrollbar pr-1">
-                        <div id="milestone-comments-list" class="space-y-2.5 text-xs"></div>
+                        <div id="milestone-comments-list" class="space-y-3 text-xs"></div>
                     </div>
 
                     <!-- 2.9.0: the deliverable's tasks -->
@@ -869,12 +887,7 @@
 
                     <!-- Comment box, pinned under the Comments list -->
                     <div id="milestone-comment-input-box" class="editor-only hidden pt-2.5 border-t border-slate-200 mt-2 shrink-0">
-                        <div class="flex items-center gap-1.5">
-                            <input type="text" id="milestone-new-comment-input" aria-label="New comment" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); addMilestoneComment(); }" placeholder="Write a comment..." class="flex-1 px-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none bg-white">
-                            <button type="button" onclick="addMilestoneComment()" aria-label="Send comment" class="p-1.5 px-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold transition-all">
-                                <i class="ph-bold ph-paper-plane-right"></i>
-                            </button>
-                        </div>
+                        <div id="edit-comment-box"></div>
                     </div>
                 </div>
             </div>
@@ -1510,16 +1523,16 @@
         // =======================================================
         let currentView = 'roadmap';
         window.openActivityPanel = function() {
-            if (!canEdit() || !activityView) return;
+            if (!activityView || !currentUser) return;
             closeAccountMenu();
             closeRoadmapMenu();
             activityView.classList.remove('hidden');
             activityView.classList.add('flex');
             document.getElementById('activity-bell')?.setAttribute('aria-expanded', 'true');
             document.body.classList.add('overflow-hidden');
-            if (!useCloudPersistence || activityKey !== activityKeyNow() || !activityUnsub) loadActivity();
-            else renderActivity();
-            markActivitySeen();
+            // For you first when it has something new; Viewers only have For you (FR-9, FR-10)
+            setBellTab(!canEdit() || forYou.some(n => !n.read) ? 'foryou' : 'activity');
+            if (canEdit()) markActivitySeen();
         };
         // What was on screen while the panel was open counts as read
         window.closeActivityPanel = function(seen = true, focusBell = true) {
@@ -1962,7 +1975,7 @@
         function activityKeyNow() { return `${activityScope}|${activityScope === 'this' ? getActiveRoadmap()?.id || '' : ''}`; }
         function syncActivity() {
             if (activityViewOpen()) {
-                if (!canEdit()) { switchView('roadmap'); return; }
+                if (!canEdit()) { if (bellTab !== 'foryou') switchView('roadmap'); else setBellTab('foryou'); return; }
                 if (activityKey !== activityKeyNow()) loadActivity(); else if (!useCloudPersistence) { activityEntries = demoActivity(); renderActivity(); } else renderActivity();
             } else if (activityKey && activityKey !== activityKeyNow()) {
                 stopActivity();
@@ -2491,7 +2504,7 @@
                     class="list-row group/row flex flex-wrap items-center gap-x-2 gap-y-0.5 xl:grid ${LIST_COLS} xl:gap-2 px-3 py-2 text-xs border-t border-slate-100 border-l-2 border-l-transparent ${tint || 'hover:bg-slate-50'} cursor-pointer">
                     <span class="hidden xl:block">${reorder ? reorderHtml(item) : ''}</span>
                     <span class="flex items-center gap-1 shrink-0">${rankChipHtml(roadmap, item, withPlace ? n + 1 : 0)}</span>
-                    <span class="list-name font-bold text-slate-900 truncate min-w-0 flex-1 xl:flex-none flex items-center gap-1.5"><span class="truncate min-w-0">${escapeHtml(item.name)}</span>${sprintChipsHtml(roadmap, item, 2)}</span>
+                    <span class="list-name font-bold text-slate-900 truncate min-w-0 flex-1 xl:flex-none flex items-center gap-1.5"><span class="truncate min-w-0">${escapeHtml(item.name)}</span>${sprintChipsHtml(roadmap, item, 2)}${commentChipHtml('milestone', item)}</span>
                     <span class="hidden xl:block text-brand-600 font-semibold truncate">${escapeHtml(item.module)}</span>
                     <span class="hidden xl:block ${effort ? 'text-slate-700' : 'text-slate-400'}" ${effort ? '' : 'title="Not estimated"'}>${effort ? fmtDays(effort) : '—'}</span>
                     <span class="hidden xl:flex min-w-0">${statusCellHtml(roadmap, item)}</span>
@@ -2881,7 +2894,7 @@
                     <td class="people-cell hidden lg:table-cell py-3 px-3 whitespace-nowrap">${peopleStackHtml(item)}</td>
                     <td class="hidden lg:table-cell py-3 px-3 text-slate-600 whitespace-nowrap">
                         <span class="text-xs font-medium">${escapeHtml(formatMonthYear(item.date))}</span>
-                        <span class="sprints-cell flex mt-0.5 h-5">${sprintChipsHtml(roadmap, item, 2)}</span>
+                        <span class="sprints-cell flex items-center gap-1 mt-0.5 h-5">${sprintChipsHtml(roadmap, item, 2)}${commentChipHtml('milestone', item)}</span>
                     </td>
                     <td class="effort-cell hidden lg:table-cell py-3 px-3 whitespace-nowrap text-xs ${effort ? 'text-slate-700' : 'text-slate-400'}" ${canEditActive() ? `onclick="event.stopPropagation(); editEffortInline('${escapeHtml(item.id)}', this)" tabindex="0" role="button" aria-label="Effort for ${escapeHtml(item.name)}: ${effort ? fmtDays(effort) : 'not estimated'}. Click to change."` : ''} title="${effort ? '' : 'Not estimated'}">${effort ? fmtDays(effort) : '—'}</td>
                     <td class="hidden lg:table-cell py-3 px-3">
@@ -3153,6 +3166,7 @@
                             <span class="hidden min-[400px]:inline-block min-w-0 max-w-[6rem] truncate align-middle px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700">${escapeHtml(item.category)}</span>
                             <span class="shrink-0">${badgeHtml}</span>
                             ${item.linkedMilestones.length ? `<span class="shrink-0 text-[11px] text-brand-700 font-semibold" title="${escapeHtml(item.linkedMilestones.map(m => m.name).join(', '))}"><i class="ph-bold ph-git-commit rotate-90 text-[10px]" aria-hidden="true"></i> ${item.linkedMilestones.length}</span>` : ''}
+                            ${commentChipHtml('feedback', item)}
                             ${toMillis(item.createdAt) ? `<span class="fb-subline-date min-w-0 truncate text-[11px] text-slate-500">· ${escapeHtml(feedbackDate(item.createdAt, true))}</span>` : ''}
                         </div>
                     </td>
@@ -3163,7 +3177,7 @@
                         ${submitterHtml}
                         <span class="block text-[11px] text-slate-500 mt-0.5 max-w-[8rem] truncate">${item.source ? 'via ' + escapeHtml(item.source) : '&nbsp;'}</span>
                     </td>
-                    <td class="fb-date hidden lg:table-cell py-3 px-3 text-slate-600 whitespace-nowrap">${dateHtml}</td>
+                    <td class="fb-date hidden lg:table-cell py-3 px-3 text-slate-600 whitespace-nowrap">${dateHtml}${item.commentCount ? '<span class="ml-1.5 align-middle">' + commentChipHtml('feedback', item) + '</span>' : ''}</td>
                     <td class="hidden lg:table-cell py-3 px-3 whitespace-nowrap">
                         ${badgeHtml}
                     </td>
@@ -3398,8 +3412,10 @@
                         </dl>
                         ${feedbackPanelSection('Description', item.description ? `<p class="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap break-words">${escapeHtml(item.description)}</p>` : '<p class="text-xs text-slate-400 italic">No description</p>')}
                         ${feedbackPanelSection(`Linked deliverables (${derived.milestones.length})`, derived.milestones.length ? `<div class="space-y-1.5">${milestones}</div>` : '<p class="text-xs text-slate-500 italic">Not linked to any milestone</p>')}
+                        ${feedbackPanelSection('Comments <span id="fb-comments-count" class="ml-1 normal-case tracking-normal px-1.5 rounded-full bg-slate-100 text-slate-600"></span>', '<div id="fb-comments-list" class="space-y-3"></div>')}
                         ${feedbackPanelSection('History', '<div id="feedback-panel-history" class="space-y-2"></div>')}
                     </div>
+                    <div id="fb-comment-box" class="px-4 pt-2.5 pb-2 border-t border-slate-200 bg-white shrink-0"></div>
                     <footer class="px-4 py-3 border-t border-slate-200 bg-slate-50/70 flex items-center gap-2 shrink-0">
                         <div class="flex items-center gap-1">
                             <button type="button" id="feedback-panel-prev" onclick="stepFeedbackPanel(-1)" ${prevId ? '' : 'disabled'} class="${navBtn}" title="Previous (↑)"><i class="ph-bold ph-caret-left" aria-hidden="true"></i> Previous</button>
@@ -3421,8 +3437,9 @@
                 feedbackPanelHtml = html;
                 const newScroller = panel.querySelector('.overflow-y-auto');
                 if (newScroller) newScroller.scrollTop = scrollTop;
-                if (focusedId) document.getElementById(focusedId)?.focus();
                 renderFeedbackPanelHistory();
+                cmRender('fb', true);
+                if (focusedId) document.getElementById(focusedId)?.focus();
             }
             fitFeedbackTable();
         }
@@ -3433,7 +3450,7 @@
             if (!roadmap || !(roadmap.feedback || []).some(f => f.id === id)) return;
             const changed = feedbackPanel?.id !== id;
             feedbackPanel = { id, roadmapId: roadmap.id, index: Math.max(0, feedbackOrder.indexOf(id)) };
-            if (changed) { startFeedbackPanelHistory(roadmap, id); feedbackPanelHtml = ''; }
+            if (changed) { startFeedbackPanelHistory(roadmap, id); cmStartFeedback(roadmap, id); feedbackPanelHtml = ''; }
             syncFeedbackSelection();
             renderFeedbackPanel();
             if (changed) document.getElementById('feedback-panel')?.querySelector('.overflow-y-auto')?.scrollTo(0, 0);
@@ -3446,6 +3463,7 @@
             const id = feedbackPanel.id;
             feedbackPanel = null;
             stopFeedbackPanelHistory();
+            cmStopFeedback();
             syncFeedbackSelection();
             renderFeedbackPanel();
             if (returnFocus) feedbackTableBody?.querySelector(`tr[data-fb-id="${CSS.escape(id)}"]`)?.focus();
@@ -3788,6 +3806,7 @@
             switchDetailTab('stages');
             renderTaskPanels();
 
+            cmStartDetail(activeRoadmap, item);
             if (detailModal) detailModal.classList.remove('hidden');
             // "Show more" only when the description is actually cut
             const more = document.getElementById('modal-description-more');
@@ -3812,13 +3831,17 @@
             if (count) count.textContent = entries.length + (item.legacyHistory || item.history || []).length;
         }
         window.switchDetailTab = function(tab) {
-            [['stages', 'detail-tab-stages', 'modal-stage-timeline'], ['logs', 'detail-tab-logs', 'detail-history-panel'], ['tasks', 'detail-tab-tasks', 'detail-tasks-panel']].forEach(([id, btn, panel]) => {
+            if (tab === 'comments' && !canEdit()) tab = 'stages';
+            [['stages', 'detail-tab-stages', 'modal-stage-timeline'], ['logs', 'detail-tab-logs', 'detail-history-panel'], ['comments', 'detail-tab-comments', 'detail-comments-panel'], ['tasks', 'detail-tab-tasks', 'detail-tasks-panel']].forEach(([id, btn, panel]) => {
                 document.getElementById(btn)?.setAttribute('aria-selected', String(id === tab));
                 document.getElementById(btn)?.setAttribute('tabindex', id === tab ? '0' : '-1');
                 document.getElementById(panel)?.classList.toggle('hidden', id !== tab);
             });
             if (tab === 'stages') scrollToCurrentStage('modal-stage-timeline');
             if (tab === 'tasks') renderTaskPanels();
+            const cp = document.getElementById('detail-comments-panel');
+            cp?.classList.toggle('flex', tab === 'comments');
+            if (tab === 'comments') cmShown('detail');
         };
         window.toggleDetailDescription = function() {
             const desc = document.getElementById('modal-description');
@@ -3834,6 +3857,7 @@
 
         window.closeModal = function() {
             stopDetailHistory();
+            cmStopDetail();
             if (document.getElementById('edit-milestone-modal')?.classList.contains('hidden')) stopTasks();
             if (detailModal) detailModal.classList.add('hidden');
         };
@@ -3876,6 +3900,7 @@
                 document.getElementById(panel)?.classList.toggle('hidden', id !== tab);
             });
             document.getElementById('milestone-comment-input-box')?.classList.toggle('hidden', tab !== 'comments');
+            if (tab === 'comments') cmShown('edit');
             if (tab === 'stages') { renderOpenTimelines(); scrollToCurrentStage('milestone-stages-panel'); }
             if (tab === 'tasks') renderTaskPanels();
             // Comments read like a chat: open at the newest, next to the comment box
@@ -3991,13 +4016,14 @@
             const comments = useCloudPersistence && !item.isPreviewItem ? openMilestoneComments : (item.comments || []);
 
             if (countBadge) countBadge.textContent = comments.length;
+            cmRender('edit');
             const historyCount = document.getElementById('milestone-history-count');
             if (historyCount) historyCount.textContent = entries.length + legacy.length;
             renderEditSummary(item);
 
             if (logsList) logsList.innerHTML = milestoneHistoryHtml(item, entries);
 
-            if (commentsList) {
+            if (commentsList && false) {
                 if (comments.length === 0) {
                     commentsList.innerHTML = `
                         <div class="py-8 text-center text-slate-500 text-xs italic">
@@ -4031,7 +4057,333 @@
             }
         }
 
-        window.addMilestoneComment = async function() {
+        // ===== 2.14.0 COMMENTS (specs/comments.md): threads, replies, @mentions, deliverables (Editors) + feedback (everyone), unread, For you =====
+        const cmState = Object.fromEntries(['edit', 'detail', 'fb'].map(k => [k, { replyTo: null, mentions: new Map(), draft: '', seenAt: 0, open: new Set(), shownCount: 0, pick: 0 }]));
+        let detailComments = [], detailCommentsUnsub = null, fbComments = [], fbCommentsUnsub = null;
+        let seenMap = new Map();           // 'm-<id>' / 'f-<id>' -> last time I opened its comments (ms)
+        let forYou = [], forYouUnsub = null, seenUnsub = null, bellTab = 'activity', activityUnread = 0;
+        const cmKeyOf = (kind, id) => (kind === 'feedback' ? 'f-' : 'm-') + id;
+        function cmCtx(ctx) {
+            const roadmap = getActiveRoadmap();
+            if (!roadmap) return {};
+            if (ctx === 'fb') return { kind: 'feedback', roadmap, item: feedbackPanel ? (roadmap.feedback || []).find(x => x.id === feedbackPanel.id) : null };
+            const id = ctx === 'edit' ? selectedMilestoneId : detailItemId;
+            return { kind: 'milestone', roadmap, item: (roadmap.items || []).find(i => i.id === id) || null };
+        }
+        function cmList(ctx) {
+            const { item, roadmap } = cmCtx(ctx);
+            if (!item) return [];
+            const cloud = useCloudPersistence && !roadmap.isPreview;
+            const list = ctx === 'edit' ? (cloud ? openMilestoneComments : item.comments || []) : ctx === 'detail' ? (cloud ? detailComments : item.comments || []) : (cloud ? fbComments : item.comments || []);
+            return list.slice().sort((a, b) => toMillis(a.originalTimestamp || a.at || a.timestamp) - toMillis(b.originalTimestamp || b.at || b.timestamp));
+        }
+        function cmCanWrite(ctx) {
+            const { roadmap, item } = cmCtx(ctx);
+            if (!roadmap || !item || roadmap.deletedAt || roadmap.isPreview) return false;
+            return ctx === 'fb' ? (!useCloudPersistence ? !!currentUser : !!myRole && myRole !== 'blocked') : canEditActive();
+        }
+        function cmVisible(ctx) {
+            if (ctx === 'edit') return !document.getElementById('edit-milestone-modal')?.classList.contains('hidden') && !document.getElementById('milestone-comments-panel')?.classList.contains('hidden');
+            if (ctx === 'detail') return !document.getElementById('detail-modal')?.classList.contains('hidden') && !document.getElementById('detail-comments-panel')?.classList.contains('hidden');
+            return !!feedbackPanel;
+        }
+        const cmName = c => c.originalAuthor || c.by?.name || c.author || 'Member';
+        // Plain text, links clickable, @mentions highlighted
+        function cmFormat(c) {
+            let html = escapeHtml(c.text || '').replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-brand-700 underline break-all">$1</a>');
+            (c.mentions || []).forEach(email => { const name = escapeHtml(personOf({ email }).name || ''); if (name) html = html.split('@' + name).join(`<span class="cm-mention">@${name}</span>`); });
+            return html;
+        }
+        function cmCommentHtml(ctx, c, isReply, seenAt) {
+            const time = c.originalTimestamp || c.at || c.timestamp;
+            const isNew = !!c.by?.email && c.by.email !== myEmail() && toMillis(time) > seenAt;
+            const movedBy = c.originalAuthor && c.by?.name ? ` · moved by ${c.by.name}` : '';
+            return `<div class="cm-comment flex gap-2 ${isNew ? 'cm-new border-l-2 border-brand-500 pl-2 -ml-2.5' : ''}" data-comment-id="${escapeHtml(c.id)}">
+                ${avatarHtml(c.by?.email ? c.by : { email: cmName(c), name: cmName(c) }, 'Author', 'sm')}
+                <div class="flex-1 min-w-0"><div class="flex items-center gap-2 text-[11px]"><b class="text-slate-900" title="${escapeHtml(c.by?.email && !c.originalAuthor ? `${c.by.name} (${c.by.email})` : '')}">${escapeHtml(cmName(c))}</b><span class="text-slate-400" title="${escapeHtml(formatPHT(time))}">${escapeHtml(formatRelativeTime(time))}${escapeHtml(movedBy)}</span>${isNew ? '<span class="cm-new-tag text-[10px] font-bold text-brand-700">New</span>' : ''}</div>
+                <p class="cm-text text-xs text-slate-700 leading-relaxed whitespace-pre-wrap break-words">${cmFormat(c)}</p>
+                ${!isReply && cmCanWrite(ctx) ? `<button type="button" class="cm-reply mt-0.5 text-[11px] font-semibold text-slate-500 hover:text-brand-700" onclick="cmReply('${ctx}', '${escapeHtml(c.id)}')"><i class="ph-bold ph-arrow-bend-up-left" aria-hidden="true"></i> Reply</button>` : ''}</div></div>`;
+        }
+        // One level of threads: replies (any depth) sit under their top comment, oldest first; > 3 fold
+        function cmThreadHtml(ctx, list) {
+            const st = cmState[ctx];
+            if (!list.length) return `<p class="py-6 text-center text-xs text-slate-500 italic">No comments yet.${cmCanWrite(ctx) ? ' Start the discussion below.' : ''}</p>`;
+            const byId = new Map(list.map(c => [c.id, c]));
+            const rootOf = c => { let r = c, n = 0; while (r.parentId && byId.has(r.parentId) && n++ < 50) r = byId.get(r.parentId); return r; };
+            const roots = list.filter(c => rootOf(c) === c);
+            return roots.map(r => {
+                const replies = list.filter(c => c !== r && rootOf(c) === r);
+                const open = st.open.has(r.id) || replies.length <= 3;
+                const shown = open ? replies : replies.slice(0, 3);
+                return `<div class="cm-thread space-y-2" data-thread="${escapeHtml(r.id)}">${cmCommentHtml(ctx, r, false, st.seenAt)}${replies.length ? `<div class="cm-replies ml-8 pl-3 border-l border-slate-200 space-y-2">${shown.map(c => cmCommentHtml(ctx, c, true, st.seenAt)).join('')}${open ? '' : `<button type="button" class="cm-more text-[11px] font-semibold text-brand-700 hover:underline" onclick="cmShowMore('${ctx}', '${escapeHtml(r.id)}')">Show ${pluralize(replies.length - 3, 'more reply', 'more replies')}</button>`}</div>` : ''}</div>`;
+            }).join('<div class="h-px bg-slate-100"></div>');
+        }
+        function cmComposerHtml(ctx) {
+            if (!cmCanWrite(ctx)) return '';
+            const st = cmState[ctx], parent = st.replyTo ? cmList(ctx).find(c => c.id === st.replyTo) : null;
+            return `<div class="cm-composer space-y-1.5">${parent ? `<div class="cm-replying flex items-center gap-1 text-[11px] font-semibold text-brand-700"><i class="ph-bold ph-arrow-bend-up-left" aria-hidden="true"></i>Replying to ${escapeHtml(cmName(parent))}<button type="button" onclick="cmCancelReply('${ctx}')" aria-label="Cancel reply" class="ml-1 text-slate-400 hover:text-slate-700"><i class="ph-bold ph-x" aria-hidden="true"></i></button></div>` : ''}
+                <div class="relative"><textarea id="${ctx}-comment-input" rows="2" maxlength="2000" aria-label="${parent ? 'Reply' : 'New comment'}" placeholder="Write a comment… @ to mention · Ctrl+Enter to post" oninput="cmInput('${ctx}', this)" onkeydown="cmKeydown(event, '${ctx}')" class="cm-input w-full px-3 py-2 text-xs border border-slate-200 rounded-xl resize-none bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none" style="max-height: 8rem"></textarea>
+                <div id="${ctx}-mention-list" role="listbox" aria-label="People" class="hidden absolute left-2 bottom-full mb-1 z-30 w-60 max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg py-1 text-xs"></div></div>
+                <div class="flex items-center"><span class="text-[10px] text-slate-400">Ctrl+Enter to post</span><button type="button" id="${ctx}-comment-post" onclick="cmPost('${ctx}')" class="ml-auto h-8 px-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold">${parent ? 'Reply' : 'Comment'}</button></div></div>`;
+        }
+        const CM_IDS = { edit: ['milestone-comments-list', 'edit-comment-box', 'milestone-comments-count', 'milestone-comments-panel'], detail: ['detail-comments-list', 'detail-comment-box', 'detail-comments-count', 'detail-comments-list'], fb: ['fb-comments-list', 'fb-comment-box', 'fb-comments-count', null] };
+        // Draw a context's thread (and its box when asked); a new comment scrolls into view; unread is cleared while it's on screen
+        function cmRender(ctx, withBox = false) {
+            const [listId, boxId, countId, scrollId] = CM_IDS[ctx];
+            const listEl = document.getElementById(listId);
+            if (!listEl) return;
+            const list = cmList(ctx), st = cmState[ctx];
+            listEl.innerHTML = cmThreadHtml(ctx, list);
+            const count = document.getElementById(countId);
+            if (count) count.textContent = list.length ? String(list.length) : (ctx === 'fb' ? '0' : '');
+            const box = document.getElementById(boxId);
+            if (box && (withBox || !box.querySelector('.cm-composer') !== !cmCanWrite(ctx))) {
+                box.innerHTML = cmComposerHtml(ctx);
+                const input = document.getElementById(`${ctx}-comment-input`);
+                if (input) { input.value = st.draft; cmGrow(input); }
+            }
+            const scroller = scrollId ? document.getElementById(scrollId) : listEl.closest('.overflow-y-auto');
+            if (list.length > st.shownCount && scroller && cmVisible(ctx) && st.shownCount) scroller.scrollTop = scroller.scrollHeight;
+            st.shownCount = list.length;
+            if (cmVisible(ctx)) { const { kind, item } = cmCtx(ctx); if (item && toMillis(item.lastCommentAt) > (seenMap.get(cmKeyOf(kind, item.id)) || 0)) cmMarkSeen(kind, item.id); }
+        }
+        // The comments came into view: remember what was new, then mark them seen (FR-8)
+        function cmShown(ctx) {
+            const { kind, item } = cmCtx(ctx);
+            if (!item) return;
+            const st = cmState[ctx];
+            st.seenAt = seenMap.get(cmKeyOf(kind, item.id)) || 0;
+            st.shownCount = 0;
+            cmRender(ctx, true);
+            const scroller = ctx === 'fb' ? null : document.getElementById(CM_IDS[ctx][3]);
+            if (scroller) scroller.scrollTop = scroller.scrollHeight;
+            cmMarkSeen(kind, item.id);
+        }
+        function cmResetCtx(ctx) { Object.assign(cmState[ctx], { replyTo: null, mentions: new Map(), draft: '', seenAt: 0, open: new Set(), shownCount: 0 }); }
+        function cmMarkSeen(kind, id) {
+            const key = cmKeyOf(kind, id);
+            seenMap.set(key, Date.now());
+            forYou.filter(n => !n.read && n.target?.id === id).forEach(n => markForYouRead(n.id));
+            scheduleRender();
+            if (!useCloudPersistence || !myEmail()) return;
+            const b = writeBatch(db);
+            b.set(wsRef('notifications', myEmail(), 'seen', key), { at: serverTimestamp() }, { merge: true });
+            b.commit().catch(e => console.warn('Could not save the comments "seen" time:', e));
+        }
+        window.cmReply = function(ctx, id) { cmState[ctx].replyTo = id; cmRender(ctx, true); document.getElementById(`${ctx}-comment-input`)?.focus(); };
+        window.cmCancelReply = function(ctx) { cmState[ctx].replyTo = null; cmRender(ctx, true); document.getElementById(`${ctx}-comment-input`)?.focus(); };
+        window.cmShowMore = function(ctx, id) { cmState[ctx].open.add(id); cmRender(ctx); };
+        function cmGrow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight + 2, 128) + 'px'; }
+        // @mentions: deliverables list the Owner + team first; feedback everyone who can see it (FR-7)
+        function cmPeople(ctx) {
+            const { kind, item } = cmCtx(ctx);
+            const people = activePeople().filter(p => p.email !== myEmail());
+            if (kind !== 'milestone' || !item) return people;
+            const on = [item.owner, ...(item.team || [])].filter(p => p?.email).map(p => p.email);
+            return [...people.filter(p => on.includes(p.email)), ...people.filter(p => !on.includes(p.email))];
+        }
+        function cmMentionQuery(el) { return el.value.slice(0, el.selectionStart).match(/(^|\s)@([^\s@]{0,30})$/); }
+        window.cmInput = function(ctx, el) {
+            cmState[ctx].draft = el.value;
+            cmGrow(el);
+            const m = cmMentionQuery(el), listEl = document.getElementById(`${ctx}-mention-list`);
+            if (!listEl) return;
+            if (!m) { listEl.classList.add('hidden'); return; }
+            const q = m[2].toLowerCase();
+            const matches = cmPeople(ctx).filter(p => !q || p.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q)) || p.name.toLowerCase().startsWith(q) || p.email.startsWith(q)).slice(0, 8);
+            cmState[ctx].pick = 0;
+            cmState[ctx].matches = matches;
+            if (!matches.length) { listEl.classList.add('hidden'); return; }
+            listEl.innerHTML = matches.map((p, i) => `<button type="button" role="option" aria-selected="${i === 0}" data-mention-email="${escapeHtml(p.email)}" onmousedown="event.preventDefault(); cmPick('${ctx}', ${i})" class="w-full flex items-center gap-2 px-2.5 py-1.5 text-left ${i === 0 ? 'bg-slate-100' : 'hover:bg-slate-50'}">${avatarHtml(p, '', 'sm')}<span class="truncate">${escapeHtml(p.name)}</span></button>`).join('');
+            listEl.classList.remove('hidden');
+        };
+        window.cmPick = function(ctx, i) {
+            const el = document.getElementById(`${ctx}-comment-input`), p = cmState[ctx].matches?.[i];
+            if (!el || !p) return;
+            const m = cmMentionQuery(el), start = el.selectionStart - m[2].length - 1;
+            el.value = el.value.slice(0, start) + '@' + p.name + ' ' + el.value.slice(el.selectionStart);
+            const caret = start + p.name.length + 2;
+            el.setSelectionRange(caret, caret);
+            cmState[ctx].mentions.set(p.name, p.email);
+            cmState[ctx].draft = el.value;
+            document.getElementById(`${ctx}-mention-list`)?.classList.add('hidden');
+            el.focus();
+        };
+        window.cmKeydown = function(e, ctx) {
+            const listEl = document.getElementById(`${ctx}-mention-list`), st = cmState[ctx];
+            const listOpen = listEl && !listEl.classList.contains('hidden');
+            if (listOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                e.preventDefault();
+                const n = st.matches?.length || 0;
+                st.pick = (st.pick + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+                [...listEl.children].forEach((b, i) => { b.classList.toggle('bg-slate-100', i === st.pick); b.setAttribute('aria-selected', String(i === st.pick)); });
+                return;
+            }
+            if (listOpen && (e.key === 'Enter' || e.key === 'Tab') && !e.ctrlKey && !e.metaKey) { e.preventDefault(); cmPick(ctx, st.pick); return; }
+            if (e.key === 'Escape') {
+                if (listOpen) { e.preventDefault(); e.stopPropagation(); listEl.classList.add('hidden'); return; }
+                if (st.replyTo) { e.preventDefault(); e.stopPropagation(); cmCancelReply(ctx); return; }
+            }
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); cmPost(ctx); }
+        };
+        window.cmPost = async function(ctx) {
+            const input = document.getElementById(`${ctx}-comment-input`);
+            const text = (input?.value || '').trim();
+            if (!text || !cmCanWrite(ctx)) return;
+            const { kind, roadmap, item } = cmCtx(ctx);
+            if (!item) return;
+            const st = cmState[ctx];
+            const mentions = [...st.mentions.entries()].filter(([name]) => text.includes('@' + name)).map(([, email]) => email).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
+            const parentId = st.replyTo || null;
+            const list = cmList(ctx);
+            Object.assign(st, { replyTo: null, mentions: new Map(), draft: '' });
+            input.value = '';
+            cmRender(ctx, true);
+            await addComment(roadmap, item, text, { kind, parentId, mentions, list });
+            cmMarkSeen(kind, item.id);
+            cmRender(ctx);
+            document.getElementById(`${ctx}-comment-input`)?.focus();
+        };
+        window.addMilestoneComment = () => cmPost('edit');
+        // Who hears about a comment (FR-9): mentions, the author replied to, the item's people; never yourself; max 20
+        function commentRecipients(kind, item, parent, mentions) {
+            const out = new Map(), me = myEmail();
+            const add = (email, why) => { if (!email || email === me || out.has(email) || personOf({ email }).noAccess) return; out.set(email, why); };
+            mentions.forEach(e => add(e, 'mention'));
+            if (parent?.by?.email) add(parent.by.email, 'reply');
+            if (kind === 'milestone') [item.owner, ...(item.team || [])].forEach(p => add(p?.email, 'mine'));
+            else add(feedbackSubmitter(item)?.email, 'mine');
+            return [...out].slice(0, 20).map(([email, why]) => ({ email, why }));
+        }
+        // Opening an item right on its comments (💬 chips, notifications)
+        window.openItemComments = function(id, rid) {
+            if (rid && getActiveRoadmap()?.id !== rid) selectRoadmap(rid);
+            if (!canEdit()) return;
+            if (canEditActive()) { selectMilestoneForEdit(id); switchMilestoneSideTab('comments'); }
+            else { openItemDetails(id); switchDetailTab('comments'); }
+        };
+        window.openFeedbackComments = function(id, rid) {
+            if (rid && getActiveRoadmap()?.id !== rid) selectRoadmap(rid);
+            if (currentView !== 'feedback') switchView('feedback');
+            openFeedbackPanel(id, { focus: false });
+            setTimeout(() => { document.getElementById('fb-comments-list')?.scrollIntoView({ block: 'start' }); document.getElementById('fb-comment-input')?.focus(); }, 50);
+        };
+        // 💬 chip (FR-3): count, blue with a dot when others commented since I last looked
+        function commentChipHtml(kind, item, rid) {
+            const n = item?.commentCount || 0;
+            if (!n || (kind === 'milestone' && !canEdit())) return '';
+            const unread = !!item.lastCommentAt && item.lastCommentBy !== myEmail() && toMillis(item.lastCommentAt) > (seenMap.get(cmKeyOf(kind, item.id)) || 0);
+            const fn = kind === 'feedback' ? 'openFeedbackComments' : 'openItemComments';
+            return `<button type="button" class="cm-chip ${unread ? 'unread' : ''}" data-comments="${escapeHtml(item.id)}" onclick="event.stopPropagation(); ${fn}('${escapeHtml(item.id)}'${rid ? `, '${escapeHtml(rid)}'` : ''})" title="${pluralize(n, 'comment')}${unread ? ' · new since you last looked' : ''}" aria-label="${pluralize(n, 'comment')}${unread ? ', new' : ''}"><i class="ph-bold ph-chat-circle" aria-hidden="true"></i>${n}</button>`;
+        }
+        // Details window and feedback panel listeners
+        function cmStartDetail(roadmap, item) {
+            detailCommentsUnsub?.(); detailCommentsUnsub = null; detailComments = [];
+            cmResetCtx('detail');
+            const tab = document.getElementById('detail-tab-comments');
+            if (tab) tab.style.display = canEdit() ? '' : 'none';   // the tab CSS sets display: flex, so not the hidden class
+            document.getElementById('detail-tabs')?.classList.toggle('grid-cols-4', canEdit());
+            document.getElementById('detail-tabs')?.classList.toggle('grid-cols-3', !canEdit());
+            const count = document.getElementById('detail-comments-count');
+            if (count) count.textContent = item.commentCount ? String(item.commentCount) : '';
+            if (!canEdit()) return;
+            if (useCloudPersistence && !roadmap.isPreview) {
+                detailCommentsUnsub = onSnapshot(wsCollection('roadmaps', roadmap.id, 'milestones', item.id, 'comments'), snap => {
+                    detailComments = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id }));
+                    cmRender('detail');
+                }, err => console.warn('Comments listener error:', err));
+            }
+            cmRender('detail', true);
+        }
+        function cmStopDetail() { detailCommentsUnsub?.(); detailCommentsUnsub = null; detailComments = []; }
+        function cmStartFeedback(roadmap, id) {
+            fbCommentsUnsub?.(); fbCommentsUnsub = null; fbComments = [];
+            cmResetCtx('fb');
+            if (useCloudPersistence && !roadmap.isPreview) {
+                fbCommentsUnsub = onSnapshot(wsCollection('roadmaps', roadmap.id, 'feedback', id, 'comments'), snap => {
+                    fbComments = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id }));
+                    cmRender('fb');
+                }, err => console.warn('Feedback comments listener error:', err));
+            }
+            const item = (roadmap.feedback || []).find(x => x.id === id);
+            cmState.fb.seenAt = item ? seenMap.get(cmKeyOf('feedback', id)) || 0 : 0;
+            if (item) cmMarkSeen('feedback', id);
+        }
+        function cmStopFeedback() { fbCommentsUnsub?.(); fbCommentsUnsub = null; fbComments = []; }
+
+        // ---- For you (FR-9, FR-10): personal notifications in the bell; Viewers get only these ----
+        function watchForYou() {
+            forYouUnsub?.(); seenUnsub?.(); forYouUnsub = seenUnsub = null;
+            if (!useCloudPersistence || !myEmail() || !myRole || myRole === 'blocked') return;
+            forYouUnsub = onSnapshot(query(wsCollection('notifications', myEmail(), 'items'), orderBy('at', 'desc'), limit(50)), snap => {
+                forYou = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id }));
+                updateBellCount();
+                if (activityViewOpen()) renderForYou();
+            }, err => console.warn('Notifications unavailable:', err));
+            seenUnsub = onSnapshot(wsCollection('notifications', myEmail(), 'seen'), snap => {
+                const next = new Map(snap.docs.map(d => [d.id, toMillis(d.data({ serverTimestamps: 'estimate' }).at)]));
+                seenMap.forEach((v, k) => { if (!next.has(k) || next.get(k) < v) next.set(k, v); });
+                seenMap = next;
+                scheduleRender();
+            }, err => console.warn('Comments seen state unavailable:', err));
+        }
+        function stopForYou() { forYouUnsub?.(); seenUnsub?.(); forYouUnsub = seenUnsub = null; forYou = []; seenMap = new Map(); }
+        function markForYouRead(id) {
+            const n = forYou.find(x => x.id === id);
+            if (!n || n.read) return;
+            n.read = true;
+            updateBellCount();
+            if (!useCloudPersistence) return;
+            const b = writeBatch(db);
+            b.update(wsRef('notifications', myEmail(), 'items', id), { read: true });
+            b.commit().catch(e => console.warn('Could not mark the notification read:', e));
+        }
+        function updateBellCount() {
+            const mine = forYou.filter(n => !n.read).length;
+            const n = mine + (canEdit() ? activityUnread : 0);
+            const text = n > 99 ? '99+' : String(n);
+            const el = document.getElementById('nav-activity-count');
+            if (el) { el.textContent = n ? text : ''; el.classList.toggle('hidden', !n); }
+            const fy = document.getElementById('foryou-count');
+            if (fy) { fy.textContent = mine ? String(mine) : ''; fy.classList.toggle('hidden', !mine); }
+            const bell = document.getElementById('activity-bell');
+            if (bell) { bell.setAttribute('aria-label', n ? `Activity, ${text} unread` : 'Activity'); bell.title = n ? `Activity: ${text} new` : 'Activity'; }
+        }
+        function renderForYou() {
+            const box = document.getElementById('foryou-list');
+            if (!box) return;
+            if (!forYou.length) { box.innerHTML = '<p class="px-6 py-12 text-center text-xs text-slate-500">Nothing for you yet. Replies to you, @mentions and comments on your deliverables and feedback show here.</p>'; return; }
+            box.innerHTML = forYou.map(n => {
+                const t = n.target || {}, label = `<b class="font-bold text-slate-800">"${escapeHtml(t.label || '')}"</b>`;
+                const where = t.type === 'feedback' ? 'feedback ' : '';
+                const what = n.kind === 'reply' ? `replied to you on ${where}${label}` : n.kind === 'mention' ? `mentioned you on ${where}${label}` : `commented on your ${t.type === 'feedback' ? 'feedback' : 'deliverable'} ${label}`;
+                return `<button type="button" class="fy-item w-full text-left flex gap-3 px-4 py-3 border-b border-slate-50 hover:bg-slate-50 ${n.read ? '' : 'bg-brand-50/40'}" data-fy="${escapeHtml(n.id)}" onclick="openForYou('${escapeHtml(n.id)}')">${avatarHtml(n.by || {}, '', 'sm')}<span class="flex-1 min-w-0 text-xs"><b class="text-slate-900">${escapeHtml(n.by?.name || 'Someone')}</b> ${what}<span class="block text-slate-500 truncate mt-0.5">"${escapeHtml(n.text || '')}"</span><span class="block text-[11px] text-slate-400 mt-0.5" title="${escapeHtml(formatPHT(n.at))}">${escapeHtml(formatRelativeTime(n.at))}</span></span>${n.read ? '' : '<span class="w-2 h-2 mt-1.5 rounded-full bg-brand-500 shrink-0" aria-label="Unread"></span>'}</button>`;
+            }).join('');
+        }
+        window.openForYou = function(id) {
+            const n = forYou.find(x => x.id === id);
+            if (!n) return;
+            markForYouRead(id);
+            closeActivityPanel(true, false);
+            const t = n.target || {};
+            if (!roadmaps.some(r => r.id === t.roadmapId && !r.deletedAt)) { showSaveStatus('info', 'That roadmap is no longer available.'); return; }
+            if (t.type === 'feedback') openFeedbackComments(t.id, t.roadmapId);
+            else openItemComments(t.id, t.roadmapId);
+        };
+        window.setBellTab = function(tab) {
+            bellTab = tab === 'foryou' || !canEdit() ? 'foryou' : 'activity';
+            document.querySelectorAll('#bell-tabs [data-bell-tab]').forEach(b => { const on = b.dataset.bellTab === bellTab; b.setAttribute('aria-selected', String(on)); b.className = `h-6 px-2.5 rounded-lg inline-flex items-center gap-1 ${on ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'}`; });
+            document.getElementById('bell-tabs')?.classList.toggle('hidden', !canEdit());
+            const fy = bellTab === 'foryou';
+            document.getElementById('foryou-panel')?.classList.toggle('hidden', !fy);
+            document.getElementById('activity-controls')?.classList.toggle('hidden', fy);
+            document.getElementById('activity-scroll')?.classList.toggle('hidden', fy);
+            document.getElementById('activity-panel-title').textContent = canEdit() ? 'Activity' : 'Notifications';
+            if (fy) renderForYou();
+            else if (!useCloudPersistence || activityKey !== activityKeyNow() || !activityUnsub) loadActivity(); else renderActivity();
+        };
+
+        window.addMilestoneComment_old = async function() {
             const input = document.getElementById('milestone-new-comment-input');
             if (!input || !input.value.trim() || !selectedMilestoneId || !canEditActive()) return;
 
@@ -5412,7 +5764,7 @@
                     <button type="button" onclick="openSprintTask('${key}')" class="sv-title text-left text-xs font-semibold leading-snug break-words min-w-0 ${t.status === 'done' ? 'line-through text-slate-400' : 'text-slate-800 hover:text-brand-700'}">${escapeHtml(t.title)}</button>
                 </div>
                 <div class="flex items-center gap-1.5 text-[11px] text-slate-500 min-w-0"><i class="ph-bold ph-git-commit rotate-90 text-[10px] shrink-0" aria-hidden="true"></i><button type="button" onclick="openSprintTask('${key}')" class="sv-deliverable truncate hover:text-brand-700 hover:underline" title="${escapeHtml(t.item.name)}">${escapeHtml(t.item.name)}</button>${svScope === 'all' ? `<span class="sv-roadmap shrink-0 max-w-[8rem] truncate px-1.5 rounded bg-slate-100 text-[10px] font-semibold" title="${escapeHtml(t.roadmap.title)}">${escapeHtml(t.roadmap.title)}</span>${svOtherSprintHtml(t.roadmap, svSprintId())}` : ''}</div>
-                <div class="flex items-center gap-2 text-[11px]"><span class="${t.estimateDays ? 'text-slate-600' : 'text-slate-300'}">${t.estimateDays ? fmtDays(t.estimateDays) : '—'}</span>${t.link ? '<i class="ph-bold ph-link text-slate-400" aria-label="Has a link"></i>' : ''}<span class="ml-auto">${t.assignee?.email ? avatarHtml(t.assignee, 'Assignee', 'sm') : '<span class="w-5 h-5 rounded-full inline-flex items-center justify-center text-[9px] font-bold bg-slate-50 text-slate-400 border border-dashed border-slate-300" title="Unassigned" role="img" aria-label="Unassigned">–</span>'}</span></div>
+                <div class="flex items-center gap-2 text-[11px]"><span class="${t.estimateDays ? 'text-slate-600' : 'text-slate-300'}">${t.estimateDays ? fmtDays(t.estimateDays) : '—'}</span>${t.link ? '<i class="ph-bold ph-link text-slate-400" aria-label="Has a link"></i>' : ''}${commentChipHtml('milestone', t.item, t.roadmapId)}<span class="ml-auto">${t.assignee?.email ? avatarHtml(t.assignee, 'Assignee', 'sm') : '<span class="w-5 h-5 rounded-full inline-flex items-center justify-center text-[9px] font-bold bg-slate-50 text-slate-400 border border-dashed border-slate-300" title="Unassigned" role="img" aria-label="Unassigned">–</span>'}</span></div>
             </div>`;
         }
         // ---- List (D-5): one card per sprint; a row = a deliverable with tasks in that sprint ----
@@ -5455,7 +5807,7 @@
                     <i class="ph-bold ${open ? 'ph-caret-down' : 'ph-caret-right'} text-slate-400 shrink-0" aria-hidden="true"></i>
                     ${rankChipHtml(g.roadmap, g.item)}
                     ${svScope === 'all' ? `<span class="sv-roadmap shrink-0 max-w-[7rem] truncate px-1.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-semibold" title="${escapeHtml(g.roadmap.title)}">${escapeHtml(g.roadmap.title)}</span>${svOtherSprintHtml(g.roadmap, sid)}` : ''}
-                    <span class="sv-name flex-1 min-w-0 truncate font-bold text-slate-900">${escapeHtml(g.item.name)}</span>
+                    <span class="sv-name flex-1 min-w-0 truncate font-bold text-slate-900">${escapeHtml(g.item.name)}</span>${commentChipHtml('milestone', g.item, g.roadmap.id)}
                     <span class="hidden md:inline-flex shrink-0">${peopleStackHtml(g.item, 2, 'sm')}</span>
                     <span class="shrink-0 flex items-center gap-1.5 w-20 sm:w-28" title="${done} of ${pluralize(total, 'task')} done"><span class="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden" aria-hidden="true"><span class="block h-full bg-emerald-500" style="width:${pct}%"></span></span><span class="sv-progress text-[11px] text-slate-500 tabular-nums">${done}/${total}</span></span>
                     <span class="sv-pd hidden sm:block shrink-0 w-12 text-right text-[11px] ${pd ? 'text-slate-600' : 'text-slate-300'}">${pd ? fmtDays(pd) : '—'}</span>
@@ -5755,7 +6107,9 @@
             startTasks(activeRoadmap, item);
             renderTaskPanels();
             shownCommentCount = 0;
+            cmResetCtx('edit');
             renderMilestoneActivity(item);
+            cmRender('edit', true);
             switchMilestoneSideTab('logs');
             const pct = document.getElementById('milestone-stage-pct');
             if (pct) pct.textContent = `${stageProgress(item)}%`;
@@ -6857,17 +7211,30 @@
             return true;
         }
 
-        async function addComment(roadmap, item, text) {
+        async function addComment(roadmap, item, text, opts = {}) {
+            const kind = opts.kind || 'milestone';
             const id = newId('c');
-            const entry = auditEntry(roadmap, 'comment.added', { type: 'milestone', id: item.id, label: item.name }, [{ f: 'text', to: clip(text, 500) }]);
-            if (!useCloudPersistence) {
-                (item.comments ||= []).push({ id, text, by: actor(), at: new Date().toISOString() });
+            const list = opts.list || [];
+            const parent = opts.parentId ? list.find(c => c.id === opts.parentId) : null;
+            const label = kind === 'feedback' ? item.title : item.name;
+            const entry = auditEntry(roadmap, 'comment.added', { type: kind, id: item.id, label }, [{ f: 'text', to: clip(text, 500) }, ...(parent ? [{ f: 'replyTo', to: clip(cmName(parent), 120) }] : [])]);
+            const comment = { text: clip(text, 2000), by: actor(), parentId: parent ? parent.id : null, mentions: (opts.mentions || []).slice(0, 20) };
+            const count = Math.max(item.commentCount || 0, list.length) + 1;
+            const recipients = commentRecipients(kind, item, parent, comment.mentions);
+            if (!useCloudPersistence || roadmap.isPreview) {
+                const at = new Date().toISOString();
+                (item.comments ||= []).push({ id, ...comment, at });
+                Object.assign(item, { commentCount: count, lastCommentAt: at, lastCommentBy: myEmail() });
                 logDemo(entry);
+                scheduleRender();
                 return true;
             }
             const aid = 'c-' + id;
+            const col = kind === 'feedback' ? 'feedback' : 'milestones';
             return commitBatch(batch => {
-                batch.set(wsRef('roadmaps', roadmap.id, 'milestones', item.id, 'comments', id), { text: clip(text, 2000), at: serverTimestamp(), by: actor(), auditId: aid });
+                batch.set(wsRef('roadmaps', roadmap.id, col, item.id, 'comments', id), { ...comment, at: serverTimestamp(), auditId: aid });
+                batch.update(itemRef(roadmap.id, col, item.id), { commentCount: count, lastCommentAt: serverTimestamp(), lastCommentBy: myEmail(), ...stamp(aid) });
+                recipients.forEach(r => batch.set(wsRef('notifications', r.email, 'items', newId('n')), { at: serverTimestamp(), by: actor(), kind: r.why, target: { type: kind, id: item.id, label: clip(label, 200), roadmapId: roadmap.id }, text: clip(text, 200), commentId: id, read: false }));
                 batch.set(auditRef(aid), entry);
             }, 'add the comment');
         }
@@ -7291,6 +7658,8 @@
             stopAllListeners();
             sessionUnsubs.push(onSnapshot(wsRef('members', myEmail()), onMyMemberChanged, onListenerError));
             sessionUnsubs.push(onSnapshot(wsRef('settings', 'sprints'), onSprintsSnapshot, err => console.warn('Sprint calendar unavailable:', err)));
+            watchForYou();
+            sessionUnsubs.push(() => stopForYou());
             sessionUnsubs.push(onSnapshot(wsCollection('people'), onPeopleSnapshot, err => console.warn('People directory unavailable:', err)));
             sessionUnsubs.push(onSnapshot(wsRef('settings', 'workflow'), onWorkflowSnapshot, err => console.warn('Workflow settings unavailable, using the default workflow:', err)));
             return subscribeRoadmaps();
@@ -8847,7 +9216,8 @@
                     text = `${who} removed ${noun} ${q(label)} for good`; break;
                 case 'comment.added': {
                     const t = changes.find(c => c.f === 'text')?.to || '';
-                    text = `${who} commented on ${q(label)}${t ? `: <span class="text-slate-600">"${escapeHtml(t.length > 90 ? t.slice(0, 90) + '…' : t)}"</span>` : ''}`;
+                    const to = changes.find(c => c.f === 'replyTo')?.to;
+                    text = `${who} ${to ? `replied to ${escapeHtml(to)} on` : 'commented on'} ${e.target?.type === 'feedback' ? 'feedback ' : ''}${q(label)}${t ? `: <span class="text-slate-600">"${escapeHtml(t.length > 90 ? t.slice(0, 90) + '…' : t)}"</span>` : ''}`;
                     break;
                 }
                 case 'roadmap.moved': text = `${who} moved ${q(label)} into the shared workspace`; break;
@@ -9247,17 +9617,7 @@
         }
 
         // ---- Unread badge (FR-14): entries by other people since I last opened Activity ----
-        function setUnreadBadge(n) {
-            const text = n > 99 ? '99+' : String(n);
-            ['nav-activity-count'].forEach(id => {
-                const el = document.getElementById(id);
-                if (!el) return;
-                el.textContent = n ? text : '';
-                el.classList.toggle('hidden', !n);
-            });
-            const bell = document.getElementById('activity-bell');
-            if (bell) { bell.setAttribute('aria-label', n ? `Activity, ${text} unread` : 'Activity'); bell.title = n ? `Activity: ${text} new` : 'Activity'; }
-        }
+        function setUnreadBadge(n) { activityUnread = n; updateBellCount(); }
         function stopUnread() { unreadUnsub?.(); unreadUnsub = null; unreadSince = null; setUnreadBadge(0); }
         function watchUnread() {
             if (!useCloudPersistence || !canEdit() || !mySeenAt) { stopUnread(); return; }
