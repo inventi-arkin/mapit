@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.12.0" data-released="2026-11-26">
+    <meta name="mapit-version" content="2.13.0" data-released="2026-11-27">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -103,6 +103,13 @@
         .rm-item:hover, .rm-item:focus { background: #f8fafc; }
         .rm-item > i { font-size: 1rem; color: #64748b; }
         .rm-item.text-rose-600 > i { color: inherit; }
+        /* 2.13.0 kanban board: drag on desktop, tabs + swipe on phones */
+        .sv-card[draggable="true"] { cursor: grab; }
+        .sv-card.sv-dragging { opacity: .35; }
+        .sv-col.sv-over { outline: 2px solid #36aaf5; outline-offset: -2px; background: #f0f7ff; }
+        .sv-drop-line { height: 3px; border-radius: 2px; background: #0270c7; }
+        #sv-lane, #sv-lane .sv-card { touch-action: pan-y; }
+        @media (min-width: 1024px) { #sprints-board.sv-board-mode { overflow: hidden; } #sprints-board.sv-board-mode > .sv-board { height: 100%; } }
         /* 2.12.0: own / workspace tags in the ⚙ menu */
         .settings-tag { font-size: 10px; font-weight: 700; padding: 0 .375rem; border-radius: .375rem; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; }
         .settings-tag.own { border-color: #bae0fd; background: #f0f7ff; color: #0359a1; }
@@ -346,7 +353,7 @@
                 </select>
                 <!-- Sprint view controls (D-5) -->
                 <div id="sv-controls" class="hidden order-last sm:order-none w-full sm:w-auto flex-wrap items-center gap-2">
-                    <div class="flex items-center gap-1 min-w-0 flex-1 sm:flex-none">
+                    <div class="flex items-center gap-1 min-w-0 w-full sm:w-auto">
                         <button type="button" id="sv-prev" onclick="stepSprint(-1)" aria-label="Previous sprint" class="ctl ctl-icon ctl-quiet bg-white disabled:opacity-30 disabled:pointer-events-none"><i class="ph-bold ph-caret-left" aria-hidden="true"></i></button>
                         <select id="sv-sprint" aria-label="Sprint" onchange="setSprintFromPicker(this.value)" class="min-w-0 flex-1 sm:flex-none sm:max-w-[14rem] font-bold text-slate-800 bg-white ctl ctl-quiet cursor-pointer outline-none focus:ring-2 focus:ring-brand-500/20"></select>
                         <button type="button" id="sv-next" onclick="stepSprint(1)" aria-label="Next sprint" class="ctl ctl-icon ctl-quiet bg-white disabled:opacity-30 disabled:pointer-events-none"><i class="ph-bold ph-caret-right" aria-hidden="true"></i></button>
@@ -5134,6 +5141,7 @@
                 return;
             }
             updateFilterCounts();
+            box.classList.remove('sv-board-mode');
             if (svMode === 'list') {
                 const focusKey = document.activeElement?.dataset?.rowKey;
                 box.innerHTML = sprintListHtml();
@@ -5147,30 +5155,260 @@
                     <p class="text-xs mt-1">${svScope === 'this' ? '<button type="button" onclick="setSprintScope(\'all\')" class="text-brand-700 font-semibold hover:underline">Show all roadmaps</button>, or add' : 'Add'} tasks from a deliverable's Tasks tab.</p></div>`;
                 return;
             }
-            // Show done off: the Done column is hidden (D-5)
-            const cols = showDone ? SV_COLS : SV_COLS.filter(k => k !== 'done');
-            box.innerHTML = (showDone || !done.length ? '' : `<p class="sv-done-hidden mb-2 text-[11px] text-slate-500">${pluralize(done.length, 'done task')} hidden · <button type="button" onclick="toggleShowDone()" class="font-semibold text-brand-700 hover:underline">Show</button></p>`)
-                + `<div class="grid grid-cols-1 sm:grid-cols-2 ${cols.length === 4 ? 'xl:grid-cols-4' : 'xl:grid-cols-3'} gap-3">${cols.map(k => {
+            box.classList.add('sv-board-mode');
+            box.innerHTML = svBoardHtml(list);
+            if (isPhone()) svWireSwipe(box); else svWireDrag(box);
+        }
+        // Desktop: four columns side by side, each scrolling on its own (FR-12); phones: one column at a time with tabs (FR-5)
+        let svTab = 'todo';
+        function svBoardHtml(list) {
+            const doneHiddenHtml = n => `<p class="sv-done-hidden text-[11px] text-slate-500">${pluralize(n, 'done task')} hidden · <button type="button" onclick="toggleShowDone()" class="font-semibold text-brand-700 hover:underline">Show</button></p>`;
+            if (isPhone()) {
+                const tabs = SV_COLS.map(k => `<button type="button" role="tab" data-sv-tab="${k}" aria-selected="${svTab === k}" onclick="setSprintTab('${k}')" class="sv-tab flex-1 min-w-0 px-1 py-2.5 text-[11px] font-semibold border-b-2 ${svTab === k ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500'}">${TASK_STATUS[k][0]} <span class="sv-tab-count text-[10px] px-1 rounded-full ${svTab === k ? 'bg-brand-50' : 'bg-slate-100'}">${list.filter(t => t.status === k).length}</span></button>`).join('');
+                const items = list.filter(t => t.status === svTab);
+                const body = svTab === 'done' && !showDone ? `<div class="py-8 text-center">${doneHiddenHtml(items.length)}</div>`
+                    : items.map(t => `<div class="sv-swipe relative" data-key="${escapeHtml(t.key)}"><div class="sv-swipe-bg hidden absolute inset-0 rounded-xl items-center px-3 text-[11px] font-bold" aria-hidden="true"></div>${svCardHtml(t)}</div>`).join('') || '<p class="py-8 text-center text-xs text-slate-400 italic">Nothing here</p>';
+                return `<div role="tablist" aria-label="Board columns" class="sv-tabs flex -mx-3 -mt-3 mb-3 border-b border-slate-200">${tabs}</div>
+                    <div id="sv-lane" class="space-y-2 min-h-[50vh]" data-col="${svTab}">${body}<p class="text-center text-[10px] text-slate-400 pt-1">Swipe a card → next column, ← back · tap its status for every choice</p></div>`;
+            }
+            return `<div class="sv-board grid grid-cols-1 sm:grid-cols-2 gap-3 lg:flex">${SV_COLS.map(k => {
                 const [label] = TASK_STATUS[k];
                 const items = list.filter(t => t.status === k);
-                const p = items.reduce((s, t) => s + (t.estimateDays || 0), 0);
-                const phoneClosed = !svOpenCols.has(k);
-                const doneCollapsed = k === 'done' && items.length > 10 && !svDoneOpen;
-                return `<section class="sv-col bg-slate-100/70 rounded-2xl p-2 flex flex-col min-w-0 sm:min-h-[16rem]" data-col="${k}" aria-labelledby="sv-col-${k}">
-                    <h3 id="sv-col-${k}" class="flex items-center justify-between gap-2 px-1.5 pb-2 text-[11px] font-bold uppercase tracking-wider ${k === 'blocked' ? 'text-rose-700' : 'text-slate-600'}">
-                        <button type="button" onclick="toggleSprintColumn('${k}')" class="sm:pointer-events-none inline-flex items-center gap-1 uppercase tracking-wider" aria-expanded="${!phoneClosed}"><i class="ph-bold ${phoneClosed ? 'ph-caret-right' : 'ph-caret-down'} sm:hidden" aria-hidden="true"></i>${label} <span class="ml-1 px-1.5 rounded-full bg-white text-slate-700">${items.length}</span></button>
-                        <span class="normal-case tracking-normal font-semibold text-slate-500">${p ? fmtDays(p) : ''}</span></h3>
-                    <div class="sv-cards space-y-1.5 ${phoneClosed ? 'max-sm:hidden' : ''}">${doneCollapsed ? `<button type="button" onclick="toggleSprintDone()" class="w-full px-2 py-3 rounded-xl border border-dashed border-slate-300 text-xs font-semibold text-slate-600 hover:bg-white">Done (${items.length}) ▸</button>`
+                const p = items.reduce((a, t) => a + (t.estimateDays || 0), 0);
+                const slim = k === 'done' && !showDone;
+                return `<section class="sv-col ${slim ? 'sv-col-slim lg:w-32 lg:shrink-0' : 'lg:flex-1'} bg-slate-100/70 rounded-2xl p-2 flex flex-col min-w-0 lg:min-h-0 sm:min-h-[16rem]" data-col="${k}" aria-labelledby="sv-col-${k}">
+                    <h3 id="sv-col-${k}" class="shrink-0 flex items-center gap-1.5 px-1.5 pb-2 text-[11px] font-bold uppercase tracking-wider ${k === 'blocked' ? 'text-rose-700' : 'text-slate-600'}">${label} <span class="px-1.5 rounded-full bg-white text-slate-700">${items.length}</span>${slim ? '' : `<span class="ml-auto normal-case tracking-normal font-semibold text-slate-500">${p ? fmtDays(p) : ''}</span>`}</h3>
+                    <div class="sv-cards flex-1 lg:min-h-0 lg:overflow-y-auto custom-scrollbar space-y-1.5 pr-0.5">${slim
+                        ? `<div class="sv-drop-done h-full min-h-[8rem] rounded-xl border border-dashed border-emerald-300 bg-emerald-50/40 flex flex-col items-center justify-center gap-1.5 text-center px-2"><i class="ph-bold ph-check-circle text-lg text-emerald-600" aria-hidden="true"></i><span class="text-[11px] font-semibold text-emerald-700">Drop to finish</span>${items.length ? doneHiddenHtml(items.length) : '<button type="button" onclick="toggleShowDone()" class="text-[11px] font-semibold text-brand-700 hover:underline">Show</button>'}</div>`
                         : items.map(svCardHtml).join('') || '<p class="px-2 py-4 text-center text-[11px] text-slate-400 italic">Nothing here</p>'}</div>
                 </section>`;
             }).join('')}</div>`;
         }
+        window.setSprintTab = function(k) { svTab = SV_COLS.includes(k) ? k : 'todo'; renderSprintBoard(); };
+        // Crossing the phone breakpoint redraws the board in the other layout
+        window.matchMedia('(max-width: 639px)').addEventListener?.('change', () => { if (sprintsViewOpen() && svMode === 'board') renderSprintBoard(); });
+
+        // ---- Moving cards: one write + audit, Undo (FR-8, FR-9); reordering within a deliverable (Q-1) ----
+        const svUndo = (message, undo) => showSaveStatus('info', message, { label: 'Undo', run: undo, ms: 6000 });
+        function svTaskByKey(key) { return svVisibleTasks().find(x => x.key === key) || null; }
+        async function boardMoveTask(key, status, opts = {}) {
+            const t = svTaskByKey(key);
+            if (!t || !canBoardStatus(t) || !TASK_STATUS[status]) return false;
+            const from = t.status;
+            let orderKey;
+            if (opts.beforeKey && canEdit()) {
+                const b = svTaskByKey(opts.beforeKey);
+                if (b && b.id !== t.id && b.milestoneId === t.milestoneId && b.roadmapId === t.roadmapId) {
+                    const same = svVisibleTasks().filter(x => x.milestoneId === t.milestoneId && x.roadmapId === t.roadmapId && x.id !== t.id).sort((a, c) => (a.orderKey ?? 0) - (c.orderKey ?? 0));
+                    const prev = same[same.findIndex(x => x.id === b.id) - 1];
+                    const bk = b.orderKey ?? 0;
+                    orderKey = prev ? ((prev.orderKey ?? 0) + bk) / 2 : bk - 1000;
+                }
+            }
+            if (status === from && orderKey === undefined) return false;
+            const data = {};
+            if (status !== from) Object.assign(data, { status, doneAt: status === 'done' ? (useCloudPersistence ? serverTimestamp() : new Date().toISOString()) : null });
+            if (orderKey !== undefined) data.orderKey = orderKey;
+            const label = clip(t.title, 200);
+            const entry = auditEntry(t.roadmap, status !== from ? 'task.updated' : 'task.reordered', { type: 'milestone', id: t.item.id, label: t.item.name },
+                status !== from ? [{ f: 'taskStatus', task: label, from: TASK_STATUS[from][0], to: TASK_STATUS[status][0] }] : [{ f: 'taskOrder', task: label }]);
+            let ok = true;
+            if (!useCloudPersistence) {
+                const src = (demoTasks.get(t.milestoneId) || []).find(x => x.id === t.id);
+                if (src) Object.assign(src, data);
+                logDemo(entry);
+                loadSprintBoard();
+            } else {
+                const aid = newId('a');
+                ok = await commitBatch(batch => {
+                    batch.update(wsRef('roadmaps', t.roadmapId, 'milestones', t.milestoneId, 'tasks', t.id), { ...data, ...stamp(aid) });
+                    batch.set(auditRef(aid), entry);
+                }, status !== from ? 'change the task status' : 'reorder the tasks');
+                if (!ok) showSaveStatus('error', 'You can no longer change this task.');
+            }
+            if (ok && opts.undo !== false && status !== from) svUndo(`Moved "${clip(t.title, 60)}" to ${TASK_STATUS[status][0]}${status === 'done' && !showDone ? ' (hidden)' : ''}.`, () => boardMoveTask(key, from, { undo: false }));
+            return ok;
+        }
+        window.boardMoveTask = boardMoveTask;
+        // Move a task to another sprint of its roadmap (Editors); its deliverable's sprintIds follow in the same batch
+        async function boardMoveSprint(ctx, sid, undoable = true) {
+            if (!canEdit() || (ctx.sprintId || null) === (sid || null)) return false;
+            const name = sid ? (sprintsFor(ctx.roadmap).find(x => x.id === sid)?.name || 'a sprint') : 'No sprint';
+            const fromSid = ctx.sprintId || null;
+            const entry = auditEntry(ctx.roadmap, 'task.updated', { type: 'milestone', id: ctx.item.id, label: ctx.item.name }, [{ f: 'taskSprint', task: clip(ctx.title, 200), to: name }]);
+            let ok = true;
+            if (!useCloudPersistence) {
+                const list = demoTasks.get(ctx.milestoneId) || [];
+                const src = list.find(x => x.id === ctx.id);
+                if (src) src.sprintId = sid || null;
+                ctx.item.sprintIds = [...new Set(list.filter(x => !x.deletedAt && x.sprintId).map(x => x.sprintId))].sort();
+                logDemo(entry);
+                loadSprintBoard();
+            } else {
+                let ids = null;
+                try {
+                    const snap = await getDocs(wsCollection('roadmaps', ctx.roadmapId, 'milestones', ctx.milestoneId, 'tasks'));
+                    ids = [...new Set(snap.docs.map(d => ({ ...d.data(), id: d.id })).map(x => x.id === ctx.id ? { ...x, sprintId: sid || null } : x).filter(x => !x.deletedAt && x.sprintId).map(x => x.sprintId))].sort();
+                } catch (e) { console.warn('Could not read the tasks for the sprint chips:', e); }
+                const aid = newId('a');
+                ok = await commitBatch(batch => {
+                    batch.update(wsRef('roadmaps', ctx.roadmapId, 'milestones', ctx.milestoneId, 'tasks', ctx.id), { sprintId: sid || null, ...stamp(aid) });
+                    if (ids) batch.update(itemRef(ctx.roadmapId, 'milestones', ctx.milestoneId), { sprintIds: ids, ...stamp(aid) });
+                    batch.set(auditRef(aid), entry);
+                }, 'move the task');
+            }
+            if (ok && undoable) svUndo(`Moved "${clip(ctx.title, 60)}" to ${name}.`, () => boardMoveSprint({ ...ctx, sprintId: sid || null }, fromSid, false));
+            return ok;
+        }
+
+        // ---- Move to… menu (desktop ▾, keyboard) and sheet (phones) (FR-4, FR-6) ----
+        function svCloseMove() { document.getElementById('sv-move-layer')?.remove(); }
+        window.svCloseMove = svCloseMove;
+        window.svOpenMove = function(key, anchor, kind = isPhone() ? 'sheet' : 'menu') {
+            const t = svTaskByKey(key);
+            if (!t || !canBoardStatus(t)) return;
+            svCloseMove();
+            const sheet = kind === 'sheet';
+            const opt = (attr, v, icon, label, cur) => `<button type="button" role="menuitem" ${attr}="${escapeHtml(v)}" class="sv-move-opt w-full flex items-center gap-2 text-left font-semibold ${sheet ? 'h-11 px-3 rounded-xl border text-sm' : 'px-2.5 py-1.5 text-[11px] hover:bg-slate-50 focus:bg-slate-50 outline-none'} ${cur ? (sheet ? 'border-brand-300 bg-brand-50 text-brand-700' : 'text-brand-700') : (sheet ? 'border-slate-200 text-slate-800' : 'text-slate-700')}"><i class="ph-bold ${icon}" aria-hidden="true"></i>${label}${cur ? '<i class="ph-bold ph-check ml-auto" aria-hidden="true"></i>' : ''}</button>`;
+            const statuses = SV_COLS.map(k => opt('data-move-to', k, TASK_STATUS[k][2], TASK_STATUS[k][0], t.status === k)).join('');
+            const today = phtToday();
+            const cal = sprintsFor(t.roadmap).filter(x => x.id !== t.sprintId && x.end >= today).slice(0, 4);
+            const sprintOpts = canEdit() && !t.roadmap.deletedAt ? `<p class="${sheet ? 'pt-2' : 'px-2.5 pt-2 border-t border-slate-100 mt-1'} text-[10px] font-bold uppercase tracking-wider text-slate-400">Move to sprint</p>${cal.map(x => opt('data-move-sprint', x.id, 'ph-calendar-dots', `${escapeHtml(x.name)} · ${escapeHtml(shortDate(x.start))} – ${escapeHtml(shortDate(x.end))}`, false)).join('')}${t.sprintId ? opt('data-move-sprint', '', 'ph-tray', 'No sprint', false) : ''}` : '';
+            const layer = document.createElement('div');
+            layer.id = 'sv-move-layer';
+            layer.innerHTML = sheet
+                ? `<div class="fixed inset-0 z-[60] bg-slate-900/30" data-move-close></div><div role="menu" aria-label="Move ${escapeHtml(t.title)}" class="sv-move fixed left-0 right-0 bottom-0 z-[61] bg-white rounded-t-2xl shadow-2xl p-4 pb-6 space-y-2 max-h-[85vh] overflow-y-auto"><div class="mx-auto w-10 h-1 rounded-full bg-slate-300" aria-hidden="true"></div><p class="text-sm font-bold text-slate-900">Move "${escapeHtml(t.title)}"</p>${statuses}${sprintOpts}</div>`
+                : `<div role="menu" aria-label="Move ${escapeHtml(t.title)}" class="sv-move fixed z-[61] w-60 bg-white border border-slate-200 rounded-lg shadow-lg py-1">${statuses}${sprintOpts}</div>`;
+            document.body.appendChild(layer);
+            if (!sheet && anchor) {
+                const r = anchor.getBoundingClientRect(), m = layer.querySelector('.sv-move');
+                m.style.left = Math.min(r.left, innerWidth - 248) + 'px';
+                m.style.top = (r.bottom + 4 + m.offsetHeight > innerHeight ? Math.max(8, r.top - m.offsetHeight - 4) : r.bottom + 4) + 'px';
+            }
+            const ctx = { ...t };
+            layer.querySelectorAll('[data-move-to]').forEach(b => b.onclick = () => { svCloseMove(); boardMoveTask(key, b.dataset.moveTo); anchor?.focus?.(); });
+            layer.querySelectorAll('[data-move-sprint]').forEach(b => b.onclick = () => { svCloseMove(); boardMoveSprint(ctx, b.dataset.moveSprint || null); });
+            layer.querySelector('[data-move-close]')?.addEventListener('click', svCloseMove);
+            layer.addEventListener('keydown', e => {
+                const items = [...layer.querySelectorAll('[role="menuitem"]')], i = items.indexOf(document.activeElement);
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); svCloseMove(); anchor?.focus?.(); }
+                else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus(); }
+            });
+            setTimeout(() => layer.querySelector('[data-move-to]')?.focus(), 0);
+        };
+        document.addEventListener('click', e => { if (!e.target.closest?.('#sv-move-layer, .sv-move-btn, .task-status')) svCloseMove(); });
+        // Pill: one step on desktop (as before); the sheet on phones
+        window.svPillClick = function(key, el) { if (isPhone()) svOpenMove(key, el, 'sheet'); else boardNextStatus(key); };
+
+        // ---- Desktop drag and drop (FR-1, FR-2, FR-10, Q-1) ----
+        let svDrag = null;
+        function svClearDrop(box, keep) {
+            box.querySelectorAll('.sv-over').forEach(c => { if (c !== keep) c.classList.remove('sv-over'); });
+            if (!keep) box.querySelectorAll('.sv-drop-line').forEach(x => x.remove());
+        }
+        function svWireDrag(box) {
+            if (box.dataset.dragWired) return;
+            box.dataset.dragWired = '1';
+            box.addEventListener('dragstart', e => {
+                const c = e.target.closest?.('.sv-card[draggable="true"]');
+                if (!c) return;
+                const t = svTaskByKey(c.dataset.key);
+                svDrag = { key: c.dataset.key, status: t?.status };
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', c.dataset.key);
+                setTimeout(() => c.classList.add('sv-dragging'), 0);
+            });
+            box.addEventListener('dragend', () => { svDrag = null; svClearDrop(box); box.querySelectorAll('.sv-dragging').forEach(x => x.classList.remove('sv-dragging')); });
+            box.addEventListener('dragover', e => {
+                if (!svDrag) return;
+                const col = e.target.closest?.('.sv-col');
+                if (!col) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                svClearDrop(box, col);
+                col.classList.add('sv-over');
+                const t = svTaskByKey(svDrag.key);
+                const target = [...col.querySelectorAll('.sv-card')].find(c => { const r = c.getBoundingClientRect(); return c.dataset.key !== svDrag.key && e.clientY < r.top + r.height / 2; });
+                const tt = target && svTaskByKey(target.dataset.key);
+                if (t && tt && canEdit() && tt.milestoneId === t.milestoneId && tt.roadmapId === t.roadmapId) {
+                    if (!target.previousElementSibling?.classList.contains('sv-drop-line')) { box.querySelectorAll('.sv-drop-line').forEach(x => x.remove()); target.insertAdjacentHTML('beforebegin', '<div class="sv-drop-line" aria-hidden="true"></div>'); }
+                } else box.querySelectorAll('.sv-drop-line').forEach(x => x.remove());
+            });
+            box.addEventListener('dragleave', e => { const col = e.target.closest?.('.sv-col'); if (col && !col.contains(e.relatedTarget)) col.classList.remove('sv-over'); });
+            box.addEventListener('drop', e => {
+                if (!svDrag) return;
+                const col = e.target.closest?.('.sv-col');
+                if (!col) return;
+                e.preventDefault();
+                const before = col.querySelector('.sv-drop-line')?.nextElementSibling?.dataset.key || null;
+                const d = svDrag;
+                svDrag = null;
+                svClearDrop(box);
+                const t = svTaskByKey(d.key);
+                if (!t) return;
+                // Someone else moved it meanwhile: their change wins (FR-10)
+                if (t.status !== d.status) { showSaveStatus('info', `"${t.title}" was moved by ${t.updatedBy?.name || 'someone else'} just now.`); renderSprintBoard(); return; }
+                boardMoveTask(d.key, col.dataset.col, { beforeKey: before });
+            });
+        }
+
+        // ---- Phones: swipe a card one column; swipe empty space to change tab (FR-5, FR-7) ----
+        const SV_SWIPE_NEXT = { todo: 'in-progress', 'in-progress': 'done', blocked: 'in-progress', done: null };
+        const SV_SWIPE_PREV = { todo: null, 'in-progress': 'todo', blocked: 'in-progress', done: 'in-progress' };
+        const SV_COL_COLOR = { todo: '#64748b', 'in-progress': '#0270c7', blocked: '#e11d48', done: '#059669' };
+        function svWireSwipe(box) {
+            const lane = box.querySelector('#sv-lane');
+            if (!lane) return;
+            let g = null;
+            lane.addEventListener('pointerdown', e => {
+                if (e.target.closest('button, a, input, select')) { g = null; return; }
+                g = { wrap: e.target.closest('.sv-swipe'), x: e.clientX, y: e.clientY, dx: 0, horiz: null };
+            });
+            lane.addEventListener('pointermove', e => {
+                if (!g) return;
+                g.dx = e.clientX - g.x;
+                const dy = e.clientY - g.y;
+                if (g.horiz === null && (Math.abs(g.dx) > 10 || Math.abs(dy) > 10)) { g.horiz = Math.abs(g.dx) > Math.abs(dy); if (g.horiz) lane.setPointerCapture?.(e.pointerId); }
+                if (!g.horiz || !g.wrap) return;
+                const t = svTaskByKey(g.wrap.dataset.key);
+                const to = t && canBoardStatus(t) ? (g.dx > 0 ? SV_SWIPE_NEXT : SV_SWIPE_PREV)[t.status] : null;
+                const card = g.wrap.querySelector('.sv-card'), bg = g.wrap.querySelector('.sv-swipe-bg');
+                if (to) {
+                    bg.classList.remove('hidden'); bg.classList.add('flex');
+                    bg.style.background = SV_COL_COLOR[to] + '22'; bg.style.color = SV_COL_COLOR[to];
+                    bg.style.justifyContent = g.dx > 0 ? 'flex-start' : 'flex-end';
+                    bg.textContent = g.dx > 0 ? `→ ${TASK_STATUS[to][0]}` : `${TASK_STATUS[to][0]} ←`;
+                }
+                card.style.transform = `translateX(${to ? g.dx : g.dx / 6}px)`;
+            });
+            const end = () => {
+                if (!g) return;
+                const st = g;
+                g = null;
+                if (!st.horiz) return;
+                if (!st.wrap) {   // empty space: next / previous tab
+                    if (Math.abs(st.dx) > 60) { const next = SV_COLS[SV_COLS.indexOf(svTab) + (st.dx < 0 ? 1 : -1)]; if (next) setSprintTab(next); }
+                    return;
+                }
+                const t = svTaskByKey(st.wrap.dataset.key);
+                const card = st.wrap.querySelector('.sv-card'), bg = st.wrap.querySelector('.sv-swipe-bg');
+                const to = t && canBoardStatus(t) ? (st.dx > 0 ? SV_SWIPE_NEXT : SV_SWIPE_PREV)[t.status] : null;
+                if (to && Math.abs(st.dx) > card.offsetWidth * 0.4) { boardMoveTask(t.key, to); return; }
+                if (t && !canBoardStatus(t)) showSaveStatus('info', 'Only the assignee or an Editor can move this task.');
+                card.style.transition = 'transform .15s'; card.style.transform = '';
+                bg.classList.add('hidden'); bg.classList.remove('flex');
+                setTimeout(() => { card.style.transition = ''; }, 160);
+            };
+            lane.addEventListener('pointerup', end);
+            lane.addEventListener('pointercancel', end);
+        }
         function svCardHtml(t) {
             const [label, cls, icon] = TASK_STATUS[t.status] || TASK_STATUS.todo;
             const ok = canBoardStatus(t), key = escapeHtml(t.key);
-            return `<div class="sv-card bg-white rounded-xl border border-slate-200 p-2.5 shadow-xs hover:shadow-sm space-y-1.5" data-key="${key}" tabindex="0" onkeydown="if (event.key === 'Enter' && event.target === this) openSprintTask('${key}')">
+            const drag = ok && !isPhone();
+            return `<div class="sv-card relative bg-white rounded-xl border border-slate-200 p-2.5 shadow-xs hover:shadow-sm space-y-1.5" data-key="${key}" tabindex="0" ${drag ? 'draggable="true"' : ''} title="${ok ? (isPhone() ? 'Swipe to move · tap the status for every choice' : 'Drag to another column') : 'Only the assignee or an Editor can move this task'}" onkeydown="if (event.key === 'Enter' && event.target === this) openSprintTask('${key}')">
                 <div class="flex items-start gap-2">
-                    <button type="button" class="task-status shrink-0 inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-full border text-[10px] font-bold ${cls} ${ok ? 'hover:shadow-sm' : 'opacity-70 cursor-default'}" ${ok ? `onclick="boardNextStatus('${key}')"` : 'disabled'} aria-label="Status: ${label}${ok ? ', change' : ''}" title="${ok ? 'Click: next status' : 'Only the assignee or an Editor can change this'}"><i class="ph-bold ${icon} text-xs" aria-hidden="true"></i>${label}</button>
+                    <span class="shrink-0 inline-flex items-center"><button type="button" class="task-status shrink-0 inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-full border text-[10px] font-bold ${cls} ${ok ? 'hover:shadow-sm' : 'opacity-70 cursor-default'}" ${ok ? `onclick="svPillClick('${key}', this)"` : 'disabled'} aria-label="Status: ${label}${ok ? ', change' : ''}" title="${ok ? (isPhone() ? 'Tap: move to…' : 'Click: next status') : 'Only the assignee or an Editor can change this'}"><i class="ph-bold ${icon} text-xs" aria-hidden="true"></i>${label}</button>${ok && !isPhone() ? `<button type="button" class="sv-move-btn ml-0.5 p-0.5 text-slate-400 hover:text-slate-700" onclick="event.stopPropagation(); svOpenMove('${key}', this, 'menu')" aria-label="Move ${escapeHtml(t.title)} to…" aria-haspopup="menu" title="Move to…"><i class="ph-bold ph-caret-down text-[10px]" aria-hidden="true"></i></button>` : ''}</span>
                     <button type="button" onclick="openSprintTask('${key}')" class="sv-title text-left text-xs font-semibold leading-snug break-words min-w-0 ${t.status === 'done' ? 'line-through text-slate-400' : 'text-slate-800 hover:text-brand-700'}">${escapeHtml(t.title)}</button>
                 </div>
                 <div class="flex items-center gap-1.5 text-[11px] text-slate-500 min-w-0"><i class="ph-bold ph-git-commit rotate-90 text-[10px] shrink-0" aria-hidden="true"></i><button type="button" onclick="openSprintTask('${key}')" class="sv-deliverable truncate hover:text-brand-700 hover:underline" title="${escapeHtml(t.item.name)}">${escapeHtml(t.item.name)}</button>${svScope === 'all' ? `<span class="sv-roadmap shrink-0 max-w-[8rem] truncate px-1.5 rounded bg-slate-100 text-[10px] font-semibold" title="${escapeHtml(t.roadmap.title)}">${escapeHtml(t.roadmap.title)}</span>${svOtherSprintHtml(t.roadmap, svSprintId())}` : ''}</div>
