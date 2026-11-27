@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.14.1" data-released="2026-11-27">
+    <meta name="mapit-version" content="2.14.2" data-released="2026-11-28">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -108,7 +108,11 @@
         @media (max-width: 639px) {
             /* iOS zooms into fields under 16 px and the page then needs sideways scrolling */
             input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px !important; }
-            body { overflow-x: hidden; }
+            /* 2.14.2: iOS ignores the body rule, so clip at the root too; body uses clip so the sticky header keeps working */
+            html { overflow-x: hidden; }
+            body { overflow-x: hidden; overflow-x: clip; }
+            /* Fixed bars, sheets and windows never get wider than the screen, even if something on the page is */
+            #mobile-nav, .fixed.inset-0, .fixed.inset-x-0, .fixed.left-0.right-0, .filter-sheet:not(.hidden) { max-width: 100vw; }
             #mobile-nav { padding-bottom: env(safe-area-inset-bottom); }
             main { padding-bottom: calc(5rem + env(safe-area-inset-bottom)) !important; }
             /* Sprints window: each sprint on two lines (name · status · remove / start · end) */
@@ -303,7 +307,7 @@
                     <span id="header-role-badge" class="hidden"></span>
                     <i class="ph-bold ph-caret-down text-xs text-slate-500" aria-hidden="true"></i>
                 </button>
-                <div id="account-menu" role="menu" aria-label="Account" class="hidden absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-40 text-xs">
+                <div id="account-menu" role="menu" aria-label="Account" class="hidden absolute right-0 top-full mt-2 w-64 max-w-[calc(100vw-1rem)] bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-40 text-xs">
                     <div class="px-3 py-2 border-b border-slate-100 mb-1">
                         <div id="header-user-name" class="font-bold text-slate-900 truncate">Workspace User</div>
                         <div id="header-user-email" class="text-[11px] text-slate-500 truncate">user@example.com</div>
@@ -885,7 +889,7 @@
                                 Cancel
                             </button>
                             <button type="submit" class="editor-only px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
-                                <i class="ph-bold ph-check"></i> Save changes
+                                <i class="ph-bold ph-check"></i> Save<span class="max-[359px]:hidden"> changes</span>
                             </button>
                         </div>
                     </div>
@@ -2913,14 +2917,15 @@
                     <td class="editor-name-cell py-3 px-3 font-bold text-slate-900 max-lg:w-full max-lg:max-w-0">
                         <div class="editor-name text-xs font-bold text-slate-900 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[26rem] md:max-w-[32rem] lg:max-w-[11rem] xl:max-w-[12rem]">${escapeHtml(item.name)}</div>
                         <p class="editor-desc text-[11px] font-normal text-slate-500 mt-0.5 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[26rem] md:max-w-[32rem] lg:max-w-[11rem] xl:max-w-[12rem]">${item.description ? escapeHtml(item.description) : '&nbsp;'}</p>
+                        <!-- 2.14.2: one line; fitEditorSublines() hides the parts marked data-fit (1 first) until the line fits, so nothing sticks out of the row -->
                         <div class="editor-subline lg:hidden mt-1 h-5 flex flex-nowrap items-center gap-x-1.5 text-[11px] font-normal text-slate-500 max-w-full overflow-hidden">
                             <span class="min-w-[3rem] max-w-[7rem] truncate text-brand-600 font-semibold">${escapeHtml(item.module)}</span>
                             <span class="shrink-0">· ${escapeHtml(formatMonthYear(item.date))}</span>
-                            ${effort ? `<span class="shrink-0">· ${fmtDays(effort)}</span>` : ''}
-                            <span class="shrink-0 flex items-center gap-1">${statusShortHtml(item)}</span>
-                            ${item.owner?.email || (item.team || []).length ? `<span class="shrink-0">${peopleStackHtml(item, 1, 'sm')}</span>` : ''}
-                            ${sprintChipsHtml(roadmap, item, 1)}
-                            ${overFlagHtml(roadmap, item) ? `<span class="shrink-0">${overFlagHtml(roadmap, item)}</span>` : ''}
+                            ${effort ? `<span class="shrink-0" data-fit="4">· ${fmtDays(effort)}</span>` : ''}
+                            <span class="editor-status min-w-0 flex items-center gap-1 whitespace-nowrap overflow-hidden">${statusShortHtml(item)}</span>
+                            ${item.owner?.email || (item.team || []).length ? `<span class="shrink-0" data-fit="5">${peopleStackHtml(item, 1, 'sm')}</span>` : ''}
+                            ${sprintChipsHtml(roadmap, item, 1) ? `<span class="shrink-0 flex" data-fit="2">${sprintChipsHtml(roadmap, item, 1)}</span>` : ''}
+                            ${overFlagHtml(roadmap, item) ? `<span class="shrink-0" data-fit="1">${overFlagHtml(roadmap, item)}</span>` : ''}
                         </div>
                     </td>
                     <td class="hidden lg:table-cell py-3 px-3 text-brand-600 font-semibold whitespace-nowrap">
@@ -2947,7 +2952,47 @@
                 `;
                 editorTableBody.appendChild(tr);
             });
+            fitEditorSublines();
         }
+
+        // 2.14.2: the Editor phone line stays on one line inside the row. Parts give way in order:
+        // over flag, sprint chips, stage name, effort, people (module, month and status stay; the status truncates last)
+        function fitEditorSublines() {
+            const lines = [...(editorTableBody?.querySelectorAll('.editor-subline') || [])];
+            if (!lines.length || !lines[0].offsetParent) return;
+            const over = el => el.scrollWidth > el.clientWidth + 1;
+            for (const line of lines) {
+                const status = line.querySelector('.editor-status');
+                const label = status?.firstElementChild?.lastChild;   // "Planned 25%" after the dot
+                status?.lastElementChild?.setAttribute('data-fit', '3');
+                const parts = [...line.querySelectorAll('[data-fit]')].sort((a, b) => a.dataset.fit - b.dataset.fit);
+                parts.forEach(p => p.classList.remove('hidden'));
+                line.firstElementChild.style.minWidth = '';
+                if (status) {
+                    status.classList.remove('shrink-0');
+                    if (status.dataset.full) { label.textContent = status.dataset.full; status.removeAttribute('title'); status.firstElementChild.removeAttribute('aria-label'); delete status.dataset.full; }
+                }
+                // Over flag, sprint chips, stage name and effort give way to the line and to the full status
+                for (const p of parts.filter(p => p.dataset.fit <= 4)) {
+                    if (!over(line) && !(status && over(status))) break;
+                    p.classList.add('hidden');
+                }
+                // Still cut: the dot and the % only, never half a word (the full status stays in the tooltip), at full size
+                if (label && over(status)) {
+                    status.dataset.full = label.textContent;
+                    status.title = label.textContent.trim();
+                    label.textContent = (label.textContent.match(/\d+%\s*$/) || [''])[0];
+                    status.firstElementChild.setAttribute('aria-label', status.title);
+                    status.classList.add('shrink-0');
+                }
+                // People give way last, to the line only
+                for (const p of parts.filter(p => p.dataset.fit > 4)) { if (!over(line)) break; p.classList.add('hidden'); }
+                // Last resort: the module name truncates further
+                if (over(line)) line.firstElementChild.style.minWidth = '0';
+            }
+        }
+        let fitSublinesTimer = null;
+        window.addEventListener('resize', () => { clearTimeout(fitSublinesTimer); fitSublinesTimer = setTimeout(fitEditorSublines, 150); });
 
         // =======================================================
         // FEEDBACK & SUGGESTIONS DASHBOARD
@@ -2994,7 +3039,7 @@
         const FEEDBACK_SORT_DEFAULT = { key: 'date', dir: 'desc' };
         const FEEDBACK_STATUS_ORDER = { backlog: 0, planned: 1, 'in-progress': 2, done: 3 };
         const FEEDBACK_COLUMNS = [
-            { key: 'title', label: 'Suggestion / Feedback', cls: 'py-3 px-4' },
+            { key: 'title', label: 'Suggestion / Feedback', cls: 'py-3 px-3 sm:px-4 max-sm:!whitespace-normal' },
             { key: 'category', label: 'Category', cls: 'hidden lg:table-cell py-3 px-3' },
             { key: 'sub', label: 'Submitted By', cls: 'fb-col-sub hidden xl:table-cell py-3 px-3' },
             { key: 'date', label: 'Date', cls: 'hidden lg:table-cell py-3 px-3' },
@@ -3055,7 +3100,7 @@
                 // The active sort's column can be hidden at this width: say so next to the first header (FR-12)
                 const chip = c.key === 'title' ? `<span id="feedback-sort-chip" class="hidden items-center gap-1 ml-2 px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200 normal-case tracking-normal font-semibold text-[10px]">Sorted by ${escapeHtml(label)}<button type="button" onclick="setFeedbackSort('default')" aria-label="Clear the sort" class="hover:text-brand-900"><i class="ph-bold ph-x" aria-hidden="true"></i></button></span>` : '';
                 return `<th data-col="${c.key}" class="${c.cls} whitespace-nowrap" aria-sort="${on ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}"><button type="button" onclick="setFeedbackSort('${c.key}')"${c.title ? ` title="${c.title}"` : ''} class="fb-sort inline-flex items-center gap-1 uppercase tracking-wider font-bold ${on ? 'text-slate-800' : ''} hover:text-slate-800 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40">${c.label}${icon}</button>${chip}</th>`;
-            }).join('') + '<th class="py-3 px-4 w-[5.5rem]"><span class="sr-only">Actions</span></th></tr>';
+            }).join('') + '<th class="py-3 px-2 sm:px-4 w-[5.5rem]"><span class="sr-only">Actions</span></th></tr>';
             const select = document.getElementById('feedback-sort-select');
             if (select) {
                 if (!select.options.length) select.innerHTML = FEEDBACK_SORT_OPTIONS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
@@ -3194,10 +3239,10 @@
                     : '';
 
                 tr.innerHTML = `
-                    <td class="py-3 px-4 font-bold text-slate-800 max-lg:w-full max-lg:max-w-0">
-                        <div class="feedback-title text-xs font-bold text-slate-900 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem] lg:max-w-[13rem] xl:max-w-[16rem]">${escapeHtml(item.title)}</div>
-                        <p class="feedback-desc text-[11px] font-normal text-slate-500 mt-0.5 truncate max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem] lg:max-w-[13rem] xl:max-w-[16rem]">${item.description ? escapeHtml(item.description) : '&nbsp;'}</p>
-                        <div class="fb-subline lg:hidden mt-1.5 flex flex-nowrap items-center gap-1.5 font-normal max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem]">
+                    <td class="py-3 px-3 sm:px-4 font-bold text-slate-800 max-lg:w-full max-lg:max-w-0">
+                        <div class="feedback-title text-xs font-bold text-slate-900 truncate max-w-[8.5rem] min-[340px]:max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem] lg:max-w-[13rem] xl:max-w-[16rem]">${escapeHtml(item.title)}</div>
+                        <p class="feedback-desc text-[11px] font-normal text-slate-500 mt-0.5 truncate max-w-[8.5rem] min-[340px]:max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem] lg:max-w-[13rem] xl:max-w-[16rem]">${item.description ? escapeHtml(item.description) : '&nbsp;'}</p>
+                        <div class="fb-subline lg:hidden mt-1.5 flex flex-nowrap items-center gap-1.5 font-normal max-w-[8.5rem] min-[340px]:max-w-[11rem] min-[400px]:max-w-[14rem] sm:max-w-[30rem]">
                             <span class="hidden min-[400px]:inline-block min-w-0 max-w-[6rem] truncate align-middle px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700">${escapeHtml(item.category)}</span>
                             <span class="shrink-0">${badgeHtml}</span>
                             ${item.linkedMilestones.length ? `<span class="shrink-0 text-[11px] text-brand-700 font-semibold" title="${escapeHtml(item.linkedMilestones.map(m => m.name).join(', '))}"><i class="ph-bold ph-git-commit rotate-90 text-[10px]" aria-hidden="true"></i> ${item.linkedMilestones.length}</span>` : ''}
@@ -3221,7 +3266,7 @@
                             ${milestonesHtml}
                         </div>
                     </td>
-                    <td class="py-3 px-4 text-right whitespace-nowrap w-[5.5rem]">${actionsHtml}</td>
+                    <td class="py-3 px-2 sm:px-4 text-right whitespace-nowrap w-[5.5rem]">${actionsHtml}</td>
                 `;
                 feedbackTableBody.appendChild(tr);
             });
@@ -4135,7 +4180,7 @@
             const movedBy = c.originalAuthor && c.by?.name ? ` · moved by ${c.by.name}` : '';
             return `<div class="cm-comment flex gap-2 ${isNew ? 'cm-new border-l-2 border-brand-500 pl-2 -ml-2.5' : ''}" data-comment-id="${escapeHtml(c.id)}">
                 ${avatarHtml(c.by?.email ? c.by : { email: cmName(c), name: cmName(c) }, 'Author', 'sm')}
-                <div class="flex-1 min-w-0"><div class="flex items-center gap-2 text-[11px]"><b class="text-slate-900" title="${escapeHtml(c.by?.email && !c.originalAuthor ? `${c.by.name} (${c.by.email})` : '')}">${escapeHtml(cmName(c))}</b><span class="text-slate-400" title="${escapeHtml(formatPHT(time))}">${escapeHtml(formatRelativeTime(time))}${escapeHtml(movedBy)}</span>${isNew ? '<span class="cm-new-tag text-[10px] font-bold text-brand-700">New</span>' : ''}</div>
+                <div class="flex-1 min-w-0"><div class="flex items-center gap-2 text-[11px] min-w-0"><b class="text-slate-900 min-w-0 truncate" title="${escapeHtml(c.by?.email && !c.originalAuthor ? `${c.by.name} (${c.by.email})` : '')}">${escapeHtml(cmName(c))}</b><span class="text-slate-400" title="${escapeHtml(formatPHT(time))}">${escapeHtml(formatRelativeTime(time))}${escapeHtml(movedBy)}</span>${isNew ? '<span class="cm-new-tag text-[10px] font-bold text-brand-700">New</span>' : ''}</div>
                 <p class="cm-text text-xs text-slate-700 leading-relaxed whitespace-pre-wrap break-words">${cmFormat(c)}</p>
                 ${!isReply && cmCanWrite(ctx) ? `<button type="button" class="cm-reply mt-0.5 text-[11px] font-semibold text-slate-500 hover:text-brand-700" onclick="cmReply('${ctx}', '${escapeHtml(c.id)}')"><i class="ph-bold ph-arrow-bend-up-left" aria-hidden="true"></i> Reply</button>` : ''}</div></div>`;
         }
@@ -5523,7 +5568,7 @@
             if (summary) {
                 const today = phtToday();
                 const left = sprint && sprint.start <= today && today <= sprint.end ? Math.round((new Date(sprint.end + 'T00:00:00') - new Date(today + 'T00:00:00')) / 864e5) + 1 : null;
-                summary.innerHTML = `<b class="text-slate-900">${sprint ? `${escapeHtml(sprint.name)} · ${escapeHtml(shortDate(sprint.start))} – ${escapeHtml(shortDate(sprint.end))}` : 'No sprint (backlog)'}</b>
+                summary.innerHTML = `<b class="text-slate-900 min-w-0 max-w-full break-words">${sprint ? `${escapeHtml(sprint.name)} · ${escapeHtml(shortDate(sprint.start))} – ${escapeHtml(shortDate(sprint.end))}` : 'No sprint (backlog)'}</b>
                     ${left !== null ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200">current · ${pluralize(left, 'day')} left</span>` : ''}
                     <span class="sv-counts text-slate-600">${pluralize(list.length, 'task')} · ${done.length} done${blocked ? ` · <span class="text-rose-700 font-semibold">${blocked} blocked</span>` : ''}${pd ? ` · ${fmtDays(pdDone)} of ${fmtDays(pd)} done` : ''}</span>
                     <span class="flex items-center gap-1.5"><span class="w-32 h-1.5 rounded-full bg-slate-100 overflow-hidden" aria-hidden="true"><span class="block h-full bg-emerald-500" style="width:${pct}%"></span></span><span class="text-slate-500">${pct}%</span></span>`;
@@ -7978,7 +8023,7 @@
         function moveButtonsHtml(item) {
             if (!canEditActive()) return '';
             const id = escapeHtml(item.id);
-            return `<span class="rank-moves flex items-center shrink-0 sm:opacity-0 sm:group-hover/row:opacity-100 sm:focus-within:opacity-100">
+            return `<span class="rank-moves max-[359px]:hidden flex items-center shrink-0 sm:opacity-0 sm:group-hover/row:opacity-100 sm:focus-within:opacity-100">
                 <button type="button" onclick="event.stopPropagation(); moveInList(this, 'up')" aria-label="Move up" title="Move up" class="px-1 text-slate-500 hover:text-brand-700">↑</button>
                 <button type="button" onclick="event.stopPropagation(); moveInList(this, 'down')" aria-label="Move down" title="Move down" class="px-1 text-slate-500 hover:text-brand-700">↓</button>
             </span>`;
@@ -8899,7 +8944,7 @@
             const total = wfTotal();
             const share = w => total > 0 ? Math.round((Number(w) || 0) / total * 100) : 0;
             const input = 'px-2 py-1 border border-slate-200 rounded-lg text-xs focus:border-brand-500 outline-none';
-            const fixed = s => `<div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-xs">
+            const fixed = s => `<div class="flex flex-wrap items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-xs">
                 <span class="w-2.5 h-2.5 rounded-full ${s.id === 'new' ? 'bg-slate-400' : 'bg-emerald-500'}"></span>
                 <input value="${escapeHtml(s.name)}" maxlength="60" aria-label="Name of the ${s.id === 'new' ? 'first' : 'last'} stage" oninput="wfSetName('${s.id}', this.value)" class="${input} w-40 font-bold">
                 <span class="text-slate-400">(fixed ${s.id === 'new' ? 'first stage · Planned' : 'last stage · Done'})</span><span class="ml-auto text-slate-500">0 · 0%</span></div>`;
@@ -9975,6 +10020,10 @@
             if (!menu) return;
             applyRoleUI();
             menu.classList.remove('hidden');
+            // 2.14.2: on a very narrow screen the chip sits left of the edge; keep the menu on screen
+            menu.style.right = '';
+            const left = menu.getBoundingClientRect().left;
+            if (left < 8) menu.style.right = `${left - 8}px`;
             document.getElementById('header-user-badge')?.setAttribute('aria-expanded', 'true');
             accountMenuItems()[0]?.focus();
         };
