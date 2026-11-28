@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.15.0" data-released="2026-11-28">
+    <meta name="mapit-version" content="2.15.1" data-released="2026-11-28">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -7239,7 +7239,7 @@
         // For you entries are written in the same batch as the change (notify); after the batch saves, the relay
         // (a Google Apps Script web app, firebase/email-relay.gs) reads each entry from Firestore and emails it once.
         // Empty URL = email off for everyone (no switch, no calls).
-        let EMAIL_RELAY_URL = '';
+        let EMAIL_RELAY_URL = 'https://script.google.com/macros/s/AKfycbxJJwLOoFEgLn1PZ5LdJTvhh0c4sp9LVqS-eK8WL9iTNfZHMIzyfCgCz-bT9zToldN3/exec';
         let relayIdToken = () => auth?.currentUser?.getIdToken?.();
         let batchMail = null;   // entries written by the batch being built
         function notify(batch, to, kind, target, text, extra = {}) {
