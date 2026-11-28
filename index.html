@@ -23,7 +23,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://inventi-arkin.github.io/mapit/icons/og-image.png">
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.17.0" data-released="2026-11-28">
+    <meta name="mapit-version" content="2.18.0" data-released="2026-11-28">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -140,6 +140,11 @@
             .list-row .lr-state { grid-area: status; } .list-row .lr-stage { grid-area: stage; } .list-row .lr-module { grid-area: module; }
             .list-row .lr-effort { grid-area: effort; } .list-row .lr-chips { grid-area: chips; overflow: hidden; } .list-row .lr-people { grid-area: people; }
         }
+        /* 2.18.0 Ask MapIt: the waiting dots */
+        .assist-dots span { width: 6px; height: 6px; border-radius: 9999px; background: #94a3b8; animation: assist-dot 1.2s infinite; }
+        .assist-dots span:nth-child(2) { animation-delay: .15s; } .assist-dots span:nth-child(3) { animation-delay: .3s; }
+        @keyframes assist-dot { 0%, 80%, 100% { opacity: .3; } 40% { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) { .assist-dots span { animation: none; } }
         /* "+N": details that didn't fit (hover / screen readers: what they are) */
         .fit-more { display: inline-flex; align-items: center; height: 1.125rem; padding: 0 .35rem; border-radius: 9999px; font-size: 10px; font-weight: 700; background: #f1f5f9; color: #475569; border: 1px dashed #94a3b8; white-space: nowrap; cursor: help; }
         /* 2.14.1 phones: no zoom on focus, no sideways page, bar above the home indicator */
@@ -328,6 +333,8 @@
 
         <!-- Right side (2.11.0): Activity bell + account. New roadmap is in the roadmap dropdown -->
         <div class="flex items-center gap-2">
+            <!-- 2.18.0 Ask MapIt (Editors and Admins, when the Admins switch it on) -->
+            <button type="button" id="assist-btn" onclick="toggleAssist()" aria-haspopup="dialog" aria-expanded="false" aria-controls="assist-view" title="Ask MapIt (/)" class="hidden h-8 px-2 lg:px-2.5 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"><span aria-hidden="true">✨</span><span class="hidden lg:inline">Ask</span><span class="sr-only lg:hidden">Ask MapIt</span></button>
             <button type="button" id="activity-bell" onclick="toggleActivityPanel()" aria-label="Activity" aria-haspopup="dialog" aria-expanded="false" aria-controls="activity-view" title="Activity"
                 class="relative w-8 h-8 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300">
                 <i class="ph-bold ph-bell text-base" aria-hidden="true"></i>
@@ -376,6 +383,9 @@
                     </button>
                     <button type="button" role="menuitem" id="positions-btn" onclick="closeAccountMenu(); openPositionsWindow()" class="admin-only w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-identification-badge text-base text-indigo-600" aria-hidden="true"></i> Positions…
+                    </button>
+                    <button type="button" role="menuitem" id="assistant-settings-btn" onclick="openAssistSettings()" class="hidden w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
+                        <span class="text-base w-4 text-center" aria-hidden="true">✨</span> Assistant…
                     </button>
                     <button type="button" role="menuitem" id="workflow-btn" onclick="openWorkflowSettings()" class="hidden w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-flow-arrow text-base text-indigo-600" aria-hidden="true"></i> Workflow
@@ -617,6 +627,62 @@
     </main>
 
     <!-- Activity panel (2.11.0, D-2): opened from the bell; Editors + Admins -->
+    <!-- 2.18.0 Ask MapIt (specs/ai-assistant.md, design/ai-assistant.md D-2 / D-4): a right panel; a bottom sheet on phones -->
+    <div id="assist-view" role="dialog" aria-modal="true" aria-labelledby="assist-title" class="hidden fixed inset-0 z-[56] bg-slate-900/20 items-end sm:items-stretch justify-end" onclick="if (event.target === this) closeAssist()">
+        <section class="w-full h-[90%] sm:h-full sm:w-[25rem] bg-white rounded-t-2xl sm:rounded-none sm:border-l border-slate-200 shadow-2xl flex flex-col min-h-0">
+            <div class="sm:hidden mx-auto mt-2 w-10 h-1 rounded-full bg-slate-300" aria-hidden="true"></div>
+            <header class="h-14 shrink-0 flex items-center gap-2 px-4 border-b border-slate-100">
+                <h2 id="assist-title" class="text-sm font-black text-slate-900 flex items-center gap-1.5"><span aria-hidden="true">✨</span>Ask MapIt</h2>
+                <div id="assist-scope" role="group" aria-label="What to ask about" class="ml-1 inline-flex rounded-lg bg-slate-100 p-0.5 text-[11px] font-semibold">
+                    <button type="button" data-scope="this" onclick="setAssistScope('this')" class="px-2 py-0.5 rounded-md">This roadmap</button>
+                    <button type="button" data-scope="all" onclick="setAssistScope('all')" class="px-2 py-0.5 rounded-md">All roadmaps</button>
+                </div>
+                <button type="button" onclick="newAssistChat()" title="New chat" aria-label="New chat" class="ml-auto p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><i class="ph-bold ph-note-pencil" aria-hidden="true"></i></button>
+                <button type="button" onclick="closeAssist()" data-dialog-close aria-label="Close" class="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><i class="ph-bold ph-x" aria-hidden="true"></i></button>
+            </header>
+            <div id="assist-log" role="log" aria-live="polite" class="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 space-y-4"></div>
+            <div class="shrink-0 border-t border-slate-100 p-3 pb-[calc(.75rem+env(safe-area-inset-bottom))]">
+                <div class="flex items-end gap-2">
+                    <textarea id="assist-input" rows="1" maxlength="2000" aria-label="Ask about this roadmap" placeholder="Ask about this roadmap…" oninput="this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 96) + 'px'" onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendAssist(); }" class="flex-1 resize-none px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-brand-500"></textarea>
+                    <button type="button" id="assist-send" onclick="sendAssist()" aria-label="Send" class="ctl ctl-primary h-9"><i class="ph-bold ph-arrow-up" aria-hidden="true"></i></button>
+                </div>
+                <p id="assist-count" class="text-[10px] mt-1 text-slate-400"></p>
+            </div>
+        </section>
+    </div>
+
+    <!-- 2.18.0 Assistant settings (Admins, design D-5) -->
+    <div id="assist-settings-modal" role="dialog" aria-modal="true" aria-labelledby="assist-settings-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4">
+        <div class="bg-white sm:rounded-2xl sm:max-w-md w-full h-full sm:h-auto sm:max-h-[90vh] border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
+                <h3 id="assist-settings-title" class="text-sm font-black text-slate-900 flex items-center gap-2"><span aria-hidden="true">✨</span>Assistant</h3>
+                <button type="button" onclick="closeAssistSettings()" data-dialog-close aria-label="Close" class="text-slate-500 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100"><i class="ph-bold ph-x text-base"></i></button>
+            </div>
+            <div class="p-5 space-y-4 text-xs overflow-y-auto custom-scrollbar flex-1">
+                <button type="button" id="assist-enabled" role="switch" aria-checked="false" onclick="this.setAttribute('aria-checked', String(this.getAttribute('aria-checked') !== 'true'))" class="sw w-full justify-between">
+                    <span class="label">Assistant for Editors and Admins</span><span class="track" aria-hidden="true"><span class="knob"></span></span>
+                </button>
+                <fieldset>
+                    <legend class="block text-[11px] font-bold text-slate-600 mb-1">Provider</legend>
+                    <div id="assist-providers" class="space-y-1.5"></div>
+                </fieldset>
+                <div>
+                    <label for="assist-model" class="block text-[11px] font-bold text-slate-600 mb-1">Model</label>
+                    <select id="assist-model" onchange="document.getElementById('assist-model-other').classList.toggle('hidden', this.value !== '__other')" class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white"></select>
+                    <input id="assist-model-other" type="text" maxlength="100" placeholder="Model id, e.g. as listed by the provider" aria-label="Other model id" class="hidden mt-1.5 w-full px-3 py-2 border border-slate-200 rounded-lg">
+                </div>
+                <label class="flex items-center gap-2 font-semibold text-slate-700">Daily questions per person <input id="assist-cap" type="number" min="1" max="500" step="1" class="w-20 px-2 py-1 border border-slate-200 rounded-lg text-right"></label>
+                <div class="flex items-center gap-2"><button type="button" onclick="testAssist()" class="ctl ctl-quiet">Test</button><span id="assist-test-result" class="text-[11px] font-semibold"></span></div>
+                <p class="text-[10px] text-slate-400">Keys are set in the relay script (see firebase/AI-SETUP.md). Questions and the roadmap data people can see are sent to the chosen provider; use a paid tier.</p>
+                <p id="assist-settings-error" class="hidden text-[11px] font-semibold text-rose-600" role="alert"></p>
+            </div>
+            <div class="px-5 py-3 border-t border-slate-100 flex justify-end gap-2 shrink-0">
+                <button type="button" onclick="closeAssistSettings()" class="ctl ctl-quiet">Cancel</button>
+                <button type="button" onclick="saveAssistSettings()" class="ctl ctl-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
     <div id="activity-view" role="dialog" aria-modal="true" aria-labelledby="activity-panel-title" class="hidden fixed inset-0 z-[55] bg-slate-900/20 justify-end">
         <section class="h-full w-full sm:w-[28rem] bg-white sm:border-l border-slate-200 shadow-2xl flex flex-col min-h-0">
             <header class="h-14 shrink-0 flex items-center gap-2 px-4 border-b border-slate-100">
@@ -1687,6 +1753,7 @@
         let currentView = 'roadmap';
         window.openActivityPanel = function() {
             if (!activityView || !currentUser) return;
+            closeAssist();   // 2.18.0: the two panels share the right edge
             closeAccountMenu();
             closeRoadmapMenu();
             activityView.classList.remove('hidden');
@@ -4770,7 +4837,7 @@
         // The current shown name for someone on a saved record (comments, bell, Activity, History); "System (via …)" stays
         function liveName(by) {
             if (!by?.email || /^System \(via /.test(by.name || '')) return by?.name || '';
-            return personOf(by).name;
+            return personOf(by).name + (by.via === 'assistant' ? ' via assistant' : '');
         }
         function avatarHtml(ref, role, size = 'md') {
             const p = personOf(ref);
@@ -7338,7 +7405,9 @@
         function myEmail() { return (currentUser?.email || '').toLowerCase(); }
         function actor() {
             const email = myEmail();
-            return { name: (peopleDir.get(email)?.name) || currentUser?.displayName || email.split('@')[0] || 'Workspace Member', email };
+            const a = { name: (peopleDir.get(email)?.name) || currentUser?.displayName || email.split('@')[0] || 'Workspace Member', email };
+            if (actorVia) a.via = actorVia;   // 2.18.0: changes applied from Ask MapIt
+            return a;
         }
         function canEdit() { return myRole === 'admin' || myRole === 'editor'; }
         function isAdmin() { return myRole === 'admin'; }
@@ -8067,6 +8136,7 @@
             sessionUnsubs.push(onSnapshot(wsRef('members', myEmail()), onMyMemberChanged, onListenerError));
             sessionUnsubs.push(onSnapshot(wsRef('settings', 'sprints'), onSprintsSnapshot, err => console.warn('Sprint calendar unavailable:', err)));
             sessionUnsubs.push(onSnapshot(wsRef('settings', 'positions'), onPositionsSnapshot, err => console.warn('Positions unavailable:', err)));
+            sessionUnsubs.push(onSnapshot(wsRef('settings', 'assistant'), onAssistantSnapshot, err => console.warn('Assistant settings unavailable:', err)));
             watchForYou();
             sessionUnsubs.push(() => stopForYou());
             sessionUnsubs.push(onSnapshot(wsCollection('people'), onPeopleSnapshot, err => console.warn('People directory unavailable:', err)));
@@ -10380,6 +10450,317 @@
             setTimeout(() => { openAccountMenu(); document.getElementById('email-notify-btn')?.focus(); }, 0);
         };
         // =======================================================
+        // ASK MAPIT (2.18.0, specs/ai-assistant.md, design/ai-assistant.md)
+        // The page never holds an AI key: questions go to the relay (EMAIL_RELAY_URL), which checks the sign-in and role,
+        // reads what you may see, asks the provider the Admins chose (settings/assistant) and returns { text, changes }.
+        // Changes are applied here, as you, only after Apply (normal rules + audit, "via assistant").
+        // =======================================================
+        let assistCfg = { enabled: false, provider: 'gemini', model: '', dailyCap: 30 };
+        let assistMsgs = [], assistBusy = false, assistScope = 'this', assistUsed = null, assistCap = null, assistRefs = {}, assistStatusCache = null;
+        let actorVia = null;   // set while applying assistant changes: saved records say "via assistant"
+        const ASSIST_SUGGESTIONS = ["What's at risk this month?", "Who's over capacity?", 'Summarise the current sprint', 'What changed this week?'];
+        function onAssistantSnapshot(snap) {
+            const d = snap.exists() ? snap.data() : {};
+            assistCfg = { enabled: d.enabled === true, provider: d.provider === 'anthropic' ? 'anthropic' : 'gemini', model: String(d.model || ''), dailyCap: Number(d.dailyCap) || 30 };
+            renderAssistButton();
+        }
+        const assistAvailable = () => !!EMAIL_RELAY_URL && useCloudPersistence && canEdit() && assistCfg.enabled && !!assistCfg.model;
+        function renderAssistButton() {
+            document.getElementById('assist-btn')?.classList.toggle('hidden', !assistAvailable());
+            document.getElementById('assistant-settings-btn')?.classList.toggle('hidden', !isAdmin() || !EMAIL_RELAY_URL);
+            if (!assistAvailable() && assistOpen()) closeAssist();
+        }
+        async function relayCall(body) {
+            const idToken = await relayIdToken();
+            if (!idToken) throw new Error('not signed in');
+            const res = await fetch(EMAIL_RELAY_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...body, idToken }) });
+            if (!res.ok) throw new Error('relay ' + res.status);
+            return res.json();
+        }
+        const assistOpen = () => !document.getElementById('assist-view')?.classList.contains('hidden');
+        window.openAssist = function() {
+            if (!assistAvailable()) return;
+            closeActivityPanel(false, false);
+            closeAccountMenu();
+            const v = document.getElementById('assist-view');
+            v.classList.remove('hidden'); v.classList.add('flex');
+            document.getElementById('assist-btn')?.setAttribute('aria-expanded', 'true');
+            document.body.classList.add('overflow-hidden');
+            renderAssist();
+            setTimeout(() => document.getElementById('assist-input')?.focus(), 60);   // after the dialog helper focuses the first control
+            relayCall({ action: 'assistStatus' }).then(r => { if (r?.ok) { assistUsed = r.used; assistCap = r.cap; renderAssistCount(); } }).catch(() => {});
+        };
+        window.closeAssist = function() {
+            const v = document.getElementById('assist-view');
+            if (!v || v.classList.contains('hidden')) return;
+            v.classList.add('hidden'); v.classList.remove('flex');
+            document.getElementById('assist-btn')?.setAttribute('aria-expanded', 'false');
+            document.body.classList.remove('overflow-hidden');
+        };
+        window.toggleAssist = function() { if (assistOpen()) closeAssist(); else openAssist(); };
+        window.setAssistScope = function(scope) { assistScope = scope === 'all' ? 'all' : 'this'; renderAssist(); };
+        window.newAssistChat = function() { assistMsgs = []; assistRefs = {}; renderAssist(); document.getElementById('assist-input')?.focus(); };
+        function renderAssistCount() {
+            const el = document.getElementById('assist-count');
+            if (!el) return;
+            el.textContent = assistUsed == null ? '' : `${assistUsed} of ${assistCap} today`;
+            el.classList.toggle('text-amber-600', assistUsed != null && assistCap - assistUsed <= 5);
+            el.classList.toggle('font-semibold', assistUsed != null && assistCap - assistUsed <= 5);
+        }
+        // Answers: plain text with **bold**, "- " lists and [[kind:path]] references as item chips
+        function assistAnswerHtml(text) {
+            const chip = ref => {
+                const label = assistRefs[ref];
+                if (!label) return escapeHtml(ref.replace(/^[a-z]+:/, ''));
+                const icon = ref.startsWith('task:') ? 'ph-check-square' : ref.startsWith('feedback:') ? 'ph-chat-centered-text' : 'ph-cube';
+                return `<button type="button" class="assist-ref inline-flex items-center gap-1 max-w-full align-baseline px-1.5 rounded-md bg-brand-50 border border-brand-200 text-brand-700 font-semibold text-[11px] hover:bg-brand-100" data-ref="${escapeHtml(ref)}" onclick="openAssistRef(this.dataset.ref)"><i class="ph ${icon}" aria-hidden="true"></i><span class="truncate">${escapeHtml(label)}</span></button>`;
+            };
+            const inline = s => escapeHtml(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\[\[([a-z]+:[A-Za-z0-9_\/-]+)\]\]/g, (m, ref) => chip(ref));
+            const out = [];
+            let list = [];
+            const flush = () => { if (list.length) { out.push(`<ul class="list-disc pl-4 space-y-1">${list.map(li => `<li>${inline(li)}</li>`).join('')}</ul>`); list = []; } };
+            String(text || '').split('\n').forEach(line => {
+                const m = line.match(/^\s*[-*•]\s+(.*)$/);
+                if (m) { list.push(m[1]); return; }
+                flush();
+                if (line.trim()) out.push(`<p>${inline(line)}</p>`);
+            });
+            flush();
+            return out.join('');
+        }
+        window.openAssistRef = function(ref) {
+            const [kind, path] = ref.split(':'), parts = (path || '').split('/');
+            if (kind === 'deliverable') openItemOn(parts[0], parts[1], 'details');
+            else if (kind === 'task') openItemOn(parts[0], parts[1], 'tasks', parts[2]);
+            else if (kind === 'feedback') { if (getActiveRoadmap()?.id !== parts[0]) selectRoadmap(parts[0]); switchView('feedback'); openFeedbackPanel(parts[1]); }
+            if (window.matchMedia('(max-width: 639px)').matches) closeAssist();
+        };
+        function assistChangeCardHtml(m, i) {
+            const icon = c => c.field === 'date' || c.field === 'sprintId' ? 'ph-arrow-right' : c.field === 'owner' || c.field === 'assignee' ? 'ph-user' : 'ph-pencil-simple';
+            const FIELD = { date: 'Target month', owner: 'Owner', effortDays: 'Effort', status: 'Status', assignee: 'Assignee', sprintId: 'Sprint', estimateDays: 'Estimate' };
+            const done = m.applied;
+            return `<div class="assist-changes mt-2 rounded-xl border border-slate-200 bg-white overflow-hidden" data-msg="${i}">
+                <div class="px-3 py-2 bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-700 flex items-center gap-1.5"><i class="ph-bold ph-list-checks text-brand-600" aria-hidden="true"></i>Proposed changes</div>
+                ${m.changes.map((c, j) => `<label class="flex items-start gap-2 px-3 py-2 border-b border-slate-50 text-xs">
+                    <input type="checkbox" class="assist-change mt-0.5" data-j="${j}" ${c.skip ? '' : 'checked'} ${done ? 'disabled' : ''} onchange="assistSkip(${i}, ${j}, !this.checked)">
+                    <i class="ph ${icon(c)} text-slate-500 mt-0.5" aria-hidden="true"></i>
+                    <span class="flex-1 min-w-0"><span class="inline-flex max-w-full px-1.5 rounded-md bg-brand-50 border border-brand-200 text-brand-700 font-semibold text-[11px]"><span class="truncate">${escapeHtml(c.label || c.ref)}</span></span>
+                    <span class="block text-[11px] text-slate-600 mt-0.5">${FIELD[c.field] || c.field}: <s class="text-slate-400">${escapeHtml(c.before)}</s> → <b>${escapeHtml(c.after)}</b></span>${c.result ? `<span class="block text-[11px] font-semibold ${c.result === 'ok' ? 'text-emerald-700' : 'text-rose-600'}">${c.result === 'ok' ? '✓ Applied' : '✕ ' + escapeHtml(c.result)}</span>` : ''}</span>
+                </label>`).join('')}
+                <div class="px-3 py-2 flex flex-wrap items-center gap-2">${done
+                    ? `<span class="text-xs font-semibold text-emerald-700">${escapeHtml(done)}</span>`
+                    : `<button type="button" class="ctl ctl-primary max-sm:flex-1 max-sm:justify-center" onclick="applyAssistChanges(${i})">Apply changes</button><button type="button" class="ctl ctl-quiet max-sm:flex-1 max-sm:justify-center" onclick="assistCancel(${i})">Cancel</button>`}
+                    <span class="w-full text-[10px] text-slate-400">Saved as you · shown in History as <i>via assistant</i></span></div>
+            </div>`;
+        }
+        function renderAssist() {
+            const log = document.getElementById('assist-log');
+            if (!log) return;
+            document.querySelectorAll('#assist-scope [data-scope]').forEach(b => { const on = b.dataset.scope === assistScope; b.setAttribute('aria-pressed', String(on)); b.className = `px-2 py-0.5 rounded-md ${on ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`; });
+            const input = document.getElementById('assist-input');
+            if (input) input.placeholder = assistScope === 'all' ? 'Ask about all roadmaps…' : 'Ask about this roadmap…';
+            const who = `<span class="w-6 h-6 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-600 text-white inline-flex items-center justify-center text-[11px] shrink-0" aria-hidden="true">✨</span>`;
+            log.innerHTML = (assistMsgs.length ? assistMsgs.map((m, i) => m.role === 'user'
+                ? `<div class="flex justify-end"><div class="assist-q max-w-[85%] bg-brand-600 text-white text-xs rounded-2xl rounded-br-md px-3 py-2 whitespace-pre-wrap break-words">${escapeHtml(m.text)}</div></div>`
+                : m.error
+                    ? `<div class="flex gap-2">${who}<div class="assist-error flex-1 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-600">${escapeHtml(m.error)}${m.retry ? ` <button type="button" onclick="retryAssist(${i})" class="ml-1 font-semibold text-brand-700 hover:underline">Retry</button>` : ''}</div></div>`
+                    : `<div class="flex gap-2">${who}<div class="assist-a flex-1 min-w-0 text-xs text-slate-800 leading-relaxed space-y-1.5 break-words">${assistAnswerHtml(m.text)}${m.changes?.length ? assistChangeCardHtml(m, i) : ''}${m.dropped ? `<p class="text-[11px] text-slate-500">${pluralize(m.dropped, 'suggested change')} left out (not something the assistant can change, or not valid).</p>` : ''}
+                        <p class="mt-1.5 text-[10px] text-slate-400 flex items-start gap-2"><span>${escapeHtml(m.via || '')} · ${m.scope === 'all' ? 'All roadmaps' : 'This roadmap'} · AI can be wrong. Check before acting</span><button type="button" onclick="copyAssist(${i})" class="ml-auto shrink-0 hover:text-slate-600"><i class="ph ph-copy" aria-hidden="true"></i> Copy</button></p></div></div>`).join('')
+                : `<div class="text-center pt-6"><p class="text-xs text-slate-500 px-4">Ask about deliverables, sprints, people and feedback. Answers use only what you can see.</p>
+                    <div class="assist-suggestions mt-4 flex flex-nowrap sm:flex-wrap sm:justify-center overflow-x-auto gap-1.5 px-1 pb-1">${ASSIST_SUGGESTIONS.map(q => `<button type="button" onclick="sendAssist(this.textContent)" class="shrink-0 px-2.5 py-1.5 rounded-full border border-slate-200 bg-white text-[11px] font-semibold text-slate-700 hover:border-brand-300">${escapeHtml(q)}</button>`).join('')}</div></div>`)
+                + (assistBusy ? `<div class="assist-thinking flex gap-2 items-center text-xs text-slate-500">${who}<span class="assist-dots inline-flex gap-1" aria-hidden="true"><span></span><span></span><span></span></span><span id="assist-thinking-text">Thinking…</span></div>` : '');
+            log.scrollTop = log.scrollHeight;
+            const send = document.getElementById('assist-send');
+            if (send) send.disabled = assistBusy;
+            renderAssistCount();
+        }
+        const ASSIST_ERRORS = { busy: 'The assistant is busy. Try again in a minute.', limit: "You've reached today's questions.", refused: "The assistant couldn't help with that.", off: 'The assistant is switched off.', 'no key': "The assistant isn't set up yet.", 'not allowed': 'The assistant is for Editors and Admins.', 'no roadmap': 'That roadmap is no longer available.' };
+        window.sendAssist = async function(text) {
+            const input = document.getElementById('assist-input');
+            const question = String(text ?? input?.value ?? '').trim();
+            if (!question || assistBusy) return;
+            if (input && text == null) { input.value = ''; input.style.height = 'auto'; }
+            const history = assistMsgs.filter(m => !m.error && m.text).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', text: m.text })).slice(-10);
+            assistMsgs.push({ role: 'user', text: question });
+            assistBusy = true;
+            renderAssist();
+            const slow = setTimeout(() => { const t = document.getElementById('assist-thinking-text'); if (t) t.textContent = 'Still thinking (big question)…'; }, 20000);
+            let r;
+            try { r = await relayCall({ action: 'assist', question, history, scope: assistScope, roadmapId: getActiveRoadmap()?.id || '' }); }
+            catch (e) { r = { ok: false, error: 'busy' }; }
+            clearTimeout(slow);
+            assistBusy = false;
+            if (r.used != null) { assistUsed = r.used; assistCap = r.cap; }
+            if (r.ok) {
+                Object.assign(assistRefs, r.refs || {});
+                assistMsgs.push({ role: 'assistant', text: r.text || '', changes: (r.changes || []).map(c => ({ ...c })), dropped: r.dropped || 0, scope: assistScope, via: r.provider === 'anthropic' ? 'Claude' : 'Google Gemini' });
+            } else {
+                assistMsgs.push({ role: 'assistant', error: r.error === 'limit' ? `You've reached today's ${r.cap} questions.` : (ASSIST_ERRORS[r.error] || ASSIST_ERRORS.busy), retry: r.error === 'busy', question });
+            }
+            renderAssist();
+        };
+        window.retryAssist = function(i) {
+            const m = assistMsgs[i];
+            if (!m?.question) return;
+            assistMsgs.splice(i - 1, 2);   // the question and its error
+            sendAssist(m.question);
+        };
+        window.copyAssist = function(i) {
+            const t = String(assistMsgs[i]?.text || '').replace(/\[\[([a-z]+:[^\]]+)\]\]/g, (m, ref) => assistRefs[ref] || ref);
+            navigator.clipboard?.writeText(t).then(() => showSaveStatus('info', 'Copied'), () => {});
+        };
+
+        // ---- Applying proposed changes (A-4): as you, through the normal saves, "via assistant" ----
+        window.assistSkip = function(i, j, skip) { const c = assistMsgs[i]?.changes?.[j]; if (c) c.skip = skip; };
+        window.assistCancel = function(i) { if (assistMsgs[i] && !assistMsgs[i].applied) { assistMsgs[i].applied = 'Cancelled'; renderAssist(); } };
+        window.applyAssistChanges = async function(i) {
+            const m = assistMsgs[i];
+            if (!m || m.applied || !canEdit()) return;
+            const picked = m.changes.filter(c => !c.skip);
+            if (!picked.length) { m.applied = 'Nothing selected'; renderAssist(); return; }
+            m.applied = 'Applying…';
+            renderAssist();
+            actorVia = 'assistant';
+            try {
+                for (const c of picked.filter(c => c.kind === 'deliverable')) c.result = await applyDeliverableChange(c);
+                const byItem = new Map();
+                picked.filter(c => c.kind === 'task').forEach(c => { const k = c.roadmapId + '/' + c.id; if (!byItem.has(k)) byItem.set(k, []); byItem.get(k).push(c); });
+                for (const list of byItem.values()) { const res = await applyTaskChanges(list); list.forEach(c => { c.result = res; }); }
+            } finally { actorVia = null; }
+            const ok = picked.filter(c => c.result === 'ok').length, bad = picked.length - ok;
+            m.applied = bad ? `✓ ${ok} applied · ✕ ${bad} failed` : `✓ Applied ${pluralize(ok, 'change')}`;
+            renderAssist();
+        };
+        async function applyDeliverableChange(c) {
+            const roadmap = roadmaps.find(r => r.id === c.roadmapId && !r.deletedAt);
+            const item = roadmap?.items?.find(x => x.id === c.id);
+            if (!item) return 'deliverable no longer exists';
+            const updates = {}, changes = [];
+            if (c.field === 'date') {
+                updates.date = c.value;
+                changes.push({ f: 'date', from: clip(item.date || ''), to: clip(c.value) });
+                if ((roadmap.items || []).every(hasKey) || await ensureRanked(roadmap)) {
+                    const from = rankOf(roadmap, item.id);
+                    const probe = { ...item, date: c.value };
+                    const target = await keyForIndex(roadmap, item, monthEndIndex(roadmap, probe, c.value));
+                    if (target && target.to !== from) { updates.rankKey = target.key; changes.push({ f: 'rank', from, to: target.to }); }
+                }
+            } else if (c.field === 'owner') {
+                updates.owner = c.value ? personRef(c.value) : null;
+                changes.push(...peopleChanges({ owner: item.owner, team: item.team }, { owner: updates.owner, team: item.team || [] }));
+            } else if (c.field === 'effortDays') {
+                updates.effortDays = c.value === '' ? null : Number(c.value);
+                changes.push({ f: 'effortDays', from: item.effortDays ? String(item.effortDays) : '—', to: c.value || '—' });
+            } else return 'not supported';
+            const ok = await updateMilestone(roadmap, item, updates, changes);
+            return ok ? 'ok' : 'not saved';
+        }
+        // One deliverable's task changes in one save: tasks, the deliverable's sprint chips, the audit entry, the assignee's bell
+        async function applyTaskChanges(list) {
+            const roadmap = roadmaps.find(r => r.id === list[0].roadmapId && !r.deletedAt);
+            const item = roadmap?.items?.find(x => x.id === list[0].id);
+            if (!item) return 'deliverable no longer exists';
+            let tasks;
+            try { tasks = (await getDocs(wsCollection('roadmaps', roadmap.id, 'milestones', item.id, 'tasks'))).docs.map(d => ({ ...d.data(), id: d.id })); }
+            catch (e) { return 'could not read the tasks'; }
+            const ops = [], changes = [], assigned = [];
+            for (const c of list) {
+                const t = tasks.find(x => x.id === c.taskId && !x.deletedAt);
+                if (!t) return 'task no longer exists';
+                const data = {};
+                if (c.field === 'status') { data.status = c.value; data.doneAt = c.value === 'done' ? serverTimestamp() : null; changes.push({ f: 'taskStatus', task: taskLabel(t), from: TASK_STATUS[t.status]?.[0] || t.status, to: TASK_STATUS[c.value]?.[0] || c.value }); }
+                else if (c.field === 'assignee') { data.assignee = c.value ? personRef(c.value) : null; changes.push({ f: 'taskAssignee', task: taskLabel(t), to: data.assignee ? data.assignee.name : '—' }); if (data.assignee) assigned.push({ t, email: c.value }); }
+                else if (c.field === 'sprintId') { data.sprintId = c.value || null; changes.push({ f: 'taskSprint', task: taskLabel(t), to: c.after }); }
+                else if (c.field === 'estimateDays') { data.estimateDays = c.value === '' ? null : Number(c.value); changes.push({ f: 'taskEstimate', task: taskLabel(t), to: c.value ? fmtDays(Number(c.value)) : '—' }); }
+                else return 'not supported';
+                Object.assign(t, data);
+                ops.push({ id: t.id, data });
+            }
+            const sprintIds = [...new Set(tasks.filter(t => !t.deletedAt && t.sprintId).map(t => t.sprintId))].sort();
+            const entry = auditEntry(roadmap, 'task.updated', { type: 'milestone', id: item.id, label: item.name }, changes);
+            const aid = newId('a');
+            const ok = await commitBatch(batch => {
+                ops.forEach(op => batch.update(wsRef('roadmaps', roadmap.id, 'milestones', item.id, 'tasks', op.id), { ...op.data, ...stamp(aid) }));
+                if (!sameIds(sprintIds, item.sprintIds)) batch.update(itemRef(roadmap.id, 'milestones', item.id), { sprintIds, ...stamp(aid) });
+                batch.set(auditRef(aid), entry);
+                assigned.forEach(({ t, email }) => notify(batch, email, 'assigned', { type: 'milestone', id: item.id, label: clip(item.name, 200), roadmapId: roadmap.id, taskId: t.id }, t.title, { detail: taskDetailLine(t) }));
+            }, 'apply the changes');
+            if (ok && taskState.mid === item.id) renderTaskPanels();
+            return ok ? 'ok' : 'not saved';
+        }
+
+        // ---- Assistant settings (Admins, D-5) ----
+        window.openAssistSettings = async function() {
+            if (!isAdmin()) return;
+            closeAccountMenu();
+            document.getElementById('assist-enabled').setAttribute('aria-checked', String(assistCfg.enabled));
+            document.getElementById('assist-cap').value = String(assistCfg.dailyCap || 30);
+            document.getElementById('assist-test-result').textContent = '';
+            document.getElementById('assist-settings-error').classList.add('hidden');
+            assistStatusCache = null;
+            renderAssistSettings(assistCfg.provider);
+            document.getElementById('assist-settings-modal').classList.remove('hidden');
+            try { const r = await relayCall({ action: 'assistStatus' }); if (r?.ok) { assistStatusCache = r; renderAssistSettings(document.querySelector('input[name="assist-provider"]:checked')?.value || assistCfg.provider); } }
+            catch (e) { document.getElementById('assist-test-result').textContent = "Couldn't reach the relay."; }
+        };
+        window.closeAssistSettings = function() { document.getElementById('assist-settings-modal')?.classList.add('hidden'); };
+        window.pickAssistProvider = function(p) { renderAssistSettings(p); };
+        function renderAssistSettings(provider) {
+            const keys = assistStatusCache?.keys;
+            const pill = p => !keys ? '<span class="text-[10px] text-slate-400">Checking…</span>' : keys[p] ? '<span class="text-[10px] font-bold px-1.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Key set ✓</span>' : '<span class="text-[10px] font-bold px-1.5 rounded bg-slate-100 text-slate-500 border border-slate-200">No key yet</span>';
+            document.getElementById('assist-providers').innerHTML = [['gemini', 'Google Gemini'], ['anthropic', 'Anthropic Claude']].map(([id, label]) => `<label class="flex items-center gap-2 p-2 rounded-lg border ${provider === id ? 'border-brand-300 bg-brand-50' : 'border-slate-200'} cursor-pointer"><input type="radio" name="assist-provider" value="${id}" ${provider === id ? 'checked' : ''} onchange="pickAssistProvider(this.value)"> ${label} <span class="ml-auto">${pill(id)}</span></label>`).join('');
+            const models = (assistStatusCache?.models?.[provider] || []).map(m => typeof m === 'string' ? { id: m, label: m } : m);
+            const current = provider === assistCfg.provider ? assistCfg.model : '';
+            const inList = models.some(m => m.id === current);
+            const sel = document.getElementById('assist-model');
+            sel.innerHTML = (models.length ? '' : `<option value="">${assistStatusCache ? 'No models listed' : 'Loading models…'}</option>`) + models.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === current ? 'selected' : ''}>${escapeHtml(m.label)}${m.label !== m.id ? ` (${escapeHtml(m.id)})` : ''}</option>`).join('') + `<option value="__other" ${current && !inList ? 'selected' : ''}>Other… (type a model id)</option>`;
+            const other = document.getElementById('assist-model-other');
+            other.value = current && !inList ? current : '';
+            other.classList.toggle('hidden', sel.value !== '__other');
+        }
+        function assistSettingsDraft() {
+            const provider = document.querySelector('input[name="assist-provider"]:checked')?.value || 'gemini';
+            const sel = document.getElementById('assist-model').value;
+            const model = (sel === '__other' ? document.getElementById('assist-model-other').value : sel).trim();
+            return { enabled: document.getElementById('assist-enabled').getAttribute('aria-checked') === 'true', provider, model, dailyCap: Math.round(Number(document.getElementById('assist-cap').value)) };
+        }
+        window.testAssist = async function() {
+            const d = assistSettingsDraft(), out = document.getElementById('assist-test-result');
+            out.className = 'text-[11px] font-semibold text-slate-500'; out.textContent = 'Testing…';
+            let r;
+            try { r = await relayCall({ action: 'assistTest', provider: d.provider, model: d.model }); } catch (e) { r = { ok: false, error: 'busy' }; }
+            const name = d.provider === 'anthropic' ? 'Claude' : 'Google Gemini';
+            out.className = `text-[11px] font-semibold ${r.ok ? 'text-emerald-700' : 'text-rose-600'}`;
+            out.textContent = r.ok ? `✓ ${name} answered in ${(r.ms / 1000).toFixed(1)} s` : r.error === 'no key' ? `No key for ${name} yet. Add it in the relay (see setup).` : r.error === 'no model' ? 'Pick a model first.' : `✕ ${name} didn't answer (${r.error}).`;
+        };
+        window.saveAssistSettings = async function() {
+            const d = assistSettingsDraft(), err = document.getElementById('assist-settings-error');
+            const fail = msg => { err.textContent = msg; err.classList.remove('hidden'); };
+            if (d.enabled && !d.model) return fail('Pick a model (or switch the assistant off).');
+            if (!(d.dailyCap >= 1 && d.dailyCap <= 500)) return fail('Daily questions: 1 to 500.');
+            if (d.enabled && assistStatusCache?.keys && !assistStatusCache.keys[d.provider]) return fail(`No key for ${d.provider === 'anthropic' ? 'Claude' : 'Google Gemini'} yet. Add it in the relay first.`);
+            const changes = ['enabled', 'provider', 'model', 'dailyCap'].filter(k => d[k] !== assistCfg[k]).map(k => ({ f: 'assistant.' + k, from: String(assistCfg[k]), to: String(d[k]) }));
+            closeAssistSettings();
+            if (!changes.length) return;
+            const entry = auditEntry(null, 'workspace.assistant_changed', { type: 'workspace', id: 'assistant', label: 'Assistant' }, changes);
+            const aid = newId('a');
+            const ok = await commitBatch(batch => {
+                batch.set(wsRef('settings', 'assistant'), { ...d, ...stamp(aid) });
+                batch.set(auditRef(aid), entry);
+            }, 'save the assistant settings');
+            if (ok) showSaveStatus('info', d.enabled ? 'Assistant settings saved' : 'Assistant switched off');
+        };
+        // "/" opens Ask MapIt when not typing
+        document.addEventListener('keydown', e => {
+            if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || !assistAvailable() || assistOpen()) return;
+            const t = e.target;
+            if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+            if (document.querySelector('[role="dialog"]:not(.hidden)')) return;
+            e.preventDefault();
+            openAssist();
+        });
+
+        // =======================================================
         // MY PROFILE (2.17.0, specs/profile.md, design/profile.md): photo, nickname, position; Positions list (Admins)
         // =======================================================
         function positionLabel(id) { return id ? positionsList.find(p => p.id === id)?.label || '' : ''; }
@@ -10401,6 +10782,7 @@
             const av = document.getElementById('account-avatar');
             if (av) av.innerHTML = avatarHtml({ email: myEmail() }, '', 'md');
             document.getElementById('my-profile-btn')?.classList.toggle('hidden', !useCloudPersistence);
+            renderAssistButton();
         }
 
         // ---- My profile window (D-2) ----
@@ -10654,6 +11036,7 @@
             const menu = document.getElementById('account-menu');
             if (!menu) return;
             applyRoleUI();
+            renderAssistButton();
             menu.classList.remove('hidden');
             // 2.14.2: on a very narrow screen the chip sits left of the edge; keep the menu on screen
             menu.style.right = '';
