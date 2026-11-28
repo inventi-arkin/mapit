@@ -23,7 +23,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://inventi-arkin.github.io/mapit/icons/og-image.png">
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.16.0" data-released="2026-11-28">
+    <meta name="mapit-version" content="2.16.1" data-released="2026-11-28">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -128,7 +128,8 @@
         .list-row .lr-handle { display: none; }
         .list-row .lr-rank { grid-area: rank; } .list-row .lr-name { grid-area: name; } .list-row .lr-moves { grid-area: moves; } .list-row .lr-month { grid-area: month; }
         .list-row .lr-status { grid-area: status; padding-left: 2rem; display: flex; align-items: center; gap: .375rem; min-width: 0; }
-        .list-row .lr-meta { grid-area: meta; padding-left: 2rem; display: flex; align-items: center; gap: .375rem; min-width: 0; overflow: hidden; }
+        /* overflow-x: clip cuts only sideways (that is what +N is for); avatars (24 px with the Owner ring) may stand out of the 18 px line, inside the row padding */
+        .list-row .lr-meta { grid-area: meta; padding-left: 2rem; display: flex; align-items: center; gap: .375rem; min-width: 0; overflow: hidden; overflow-x: clip; overflow-y: visible; }
         .list-row .lr-meta > *, .list-row .lr-chips > * { flex-shrink: 0; }
         .list-row .lr-meta > .lr-module { flex-shrink: 1; min-width: 0; }   /* fitListRows keeps it at least 3rem (or its full width) */
         @media (min-width: 1280px) {
