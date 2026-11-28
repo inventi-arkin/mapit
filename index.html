@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
     <title>Map It - Dynamic Product Roadmap</title>
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.14.2" data-released="2026-11-28">
+    <meta name="mapit-version" content="2.15.0" data-released="2026-11-28">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -317,6 +317,12 @@
                         <i class="ph-bold ph-user-focus text-base text-brand-600" aria-hidden="true"></i> My deliverables
                         <span id="account-mine-count" class="ml-auto text-[10px] font-bold px-1.5 rounded-full bg-brand-50 text-brand-700"></span>
                     </button>
+                    <!-- 2.15.0: email notifications on/off (hidden until the relay is set up) -->
+                    <button type="button" role="menuitemcheckbox" aria-checked="true" id="email-notify-btn" onclick="toggleEmailNotify()" class="hidden w-full flex items-start gap-2 px-3 py-2 text-left hover:bg-slate-50 focus:bg-slate-50 outline-none">
+                        <i id="email-notify-icon" class="ph-bold ph-envelope-simple text-base text-brand-600 mt-0.5" aria-hidden="true"></i>
+                        <span class="flex-1 min-w-0"><span class="block font-semibold text-slate-700">Email notifications</span><span id="email-notify-line" class="block text-[11px] font-normal text-slate-500 truncate"></span></span>
+                        <span class="sw !h-auto !p-0 !border-0 !bg-transparent mt-0.5" aria-hidden="true"><span class="track"><span class="knob"></span></span></span>
+                    </button>
                     <p id="account-workspace-label" class="hidden px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-t border-slate-100 mt-1">Workspace</p>
                     <button type="button" role="menuitem" id="users-btn" onclick="closeAccountMenu(); openUsersModal()" class="admin-only w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-users-three text-base text-indigo-600" aria-hidden="true"></i> Users
@@ -574,7 +580,7 @@
                     <button type="button" role="tab" data-bell-tab="activity" onclick="setBellTab('activity')" class="h-6 px-2.5 rounded-lg inline-flex items-center">All activity</button>
                 </div>
             </div>
-            <div id="foryou-panel" class="hidden flex-1 min-h-0 overflow-y-auto custom-scrollbar"><div id="foryou-list"></div></div>
+            <div id="foryou-panel" class="hidden flex-1 min-h-0 overflow-y-auto custom-scrollbar"><div id="foryou-list"></div><p id="foryou-email-line" class="hidden sticky bottom-0 px-4 py-2.5 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 flex items-center gap-1.5"></p></div>
             <div id="activity-controls" class="shrink-0 px-4 py-2.5 border-b border-slate-100 space-y-2 text-xs">
                 <div class="flex flex-wrap items-center gap-2">
                     <div id="activity-scope" role="group" aria-label="Activity scope" class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
@@ -1363,6 +1369,7 @@
         let feedbackPanel = null;       // { id, roadmapId, index, prevId, nextId }
         let feedbackOrder = [];
         let pendingFeedbackLink = readFeedbackLink();
+        let pendingItemLink = readItemLink();   // 2.15.0: #deliverable=<roadmapId>/<id>&tab=… (links in emails)
         let roadmapsReady = false;      // the workspace roadmaps listener has delivered its first snapshot
         let isAuthenticated = false;
 
@@ -1987,6 +1994,7 @@
             if (!activeRoadmap) {
                 renderWorkspaceEmpty();
                 if (pendingFeedbackLink) setTimeout(tryOpenFeedbackLink, 0);
+                if (pendingItemLink) setTimeout(tryOpenItemLink, 0);
                 return;
             }
 
@@ -2006,6 +2014,7 @@
             renderPersonFilters();
             if (sprintsViewOpen()) renderSprintBoard();
             if (pendingFeedbackLink) setTimeout(tryOpenFeedbackLink, 0);
+            if (pendingItemLink) setTimeout(tryOpenItemLink, 0);
         };
 
         // Keep the Activity list in step with the selected roadmap; drop it when it's for another scope and not on screen
@@ -3608,11 +3617,12 @@
 
         // ---- Links to a feedback item: #feedback=<roadmapId>/<feedbackId> (FR-21…FR-23) ----
         function readFeedbackLink() {
-            const m = location.hash.match(/^#feedback=(.*)$/);
+            const m = location.hash.match(/^#feedback=([^&]*)(.*)$/);
             if (!m) return null;
+            const tab = new URLSearchParams(m[2].replace(/^&/, '')).get('tab') === 'comments' ? 'comments' : null;   // 2.15.0 (emails)
             const parts = m[1].split('/');
             if (parts.length !== 2 || !parts[0] || !parts[1]) return { invalid: true };
-            try { return { roadmapId: decodeURIComponent(parts[0]), feedbackId: decodeURIComponent(parts[1]) }; }
+            try { return { roadmapId: decodeURIComponent(parts[0]), feedbackId: decodeURIComponent(parts[1]), tab }; }
             catch (e) { return { invalid: true }; }
         }
 
@@ -3639,11 +3649,43 @@
             feedbackSort = { ...FEEDBACK_SORT_DEFAULT };
             closeFeedbackPanel(false);
             switchView('feedback');
-            if ((roadmap.feedback || []).some(f => f.id === link.feedbackId)) openFeedbackPanel(link.feedbackId);
-            else showSaveStatus('info', 'That feedback item is no longer available.');
+            if (!(roadmap.feedback || []).some(f => f.id === link.feedbackId)) showSaveStatus('info', 'That feedback item is no longer available.');
+            else if (link.tab === 'comments') openFeedbackComments(link.feedbackId, roadmap.id);
+            else openFeedbackPanel(link.feedbackId);
+        }
+
+        // ---- Links to a deliverable (2.15.0, from emails): #deliverable=<roadmapId>/<id>&tab=comments|tasks|details&task=<taskId> ----
+        function readItemLink() {
+            const m = location.hash.match(/^#deliverable=([^&]*)(.*)$/);
+            if (!m) return null;
+            const q = new URLSearchParams(m[2].replace(/^&/, ''));
+            const parts = m[1].split('/');
+            if (parts.length !== 2 || !parts[0] || !parts[1]) return { invalid: true };
+            try { return { roadmapId: decodeURIComponent(parts[0]), id: decodeURIComponent(parts[1]), tab: ['comments', 'tasks'].includes(q.get('tab')) ? q.get('tab') : 'details', taskId: q.get('task') || null }; }
+            catch (e) { return { invalid: true }; }
+        }
+        function dropItemLink() {
+            pendingItemLink = null;
+            if (location.hash.startsWith('#deliverable=')) history.replaceState(null, '', location.pathname + location.search);
+        }
+        // Runs after each render; waits for sign-in, the roadmaps and that roadmap's deliverables
+        function tryOpenItemLink() {
+            const link = pendingItemLink;
+            if (!link || !useCloudPersistence || !roadmapsReady) return;
+            if (link.invalid) { dropItemLink(); showSaveStatus('info', "That link isn't valid."); return; }
+            const gone = 'This deliverable was deleted or you no longer have access.';
+            const roadmap = roadmaps.find(r => r.id === link.roadmapId);
+            // Viewers don't see deliverable comments (comments spec Q-1)
+            if (!roadmap || roadmap.deletedAt || (link.tab === 'comments' && !canEdit())) { dropItemLink(); showSaveStatus('info', gone); return; }
+            if (!roadmap.itemsLoaded) return;
+            dropItemLink();
+            if (!(roadmap.items || []).some(i => i.id === link.id)) { showSaveStatus('info', gone); return; }
+            openItemOn(roadmap.id, link.id, link.tab, link.taskId);
         }
 
         window.addEventListener('hashchange', () => {
+            const item = readItemLink();
+            if (item) { pendingItemLink = item; tryOpenItemLink(); return; }
             const link = readFeedbackLink();
             if (!link) return;
             pendingFeedbackLink = link;
@@ -4441,9 +4483,24 @@
             box.innerHTML = forYou.map(n => {
                 const t = n.target || {}, label = `<b class="font-bold text-slate-800">"${escapeHtml(t.label || '')}"</b>`;
                 const where = t.type === 'feedback' ? 'feedback ' : '';
-                const what = n.kind === 'reply' ? `replied to you on ${where}${label}` : n.kind === 'mention' ? `mentioned you on ${where}${label}` : `commented on your ${t.type === 'feedback' ? 'feedback' : 'deliverable'} ${label}`;
-                return `<button type="button" class="fy-item w-full text-left flex gap-3 px-4 py-3 border-b border-slate-50 hover:bg-slate-50 ${n.read ? '' : 'bg-brand-50/40'}" data-fy="${escapeHtml(n.id)}" onclick="openForYou('${escapeHtml(n.id)}')">${avatarHtml(n.by || {}, '', 'sm')}<span class="flex-1 min-w-0 text-xs"><b class="text-slate-900">${escapeHtml(n.by?.name || 'Someone')}</b> ${what}<span class="block text-slate-500 truncate mt-0.5">"${escapeHtml(n.text || '')}"</span><span class="block text-[11px] text-slate-400 mt-0.5" title="${escapeHtml(formatPHT(n.at))}">${escapeHtml(formatRelativeTime(n.at))}</span></span>${n.read ? '' : '<span class="w-2 h-2 mt-1.5 rounded-full bg-brand-500 shrink-0" aria-label="Unread"></span>'}</button>`;
+                const what = n.kind === 'reply' ? `replied to you on ${where}${label}` : n.kind === 'mention' ? `mentioned you on ${where}${label}`
+                    : n.kind === 'assigned' ? `assigned you a task on ${label}`   // 2.15.0 (E-5)
+                    : n.kind === 'added' ? `added you to ${label} ${t.role === 'owner' ? 'as Owner' : 'as a team member'}`   // 2.15.0 (E-6)
+                    : `commented on your ${t.type === 'feedback' ? 'feedback' : 'deliverable'} ${label}`;
+                const quote = n.kind === 'added' ? escapeHtml(n.text || '') : `"${escapeHtml(n.text || '')}"`;
+                const mailed = n.emailedAt ? ' <i class="fy-mailed ph ph-envelope-simple text-[12px] align-[-2px]" title="Also sent to your email" aria-label="Also sent to your email"></i>' : '';
+                return `<button type="button" class="fy-item w-full text-left flex gap-3 px-4 py-3 border-b border-slate-50 hover:bg-slate-50 ${n.read ? '' : 'bg-brand-50/40'}" data-fy="${escapeHtml(n.id)}" data-kind="${escapeHtml(n.kind || '')}" onclick="openForYou('${escapeHtml(n.id)}')">${avatarHtml(n.by || {}, '', 'sm')}<span class="flex-1 min-w-0 text-xs"><b class="text-slate-900">${escapeHtml(n.by?.name || 'Someone')}</b> ${what}<span class="block text-slate-500 truncate mt-0.5">${quote}</span><span class="block text-[11px] text-slate-400 mt-0.5" title="${escapeHtml(formatPHT(n.at))}">${escapeHtml(formatRelativeTime(n.at))}${mailed}</span></span>${n.read ? '' : '<span class="w-2 h-2 mt-1.5 rounded-full bg-brand-500 shrink-0" aria-label="Unread"></span>'}</button>`;
             }).join('');
+            renderEmailLine();
+        }
+        // "✉ Emails on · Change" under For you (only when email is set up)
+        function renderEmailLine() {
+            const el = document.getElementById('foryou-email-line');
+            if (!el) return;
+            el.classList.toggle('hidden', !EMAIL_RELAY_URL);
+            el.innerHTML = myEmailNotify
+                ? '<i class="ph ph-envelope-simple" aria-hidden="true"></i> Emails on · <button type="button" onclick="openEmailSetting()" class="font-semibold text-brand-700 hover:underline">Change</button>'
+                : '<i class="ph ph-envelope-simple-slash" aria-hidden="true"></i> Emails off · <button type="button" onclick="openEmailSetting()" class="font-semibold text-brand-700 hover:underline">Turn on</button>';
         }
         window.openForYou = function(id) {
             const n = forYou.find(x => x.id === id);
@@ -4453,8 +4510,35 @@
             const t = n.target || {};
             if (!roadmaps.some(r => r.id === t.roadmapId && !r.deletedAt)) { showSaveStatus('info', 'That roadmap is no longer available.'); return; }
             if (t.type === 'feedback') openFeedbackComments(t.id, t.roadmapId);
+            else if (n.kind === 'assigned') openItemOn(t.roadmapId, t.id, 'tasks', t.taskId);
+            else if (n.kind === 'added') openItemOn(t.roadmapId, t.id, 'details');
             else openItemComments(t.id, t.roadmapId);
         };
+        // 2.15.0: open a deliverable on a tab (bell lines, email links). Tasks and details work for Viewers too.
+        function openItemOn(rid, id, tab, taskId = null) {
+            if (tab === 'comments') { openItemComments(id, rid); return; }
+            if (rid && getActiveRoadmap()?.id !== rid) selectRoadmap(rid);
+            if (currentView !== 'roadmap' && !canEditActive()) switchView('roadmap');
+            if (canEditActive()) { selectMilestoneForEdit(id); if (tab === 'tasks') switchMilestoneSideTab('tasks'); }
+            else { openItemDetails(id); if (tab === 'tasks') switchDetailTab('tasks'); }
+            if (taskId) highlightTask(taskId);
+        }
+        // Scrolls to a task and rings it for 1.5 s once its list has loaded (taskRowHtml keeps the ring through redraws)
+        let taskFlash = { id: null, until: 0 };
+        async function highlightTask(taskId) {
+            const rowOf = () => [...document.querySelectorAll(`.task-row[data-task-id="${CSS.escape(taskId)}"]`)].find(e => e.offsetParent);
+            for (let i = 0; i < 80; i++) {
+                const row = rowOf();
+                if (row) {
+                    taskFlash = { id: taskId, until: Date.now() + 1500 };
+                    row.classList.add('ring-2', 'ring-brand-300');
+                    row.scrollIntoView({ block: 'nearest' });
+                    setTimeout(() => { if (taskFlash.id === taskId) taskFlash = { id: null, until: 0 }; rowOf()?.classList.remove('ring-2', 'ring-brand-300'); }, 1500);
+                    return;
+                }
+                await new Promise(r => setTimeout(r, 100));
+            }
+        }
         window.setBellTab = function(tab) {
             bellTab = tab === 'foryou' || !canEdit() ? 'foryou' : 'activity';
             document.querySelectorAll('#bell-tabs [data-bell-tab]').forEach(b => { const on = b.dataset.bellTab === bellTab; b.setAttribute('aria-selected', String(on)); b.className = `h-6 px-2.5 rounded-lg inline-flex items-center gap-1 ${on ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'}`; });
@@ -4966,7 +5050,8 @@
         }
         function taskRowHtml(t, item) {
             const open = taskOpenId === t.id, id = escapeHtml(t.id);
-            return `<div class="task-row rounded-lg border ${open ? 'border-brand-200 bg-white shadow-sm' : 'border-transparent hover:bg-white'}" data-task-id="${id}">
+            const flash = taskFlash.id === t.id && Date.now() < taskFlash.until;   // 2.15.0: opened from a bell line or email link
+            return `<div class="task-row rounded-lg border ${open ? 'border-brand-200 bg-white shadow-sm' : 'border-transparent hover:bg-white'}${flash ? ' ring-2 ring-brand-300' : ''}" data-task-id="${id}">
                 <div class="flex items-center gap-2 px-2 py-1.5 cursor-pointer" role="button" tabindex="0" aria-expanded="${open}" onclick="toggleTaskOpen('${id}')" onkeydown="taskRowKey(event, '${id}')">
                     ${taskStatusHtml(t)}
                     <span class="task-title flex-1 min-w-0 truncate text-xs ${t.status === 'done' ? 'line-through text-slate-400' : 'font-semibold text-slate-800'}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
@@ -5053,7 +5138,7 @@
         });
 
         // One write + its audit entry (target = the deliverable, so its History and Activity "Mine" pick it up)
-        async function writeTasks(action, changes, ops, label = 'save the task') {
+        async function writeTasks(action, changes, ops, label = 'save the task', also = null) {
             const roadmap = getActiveRoadmap(), item = openTaskItem();
             if (!roadmap || !item) return false;
             const entry = auditEntry(roadmap, action, { type: 'milestone', id: item.id, label: item.name }, changes);
@@ -5082,9 +5167,15 @@
                 });
                 if (sprintIdsChanged) batch.update(itemRef(roadmap.id, 'milestones', item.id), { sprintIds, ...stamp(aid) });
                 batch.set(auditRef(aid), entry);
+                also?.(batch, roadmap, item);
             }, label);
         }
         const taskById = id => taskState.tasks.find(t => t.id === id);
+        // "To do · Sprint 124 (Nov 24 – Dec 5) · 2.5 pd" for the assignee's email and bell line
+        function taskDetailLine(t) {
+            const sp = sprintById(t.sprintId);
+            return clip([TASK_STATUS[t.status]?.[0], sp && `${sp.name} (${shortDate(sp.start)} – ${shortDate(sp.end)})`, t.estimateDays ? fmtDays(t.estimateDays) : ''].filter(Boolean).join(' · '), 200);
+        }
         const taskLabel = t => clip(t?.title || 'Task', 200);
 
         window.addTask = async function(input) {
@@ -5145,7 +5236,9 @@
                 change = { f: 'taskLink', task: taskLabel(t), to: value ? 'set' : 'removed' };
             } else return;
             document.activeElement?.blur?.();
-            await writeTasks('task.updated', [change], [{ kind: 'update', id, data: { [field]: value } }]);
+            // 2.15.0 (E-5): the new assignee hears about it (bell + email)
+            const also = field === 'assignee' && value?.email ? (b, r, item) => notify(b, value.email, 'assigned', { type: 'milestone', id: item.id, label: clip(item.name, 200), roadmapId: r.id, taskId: id }, t.title, { detail: taskDetailLine(t) }) : null;
+            await writeTasks('task.updated', [change], [{ kind: 'update', id, data: { [field]: value } }], 'save the task', also);
             renderTaskPanels();
         };
         window.moveTask = async function(id, dir) {
@@ -7142,10 +7235,35 @@
         }
 
         // One atomic batch per user action: the change and its audit entry are saved together or not at all
+        // ---- Email notifications (2.15.0, specs/email-notifications.md) ----
+        // For you entries are written in the same batch as the change (notify); after the batch saves, the relay
+        // (a Google Apps Script web app, firebase/email-relay.gs) reads each entry from Firestore and emails it once.
+        // Empty URL = email off for everyone (no switch, no calls).
+        let EMAIL_RELAY_URL = '';
+        let relayIdToken = () => auth?.currentUser?.getIdToken?.();
+        let batchMail = null;   // entries written by the batch being built
+        function notify(batch, to, kind, target, text, extra = {}) {
+            if (!to || to === myEmail() || personOf({ email: to }).noAccess) return;
+            const id = newId('n');
+            batch.set(wsRef('notifications', to, 'items', id), { at: serverTimestamp(), by: actor(), kind, target, text: clip(text, 200), read: false, ...extra });
+            batchMail?.push({ to, id });
+        }
+        async function relayEmails(items) {
+            if (!EMAIL_RELAY_URL || !items.length) return;
+            try {
+                const idToken = await relayIdToken();
+                if (!idToken) return;
+                // text/plain and no-cors: a "simple" request the Apps Script web app accepts; the answer isn't needed
+                await fetch(EMAIL_RELAY_URL, { method: 'POST', mode: 'no-cors', keepalive: true, headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ idToken, items: items.slice(0, 25) }) });
+            } catch (e) { console.warn('Email relay unavailable:', e); }
+        }
+
         async function commitBatch(build, action) {
             const batch = writeBatch(db);
-            build(batch);
+            const mail = batchMail = [];
+            try { build(batch); } finally { batchMail = null; }
             const write = batch.commit();
+            if (mail.length) write.then(() => relayEmails(mail), () => {});
             try {
                 if (await writeWithWait(write) === 'waiting') {
                     trackQueuedWrite(write, () => {}, err => reportWriteError(err, action));
@@ -7234,6 +7352,18 @@
         }
 
         // ---- Milestones ----
+        // 2.15.0 (E-6): people newly on a deliverable as Owner or team (notify skips yourself)
+        function addedPeople(before, after) {
+            const had = new Set([before?.owner?.email, ...(before?.team || []).map(p => p?.email)].filter(Boolean));
+            const out = [];
+            if (after.owner?.email && !had.has(after.owner.email)) out.push([after.owner.email, 'owner']);
+            (after.team || []).forEach(p => { if (p?.email && !had.has(p.email) && p.email !== after.owner?.email && !out.some(([e]) => e === p.email)) out.push([p.email, 'team']); });
+            return out;
+        }
+        function notifyAdded(batch, roadmap, id, fields, added) {
+            const line = [fields.module, formatMonthYear(fields.date), STATUS_LABELS[fields.status]].filter(Boolean).join(' · ');
+            added.forEach(([email, role]) => notify(batch, email, 'added', { type: 'milestone', id, label: clip(fields.name, 200), roadmapId: roadmap.id, role }, line));
+        }
         async function addMilestone(roadmap, fields) {
             const id = newId('m');
             const keys = (roadmap.items || []).filter(hasKey).map(i => i.rankKey);
@@ -7253,6 +7383,7 @@
             return commitBatch(batch => {
                 batch.set(itemRef(roadmap.id, 'milestones', id), { ...milestoneFields(fields), createdBy: actor(), createdAt: serverTimestamp(), ...stamp(aid) });
                 batch.set(auditRef(aid), entry);
+                notifyAdded(batch, roadmap, id, fields, addedPeople(null, fields));
             }, 'add the deliverable');
         }
 
@@ -7270,6 +7401,10 @@
             return commitBatch(batch => {
                 batch.update(itemRef(roadmap.id, 'milestones', item.id), { ...updates, ...stamp(aid) });
                 batch.set(auditRef(aid), entry);
+                if ('owner' in updates || 'team' in updates) {
+                    const after = { ...item, ...updates };
+                    notifyAdded(batch, roadmap, item.id, after, addedPeople(item, after));
+                }
             }, 'save the deliverable');
         }
 
@@ -7319,7 +7454,7 @@
             return commitBatch(batch => {
                 batch.set(wsRef('roadmaps', roadmap.id, col, item.id, 'comments', id), { ...comment, at: serverTimestamp(), auditId: aid });
                 batch.update(itemRef(roadmap.id, col, item.id), { commentCount: count, lastCommentAt: serverTimestamp(), lastCommentBy: myEmail(), ...stamp(aid) });
-                recipients.forEach(r => batch.set(wsRef('notifications', r.email, 'items', newId('n')), { at: serverTimestamp(), by: actor(), kind: r.why, target: { type: kind, id: item.id, label: clip(label, 200), roadmapId: roadmap.id }, text: clip(text, 200), commentId: id, read: false }));
+                recipients.forEach(r => notify(batch, r.email, r.why, { type: kind, id: item.id, label: clip(label, 200), roadmapId: roadmap.id }, text, { commentId: id }));
                 batch.set(auditRef(aid), entry);
             }, 'add the comment');
         }
@@ -7694,6 +7829,8 @@
             const newRole = data?.role || 'blocked';
             const oldRole = myRole;
             onActivitySeenChanged(data);
+            myEmailNotify = data?.emailNotify !== false;
+            renderEmailSwitch();
             if (newRole === oldRole) return;
             myRole = newRole;
             if (newRole === 'blocked') {
@@ -7816,6 +7953,7 @@
                     const all = snap.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id })).sort(byCreated);
                     roadmap.items = all.filter(i => !i.deletedAt);
                     roadmap.binItems = all.filter(i => i.deletedAt);
+                    roadmap.itemsLoaded = true;
                     snap.docChanges().forEach(change => {
                         if (change.doc.id !== selectedMilestoneId) return;
                         const data = change.type === 'removed' ? null : change.doc.data();
@@ -9776,6 +9914,7 @@
                             <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">${escapeHtml(m.name || email)}
                                 ${isRecent(m) ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">New</span>' : ''}
                                 ${isMe ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">You</span>' : ''}
+                                ${m.emailNotify === false && EMAIL_RELAY_URL ? '<i class="email-off ph ph-envelope-simple-slash text-slate-400 font-normal" title="Email notifications off" aria-label="Email notifications off"></i>' : ''}
                             </div>
                             <div class="text-[11px] text-slate-500 break-all">${escapeHtml(email)}</div>
                             <div class="sm:hidden text-[11px] text-slate-400">Active ${escapeHtml(formatRelativeTime(m.lastSeenAt))}</div>
@@ -10012,9 +10151,41 @@
         // ACCOUNT MENU (header chip)
         // =======================================================
         function accountMenuItems() {
-            return [...document.querySelectorAll('#account-menu [role="menuitem"]')].filter(el => el.offsetParent !== null);
+            return [...document.querySelectorAll('#account-menu [role="menuitem"], #account-menu [role="menuitemcheckbox"]')].filter(el => el.offsetParent !== null);
         }
 
+        // 2.15.0: your email switch (members/{you}.emailNotify; missing = on)
+        let myEmailNotify = true;
+        function renderEmailSwitch() {
+            const btn = document.getElementById('email-notify-btn');
+            if (!btn) return;
+            btn.classList.toggle('hidden', !EMAIL_RELAY_URL || !useCloudPersistence);
+            btn.setAttribute('aria-checked', String(myEmailNotify));
+            btn.querySelector('.sw')?.setAttribute('aria-checked', String(myEmailNotify));
+            const icon = document.getElementById('email-notify-icon');
+            if (icon) icon.className = `ph-bold ${myEmailNotify ? 'ph-envelope-simple text-brand-600' : 'ph-envelope-simple-slash text-slate-400'} text-base mt-0.5`;
+            const line = document.getElementById('email-notify-line');
+            if (line) line.textContent = myEmailNotify ? `On · to ${myEmail()}` : 'Off · the bell still shows them';
+            renderEmailLine();
+        }
+        window.toggleEmailNotify = async function() {
+            const next = !myEmailNotify;
+            myEmailNotify = next;
+            renderEmailSwitch();
+            try {
+                await updateDoc(wsRef('members', myEmail()), { emailNotify: next });
+                showSaveStatus('info', next ? 'Email notifications on' : 'Email notifications off');
+            } catch (e) {
+                myEmailNotify = !next;
+                renderEmailSwitch();
+                reportWriteError(e, 'change your email setting');
+            }
+        };
+        window.openEmailSetting = function() {
+            closeActivityPanel(false, false);
+            // After this click is done, or the menu's "click outside closes it" handler would shut it again
+            setTimeout(() => { openAccountMenu(); document.getElementById('email-notify-btn')?.focus(); }, 0);
+        };
         window.openAccountMenu = function() {
             const menu = document.getElementById('account-menu');
             if (!menu) return;
