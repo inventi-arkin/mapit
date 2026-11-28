@@ -23,7 +23,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://inventi-arkin.github.io/mapit/icons/og-image.png">
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.16.1" data-released="2026-11-28">
+    <meta name="mapit-version" content="2.17.0" data-released="2026-11-28">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -347,11 +347,19 @@
                     <i class="ph-bold ph-caret-down text-xs text-slate-500" aria-hidden="true"></i>
                 </button>
                 <div id="account-menu" role="menu" aria-label="Account" class="hidden absolute right-0 top-full mt-2 w-64 max-w-[calc(100vw-1rem)] bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-40 text-xs">
-                    <div class="px-3 py-2 border-b border-slate-100 mb-1">
-                        <div id="header-user-name" class="font-bold text-slate-900 truncate">Workspace User</div>
-                        <div id="header-user-email" class="text-[11px] text-slate-500 truncate">user@example.com</div>
-                        <div id="account-role-line" class="hidden mt-1.5 text-[11px] text-slate-600"></div>
+                    <!-- 2.17.0: photo, shown name and position; opens My profile -->
+                    <div id="account-profile-block" onclick="openMyProfile()" title="My profile" class="px-3 py-2 border-b border-slate-100 mb-1 flex items-start gap-2.5 cursor-pointer hover:bg-slate-50">
+                        <span id="account-avatar" class="shrink-0 mt-0.5"></span>
+                        <div class="min-w-0 flex-1">
+                            <div id="header-user-name" class="font-bold text-slate-900 truncate">Workspace User</div>
+                            <div id="header-user-position" class="hidden text-[11px] font-semibold text-slate-600 truncate"></div>
+                            <div id="header-user-email" class="text-[11px] text-slate-500 truncate">user@example.com</div>
+                            <div id="account-role-line" class="hidden mt-1.5 text-[11px] text-slate-600"></div>
+                        </div>
                     </div>
+                    <button type="button" role="menuitem" id="my-profile-btn" onclick="openMyProfile()" class="hidden w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
+                        <i class="ph-bold ph-user-circle text-base text-brand-600" aria-hidden="true"></i> My profile
+                    </button>
                     <button type="button" role="menuitem" id="my-deliverables-btn" onclick="openMyDeliverables()" class="w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-user-focus text-base text-brand-600" aria-hidden="true"></i> My deliverables
                         <span id="account-mine-count" class="ml-auto text-[10px] font-bold px-1.5 rounded-full bg-brand-50 text-brand-700"></span>
@@ -365,6 +373,9 @@
                     <p id="account-workspace-label" class="hidden px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-t border-slate-100 mt-1">Workspace</p>
                     <button type="button" role="menuitem" id="users-btn" onclick="closeAccountMenu(); openUsersModal()" class="admin-only w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-users-three text-base text-indigo-600" aria-hidden="true"></i> Users
+                    </button>
+                    <button type="button" role="menuitem" id="positions-btn" onclick="closeAccountMenu(); openPositionsWindow()" class="admin-only w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
+                        <i class="ph-bold ph-identification-badge text-base text-indigo-600" aria-hidden="true"></i> Positions…
                     </button>
                     <button type="button" role="menuitem" id="workflow-btn" onclick="openWorkflowSettings()" class="hidden w-full flex items-center gap-2 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus:bg-slate-50 outline-none">
                         <i class="ph-bold ph-flow-arrow text-base text-indigo-600" aria-hidden="true"></i> Workflow
@@ -802,6 +813,73 @@
     </div>
 
     <!-- Modal: Capacity (2.3.0) -->
+    <!-- 2.17.0 My profile (specs/profile.md, design/profile.md D-2) -->
+    <div id="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4">
+        <div class="bg-white sm:rounded-2xl sm:max-w-md w-full h-full sm:h-auto sm:max-h-[92vh] border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
+                <h3 id="profile-title" class="text-sm font-black text-slate-900 flex items-center gap-2"><span class="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center" aria-hidden="true"><i class="ph-bold ph-user-circle"></i></span>My profile</h3>
+                <button type="button" onclick="closeMyProfile()" data-dialog-close aria-label="Close" class="text-slate-500 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100"><i class="ph-bold ph-x text-base"></i></button>
+            </div>
+            <div class="p-5 space-y-4 text-xs overflow-y-auto custom-scrollbar flex-1">
+                <div class="flex flex-col items-center gap-2">
+                    <div id="profile-photo-box" class="relative w-24 h-24 rounded-full overflow-hidden touch-none select-none" onpointerdown="profileDragStart(event)" aria-label="Your photo"></div>
+                    <div class="flex flex-wrap justify-center gap-1.5">
+                        <label class="ctl ctl-quiet cursor-pointer"><i class="ph-bold ph-upload-simple" aria-hidden="true"></i>Upload photo<input type="file" id="profile-photo-input" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="profilePickPhoto(this)"></label>
+                        <button type="button" id="profile-google-btn" onclick="profileUseGoogle()" class="ctl ctl-quiet"><i class="ph ph-google-logo" aria-hidden="true"></i>Use Google photo</button>
+                        <button type="button" id="profile-remove-btn" onclick="profileRemovePhoto()" class="ctl ctl-quiet"><i class="ph ph-x-circle" aria-hidden="true"></i>Remove</button>
+                    </div>
+                    <label id="profile-zoom-wrap" class="hidden flex items-center gap-2 text-[11px] text-slate-500 w-56">Zoom <input type="range" id="profile-zoom" min="1" max="3" step="0.05" value="1" oninput="profileZoom(this.value)" class="flex-1"></label>
+                    <p id="profile-photo-note" class="hidden text-[10px] text-slate-400"></p>
+                    <p id="profile-photo-error" class="hidden text-[11px] font-semibold text-rose-600" role="alert"></p>
+                </div>
+                <div>
+                    <label for="profile-nickname" class="flex justify-between text-[11px] font-bold text-slate-600 mb-1">Nickname <span id="profile-nickname-count" class="font-normal text-slate-400">0/40</span></label>
+                    <input type="text" id="profile-nickname" maxlength="40" autocomplete="nickname" oninput="profileNickInput(this.value)" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:border-brand-500 outline-none">
+                    <p id="profile-nickname-help" class="text-[10px] text-slate-400 mt-1">Shown instead of your full name. People still see your full name when they hover.</p>
+                </div>
+                <div>
+                    <label for="profile-position" class="block text-[11px] font-bold text-slate-600 mb-1">Position</label>
+                    <select id="profile-position" onchange="profileSetPosition(this.value)" class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:border-brand-500 outline-none disabled:bg-slate-50"></select>
+                    <p id="profile-position-help" class="text-[10px] text-slate-400 mt-1">Positions come from the list Admins keep.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3 text-[11px]">
+                    <div><span class="block font-bold text-slate-600">Full name</span><span id="profile-fullname" class="text-slate-500 break-words"></span></div>
+                    <div><span class="block font-bold text-slate-600">Email</span><span id="profile-email" class="text-slate-500 break-all"></span></div>
+                    <p class="col-span-2 -mt-2 text-[10px] text-slate-400">From your Google account</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">How others see you</p>
+                    <div id="profile-preview" class="flex items-center gap-2"></div>
+                    <p class="text-[10px] text-slate-500 mt-2">Hover: <span id="profile-preview-hover" class="px-1.5 py-0.5 rounded bg-slate-800 text-white"></span></p>
+                </div>
+            </div>
+            <div class="px-5 py-3 border-t border-slate-100 flex justify-end gap-2 shrink-0">
+                <button type="button" onclick="closeMyProfile()" class="ctl ctl-quiet">Cancel</button>
+                <button type="button" id="profile-save-btn" onclick="saveMyProfile()" class="ctl ctl-primary disabled:opacity-50">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2.17.0 Positions (Admins; design/profile.md D-3) -->
+    <div id="positions-modal" role="dialog" aria-modal="true" aria-labelledby="positions-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4">
+        <div class="bg-white sm:rounded-2xl sm:max-w-lg w-full h-full sm:h-auto sm:max-h-[90vh] border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
+                <h3 id="positions-title" class="text-sm font-black text-slate-900 flex items-center gap-2"><span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center" aria-hidden="true"><i class="ph-bold ph-identification-badge"></i></span>Positions</h3>
+                <button type="button" onclick="closePositionsWindow()" data-dialog-close aria-label="Close" class="text-slate-500 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100"><i class="ph-bold ph-x text-base"></i></button>
+            </div>
+            <div class="p-5 space-y-2 text-xs overflow-y-auto custom-scrollbar flex-1">
+                <p class="text-[11px] text-slate-500">People pick one of these in My profile; Admins can also set it in Users. Renaming one updates everyone who has it.</p>
+                <div id="positions-rows" class="space-y-1.5"></div>
+                <button type="button" onclick="addPositionRow()" class="text-xs font-semibold text-brand-700 hover:underline">+ Add position</button>
+                <p id="positions-error" class="hidden text-[11px] font-semibold text-rose-600" role="alert"></p>
+            </div>
+            <div class="px-5 py-3 border-t border-slate-100 flex justify-end gap-2 shrink-0">
+                <button type="button" onclick="closePositionsWindow()" class="ctl ctl-quiet">Cancel</button>
+                <button type="button" onclick="savePositions()" class="ctl ctl-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
     <div id="capacity-modal" role="dialog" aria-modal="true" aria-labelledby="capacity-title" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4">
         <div class="bg-white sm:rounded-2xl max-w-2xl w-full h-full sm:h-auto sm:max-h-[90vh] border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
             <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
@@ -1312,6 +1390,7 @@
                         <tr>
                             <th class="py-2 px-3 font-bold">User</th>
                             <th class="py-2 px-3 font-bold">Role</th>
+                            <th class="hidden sm:table-cell py-2 px-3 font-bold">Position</th>
                             <th class="hidden sm:table-cell py-2 px-3 font-bold">Joined</th>
                             <th class="hidden sm:table-cell py-2 px-3 font-bold">Last active</th>
                         </tr>
@@ -1408,7 +1487,8 @@
         let feedbackPanel = null;       // { id, roadmapId, index, prevId, nextId }
         let feedbackOrder = [];
         let pendingFeedbackLink = readFeedbackLink();
-        let pendingItemLink = readItemLink();   // 2.15.0: #deliverable=<roadmapId>/<id>&tab=… (links in emails)
+        let pendingItemLink = readItemLink();
+        let positionsList = [];   // 2.17.0: [{ id, label }] from settings/positions (Admins keep it)   // 2.15.0: #deliverable=<roadmapId>/<id>&tab=… (links in emails)
         let roadmapsReady = false;      // the workspace roadmaps listener has delivered its first snapshot
         let isAuthenticated = false;
 
@@ -2395,6 +2475,8 @@
         window.addEventListener('offline', updateConnectionDot);
 
         function updateUserHeaderUI(name, photoURL) {
+            const mine = currentUser?.email && peopleDir.get(myEmail());
+            if (mine) { name = mine.name; photoURL = mine.photoURL; }   // 2.17.0: nickname and chosen photo
             updateConnectionDot();
             const headerBadge = document.getElementById('header-user-badge');
             const headerName = document.getElementById('header-user-name');
@@ -3426,7 +3508,7 @@
                                 <span class="text-[10px] text-slate-500 shrink-0" title="${escapeHtml(formatPHT(e.at))}">${escapeHtml(formatRelativeTime(e.at))}</span>
                             </div>
                             ${lines.slice(1).map(l => `<span class="text-[11px] text-slate-700 block">${escapeHtml(l)}</span>`).join('')}
-                            <span class="text-[10px] text-slate-500 block" title="${escapeHtml(e.by?.email ? `${e.by.name} (${e.by.email})` : '')}">${escapeHtml(e.by?.name || 'Member')}</span>
+                            <span class="text-[10px] text-slate-500 block" title="${escapeHtml(e.by?.email ? `${e.by.name} (${e.by.email})` : '')}">${escapeHtml(liveName(e.by) || 'Member')}</span>
                         </div>
                     </div>`;
             }).join('') || '<div class="py-8 text-center text-slate-500 text-xs italic">No activity recorded yet.</div>';
@@ -3994,7 +4076,7 @@
             const peopleList = document.getElementById('modal-people-list');
             if (peopleList) {
                 const team = (item.team || []).filter(t => t?.email);
-                const nameHtml = (r, cls) => { const p = personOf(r); return `<span class="${cls}">${escapeHtml(p.name)}</span>${p.noAccess ? ' <span class="text-[10px] italic text-slate-400">(no access)</span>' : ''}`; };
+                const nameHtml = (r, cls) => { const p = personOf(r); return `<span class="inline-flex flex-col leading-tight"><span class="${cls}">${escapeHtml(p.name)}${p.noAccess ? ' <span class="text-[10px] italic font-normal text-slate-400">(no access)</span>' : ''}</span>${p.position ? `<span class="people-position text-[10px] font-normal text-slate-500">${escapeHtml(p.position)}</span>` : ''}</span>`; };
                 peopleList.innerHTML = (item.owner?.email ? `<span class="inline-flex items-center gap-1.5">${avatarHtml(item.owner, 'Owner')}${nameHtml(item.owner, 'font-bold text-slate-800')}<span class="text-[10px] font-semibold px-1.5 rounded bg-brand-50 text-brand-700">Owner</span></span>` : '<span class="text-slate-500 italic">No owner</span>') +
                     team.map(t => `<span class="inline-flex items-center gap-1.5 ${personOf(t).noAccess ? 'text-slate-400' : 'text-slate-700'}">${avatarHtml(t, 'Team', 'sm')}${nameHtml(t, '')}</span>`).join('');
             }
@@ -4186,7 +4268,7 @@
                 </div>`;
             const html = entries.map(e => row({
                 lines: describeAudit(e),
-                who: e.by?.name || 'Member',
+                who: liveName(e.by) || 'Member',
                 whoTitle: e.by?.email ? `${e.by.name} (${e.by.email})` : '',
                 when: formatRelativeTime(e.at),
                 whenTitle: formatPHT(e.at)
@@ -4240,13 +4322,13 @@
                     `;
                 } else {
                     commentsList.innerHTML = comments.map(c => {
-                        const name = c.originalAuthor || c.by?.name || c.author || 'User';
+                        const name = c.originalAuthor || liveName(c.by) || c.author || 'User';
                         const time = c.originalTimestamp || c.at || c.timestamp;
                         const movedBy = c.originalAuthor && c.by?.name ? ` · moved by ${c.by.name}` : '';
                         return `
                         <div class="p-2.5 rounded-xl bg-white border border-slate-100 shadow-2xs space-y-1">
                             <div class="flex items-center justify-between text-[11px]">
-                                <span class="font-bold text-slate-800 flex items-center gap-1.5" title="${escapeHtml(c.by?.email && !c.originalAuthor ? `${c.by.name} (${c.by.email})` : '')}">
+                                <span class="font-bold text-slate-800 flex items-center gap-1.5" title="${escapeHtml(c.by?.email && !c.originalAuthor ? `${personLabel(personOf(c.by))} (${c.by.email})` : '')}">
                                     <span class="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[9px] font-bold">
                                         ${escapeHtml(name.charAt(0).toUpperCase())}
                                     </span>
@@ -4295,7 +4377,7 @@
             if (ctx === 'detail') return !document.getElementById('detail-modal')?.classList.contains('hidden') && !document.getElementById('detail-comments-panel')?.classList.contains('hidden');
             return !!feedbackPanel;
         }
-        const cmName = c => c.originalAuthor || c.by?.name || c.author || 'Member';
+        const cmName = c => c.originalAuthor || liveName(c.by) || c.author || 'Member';
         // Plain text, links clickable, @mentions highlighted
         function cmFormat(c) {
             let html = escapeHtml(c.text || '').replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-brand-700 underline break-all">$1</a>');
@@ -4308,7 +4390,7 @@
             const movedBy = c.originalAuthor && c.by?.name ? ` · moved by ${c.by.name}` : '';
             return `<div class="cm-comment flex gap-2 ${isNew ? 'cm-new border-l-2 border-brand-500 pl-2 -ml-2.5' : ''}" data-comment-id="${escapeHtml(c.id)}">
                 ${avatarHtml(c.by?.email ? c.by : { email: cmName(c), name: cmName(c) }, 'Author', 'sm')}
-                <div class="flex-1 min-w-0"><div class="flex items-center gap-2 text-[11px] min-w-0"><b class="text-slate-900 min-w-0 truncate" title="${escapeHtml(c.by?.email && !c.originalAuthor ? `${c.by.name} (${c.by.email})` : '')}">${escapeHtml(cmName(c))}</b><span class="text-slate-400" title="${escapeHtml(formatPHT(time))}">${escapeHtml(formatRelativeTime(time))}${escapeHtml(movedBy)}</span>${isNew ? '<span class="cm-new-tag text-[10px] font-bold text-brand-700">New</span>' : ''}</div>
+                <div class="flex-1 min-w-0"><div class="flex items-center gap-2 text-[11px] min-w-0"><b class="text-slate-900 min-w-0 truncate" title="${escapeHtml(c.by?.email && !c.originalAuthor ? `${personLabel(personOf(c.by))} (${c.by.email})` : '')}">${escapeHtml(cmName(c))}</b><span class="text-slate-400" title="${escapeHtml(formatPHT(time))}">${escapeHtml(formatRelativeTime(time))}${escapeHtml(movedBy)}</span>${isNew ? '<span class="cm-new-tag text-[10px] font-bold text-brand-700">New</span>' : ''}</div>
                 <p class="cm-text text-xs text-slate-700 leading-relaxed whitespace-pre-wrap break-words">${cmFormat(c)}</p>
                 ${!isReply && cmCanWrite(ctx) ? `<button type="button" class="cm-reply mt-0.5 text-[11px] font-semibold text-slate-500 hover:text-brand-700" onclick="cmReply('${ctx}', '${escapeHtml(c.id)}')"><i class="ph-bold ph-arrow-bend-up-left" aria-hidden="true"></i> Reply</button>` : ''}</div></div>`;
         }
@@ -4398,11 +4480,12 @@
             if (!listEl) return;
             if (!m) { listEl.classList.add('hidden'); return; }
             const q = m[2].toLowerCase();
-            const matches = cmPeople(ctx).filter(p => !q || p.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q)) || p.name.toLowerCase().startsWith(q) || p.email.startsWith(q)).slice(0, 8);
+            const words = p => [p.name, p.fullName || ''].join(' ').toLowerCase();
+            const matches = cmPeople(ctx).filter(p => !q || words(p).split(/\s+/).some(w => w.startsWith(q)) || p.name.toLowerCase().startsWith(q) || (p.fullName || '').toLowerCase().startsWith(q) || p.email.startsWith(q)).slice(0, 8);
             cmState[ctx].pick = 0;
             cmState[ctx].matches = matches;
             if (!matches.length) { listEl.classList.add('hidden'); return; }
-            listEl.innerHTML = matches.map((p, i) => `<button type="button" role="option" aria-selected="${i === 0}" data-mention-email="${escapeHtml(p.email)}" onmousedown="event.preventDefault(); cmPick('${ctx}', ${i})" class="w-full flex items-center gap-2 px-2.5 py-1.5 text-left ${i === 0 ? 'bg-slate-100' : 'hover:bg-slate-50'}">${avatarHtml(p, '', 'sm')}<span class="truncate">${escapeHtml(p.name)}</span></button>`).join('');
+            listEl.innerHTML = matches.map((p, i) => `<button type="button" role="option" aria-selected="${i === 0}" data-mention-email="${escapeHtml(p.email)}" onmousedown="event.preventDefault(); cmPick('${ctx}', ${i})" class="w-full flex items-center gap-2 px-2.5 py-1.5 text-left ${i === 0 ? 'bg-slate-100' : 'hover:bg-slate-50'}">${avatarHtml(p, '', 'sm')}<span class="truncate font-semibold">${escapeHtml(p.name)}</span>${p.nickname && p.fullName !== p.name ? `<span class="truncate text-[11px] text-slate-400">${escapeHtml(p.fullName)}</span>` : ''}${positionLabel(p.positionId) ? `<span class="ml-auto shrink-0 text-[10px] text-slate-400">${escapeHtml(positionLabel(p.positionId))}</span>` : ''}</button>`).join('');
             listEl.classList.remove('hidden');
         };
         window.cmPick = function(ctx, i) {
@@ -4575,7 +4658,7 @@
                     : `commented on your ${t.type === 'feedback' ? 'feedback' : 'deliverable'} ${label}`;
                 const quote = n.kind === 'added' ? escapeHtml(n.text || '') : `"${escapeHtml(n.text || '')}"`;
                 const mailed = n.emailedAt ? ' <i class="fy-mailed ph ph-envelope-simple text-[12px] align-[-2px]" title="Also sent to your email" aria-label="Also sent to your email"></i>' : '';
-                return `<button type="button" class="fy-item w-full text-left flex gap-3 px-4 py-3 border-b border-slate-50 hover:bg-slate-50 ${n.read ? '' : 'bg-brand-50/40'}" data-fy="${escapeHtml(n.id)}" data-kind="${escapeHtml(n.kind || '')}" onclick="openForYou('${escapeHtml(n.id)}')">${avatarHtml(n.by || {}, '', 'sm')}<span class="flex-1 min-w-0 text-xs"><b class="text-slate-900">${escapeHtml(n.by?.name || 'Someone')}</b> ${what}<span class="block text-slate-500 truncate mt-0.5">${quote}</span><span class="block text-[11px] text-slate-400 mt-0.5" title="${escapeHtml(formatPHT(n.at))}">${escapeHtml(formatRelativeTime(n.at))}${mailed}</span></span>${n.read ? '' : '<span class="w-2 h-2 mt-1.5 rounded-full bg-brand-500 shrink-0" aria-label="Unread"></span>'}</button>`;
+                return `<button type="button" class="fy-item w-full text-left flex gap-3 px-4 py-3 border-b border-slate-50 hover:bg-slate-50 ${n.read ? '' : 'bg-brand-50/40'}" data-fy="${escapeHtml(n.id)}" data-kind="${escapeHtml(n.kind || '')}" onclick="openForYou('${escapeHtml(n.id)}')">${avatarHtml(n.by || {}, '', 'sm')}<span class="flex-1 min-w-0 text-xs"><b class="text-slate-900">${escapeHtml(liveName(n.by) || 'Someone')}</b> ${what}<span class="block text-slate-500 truncate mt-0.5">${quote}</span><span class="block text-[11px] text-slate-400 mt-0.5" title="${escapeHtml(formatPHT(n.at))}">${escapeHtml(formatRelativeTime(n.at))}${mailed}</span></span>${n.read ? '' : '<span class="w-2 h-2 mt-1.5 rounded-full bg-brand-500 shrink-0" aria-label="Unread"></span>'}</button>`;
             }).join('');
             renderEmailLine();
         }
@@ -4668,7 +4751,8 @@
         function personOf(ref) {
             if (!ref?.email) return null;
             const d = peopleDir.get(ref.email);
-            return { email: ref.email, name: d?.name || ref.name || ref.email.split('@')[0], photoURL: d?.photoURL || '', noAccess: !!d?.noAccess };
+            const name = d?.name || ref.name || ref.email.split('@')[0];
+            return { email: ref.email, name, fullName: d?.fullName || name, nickname: d?.nickname || '', position: positionLabel(d?.positionId), photoURL: d?.photoURL || '', noAccess: !!d?.noAccess };
         }
         function avatarColor(email) {
             let h = 7;
@@ -4678,11 +4762,21 @@
         function initialsOf(name) {
             return String(name || '?').split(/[\s._@-]+/).filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
         }
+        // 2.17.0: "Ana (Ana Cruz-Villanueva) · QA Lead": the shown name, the full name when a nickname differs, the position
+        function personLabel(p) {
+            if (!p) return '';
+            return `${p.name}${p.nickname && p.fullName && p.fullName !== p.name ? ` (${p.fullName})` : ''}${p.position ? ' · ' + p.position : ''}`;
+        }
+        // The current shown name for someone on a saved record (comments, bell, Activity, History); "System (via …)" stays
+        function liveName(by) {
+            if (!by?.email || /^System \(via /.test(by.name || '')) return by?.name || '';
+            return personOf(by).name;
+        }
         function avatarHtml(ref, role, size = 'md') {
             const p = personOf(ref);
             if (!p) return '';
             const dim = size === 'sm' ? 'w-5 h-5 text-[9px]' : 'w-6 h-6 text-[10px]';
-            const label = `${p.name} · ${role}${p.noAccess ? ' (no access)' : ''}`;
+            const label = [personLabel(p), role].filter(Boolean).join(' · ') + (p.noAccess ? ' (no access)' : '');
             const inner = p.photoURL ? `<img src="${escapeHtml(p.photoURL)}" alt="" referrerpolicy="no-referrer" class="w-full h-full rounded-full object-cover">` : escapeHtml(initialsOf(p.name));
             return `<span class="person-avatar ${dim} ${role === 'Owner' ? 'ring-2 ring-brand-600' : ''} ${p.noAccess ? 'grayscale opacity-50' : ''} rounded-full inline-flex items-center justify-center font-bold text-white border-2 border-white shrink-0 overflow-hidden" style="background:${avatarColor(p.email)}" title="${escapeHtml(label)}" role="img" aria-label="${escapeHtml(label.replace(' · ', ', '))}" data-person="${escapeHtml(p.email)}" data-role="${role}">${inner}</span>`;
         }
@@ -4731,8 +4825,14 @@
         function onPeopleSnapshot(snap) {
             peopleDir = new Map(snap.docs.map(d => {
                 const v = d.data();
-                return [d.id, { email: d.id, name: v.name || d.id.split('@')[0], photoURL: v.photoURL || '', noAccess: !!v.noAccess }];
+                // 2.17.0 (profile spec): googleName / googlePhoto are what sign-in copies; name / photoURL are what people see
+                const googleName = v.name || d.id.split('@')[0], googlePhoto = v.photoURL || '';
+                const mode = v.photoMode || 'google';
+                const photoURL = mode === 'upload' && v.photo ? v.photo : mode === 'none' ? '' : googlePhoto;
+                return [d.id, { email: d.id, name: (v.nickname || '').trim() || googleName, fullName: googleName, nickname: v.nickname || '', positionId: v.positionId || '',
+                    photoURL, googlePhoto, photo: v.photo || '', photoMode: mode, noAccess: !!v.noAccess }];
             }));
+            refreshMeUI();
             peopleLoaded = true;
             syncMyPeopleEntry();
             syncPeopleFromMembers();
@@ -4746,7 +4846,7 @@
             const email = myEmail();
             const name = clip(currentUser.displayName || email.split('@')[0], 200), photoURL = currentUser.photoURL || '';
             const mine = peopleDir.get(email);
-            if (mine && mine.name === name && mine.photoURL === photoURL) return;
+            if (mine && mine.fullName === name && mine.googlePhoto === photoURL) return;
             const batch = writeBatch(db);
             batch.set(wsRef('people', email), { email, name, photoURL, updatedAt: serverTimestamp() }, { merge: true });
             batch.commit().catch(err => { peopleSelfSynced = false; console.warn('Could not update the people directory:', err); });
@@ -4761,7 +4861,7 @@
                 const entry = peopleDir.get(email);
                 const noAccess = m.role === 'blocked';
                 if (!email || (entry && entry.noAccess === noAccess)) return;
-                batch.set(wsRef('people', email), { email, name: clip(entry?.name || m.name || email.split('@')[0], 200), photoURL: entry?.photoURL || m.photoURL || '', noAccess, updatedAt: serverTimestamp() }, { merge: true });
+                batch.set(wsRef('people', email), { email, name: clip(entry?.fullName || m.name || email.split('@')[0], 200), photoURL: entry?.googlePhoto ?? (m.photoURL || ''), noAccess, updatedAt: serverTimestamp() }, { merge: true });
                 n++;
             });
             if (n) batch.commit().catch(err => console.warn('Could not fill in the people directory:', err));
@@ -4826,12 +4926,12 @@
             const assigned = [editPeople.owner, ...editPeople.team].filter(r => r?.email);
             const people = activePeople().map(p => personOf(p)).concat(assigned.filter(r => !activePeople().some(p => p.email === r.email)).map(personOf));
             const full = editPeople.team.length >= TEAM_MAX;
-            const rows = people.filter(p => !q || p.name.toLowerCase().includes(q) || p.email.includes(q)).map(p => {
+            const rows = people.filter(p => !q || p.name.toLowerCase().includes(q) || p.fullName.toLowerCase().includes(q) || p.position.toLowerCase().includes(q) || p.email.includes(q)).map(p => {
                 const isOwner = editPeople.owner?.email === p.email, inTeam = editPeople.team.some(t => t.email === p.email);
                 const e = escapeHtml(p.email), n = escapeHtml(p.name);
                 return `<div class="people-row flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-50" data-email="${e}">
                     ${avatarHtml(p, isOwner ? 'Owner' : 'Team', 'sm')}
-                    <span class="flex-1 min-w-0"><span class="block font-semibold text-slate-800 truncate">${n}${p.email === myEmail() ? ' <span class="font-normal text-slate-500">(you)</span>' : ''}${p.noAccess ? ' <span class="font-normal italic text-slate-400">(no access)</span>' : ''}</span><span class="block text-[10px] text-slate-500 truncate">${e}</span></span>
+                    <span class="flex-1 min-w-0"><span class="block font-semibold text-slate-800 truncate">${n}${p.email === myEmail() ? ' <span class="font-normal text-slate-500">(you)</span>' : ''}${p.noAccess ? ' <span class="font-normal italic text-slate-400">(no access)</span>' : ''}</span><span class="block text-[10px] text-slate-500 truncate">${p.position ? `<span class="people-position text-slate-600">${escapeHtml(p.position)}</span> · ` : ''}${e}</span></span>
                     <input type="radio" name="edit-people-owner" value="${e}" ${isOwner ? 'checked' : ''} ${p.noAccess && !isOwner ? 'disabled' : ''} onchange="setEditOwner(this.value)" aria-label="Owner: ${n}" class="mr-6 text-brand-600">
                     <input type="checkbox" value="${e}" ${inTeam ? 'checked' : ''} ${isOwner || (p.noAccess && !inTeam) || (full && !inTeam) ? 'disabled' : ''} onchange="toggleEditTeam(this.value, this.checked)" aria-label="Team: ${n}" class="mr-2 rounded text-brand-600">
                 </div>`;
@@ -5112,7 +5212,7 @@
             const lbl = 'block text-[10px] font-semibold text-slate-600 mb-0.5';
             const onItem = [item?.owner, ...(item?.team || [])].filter(r => r?.email).map(r => r.email);
             const people = activePeople();
-            const opt = p => `<option value="${escapeHtml(p.email)}" ${t.assignee?.email === p.email ? 'selected' : ''}>${escapeHtml(p.name)}${p.email === myEmail() ? ' (you)' : ''}</option>`;
+            const opt = p => `<option value="${escapeHtml(p.email)}" ${t.assignee?.email === p.email ? 'selected' : ''}>${escapeHtml(p.name)}${positionLabel(p.positionId) ? ' · ' + escapeHtml(positionLabel(p.positionId)) : ''}${p.email === myEmail() ? ' (you)' : ''}</option>`;
             const assigneeMissing = t.assignee?.email && !people.some(p => p.email === t.assignee.email);
             const cur = currentSprint();
             return `<div class="task-form px-2.5 pb-2.5 pt-1.5 grid grid-cols-6 gap-2 border-t border-slate-100" onclick="event.stopPropagation()">
@@ -7238,7 +7338,7 @@
         function myEmail() { return (currentUser?.email || '').toLowerCase(); }
         function actor() {
             const email = myEmail();
-            return { name: currentUser?.displayName || email.split('@')[0] || 'Workspace Member', email };
+            return { name: (peopleDir.get(email)?.name) || currentUser?.displayName || email.split('@')[0] || 'Workspace Member', email };
         }
         function canEdit() { return myRole === 'admin' || myRole === 'editor'; }
         function isAdmin() { return myRole === 'admin'; }
@@ -7823,7 +7923,7 @@
                             <div class="text-xs font-bold text-slate-900 truncate">${escapeHtml(name)}</div>
                             <div class="text-[11px] text-slate-500">
                                 ${kind !== 'roadmap' ? `${escapeHtml(roadmap.title)}${roadmapGone ? ' (in the bin)' : ''} · ` : ''}deleted by
-                                <span title="${escapeHtml(by?.email ? `${by.name} (${by.email})` : '')}">${escapeHtml(by?.name || 'someone')}</span> ·
+                                <span title="${escapeHtml(by?.email ? `${by.name} (${by.email})` : '')}">${escapeHtml(liveName(by) || 'someone')}</span> ·
                                 <span title="${escapeHtml(formatPHT(item.deletedAt))}">${escapeHtml(formatRelativeTime(item.deletedAt))}</span>
                             </div>
                         </div>
@@ -7966,6 +8066,7 @@
             stopAllListeners();
             sessionUnsubs.push(onSnapshot(wsRef('members', myEmail()), onMyMemberChanged, onListenerError));
             sessionUnsubs.push(onSnapshot(wsRef('settings', 'sprints'), onSprintsSnapshot, err => console.warn('Sprint calendar unavailable:', err)));
+            sessionUnsubs.push(onSnapshot(wsRef('settings', 'positions'), onPositionsSnapshot, err => console.warn('Positions unavailable:', err)));
             watchForYou();
             sessionUnsubs.push(() => stopForYou());
             sessionUnsubs.push(onSnapshot(wsCollection('people'), onPeopleSnapshot, err => console.warn('People directory unavailable:', err)));
@@ -9000,7 +9101,7 @@
             const ci = stageIdx(cur);
             const skipped = new Set(item.skipped || []);
             const pct = stageProgress(item);
-            const who = e => e ? `<span title="${escapeHtml(`${e.by?.email || ''} · ${formatPHT(e.at)}`)}">by ${escapeHtml(e.by?.name || 'Member')} · ${escapeHtml(shortDay(e.at))}</span>` : '';
+            const who = e => e ? `<span title="${escapeHtml(`${e.by?.email || ''} · ${formatPHT(e.at)}`)}">by ${escapeHtml(liveName(e.by) || 'Member')} · ${escapeHtml(shortDay(e.at))}</span>` : '';
             const since = toDate(item.stageSince);
             const days = since ? Math.max(0, Math.floor((Date.now() - since.getTime()) / 864e5)) : null;
             const row = (s, i) => {
@@ -9471,7 +9572,7 @@
 
         // The entry as one sentence (HTML, all values escaped) plus the full change list for the ▸ details
         function activitySentence(e) {
-            const who = `<b class="font-bold text-slate-900" title="${escapeHtml(e.by?.email ? `${e.by.name} (${e.by.email})` : '')}">${escapeHtml(e.by?.name || 'Member')}</b>`;
+            const who = `<b class="font-bold text-slate-900" title="${escapeHtml(e.by?.email ? `${e.by.name} (${e.by.email})` : '')}">${escapeHtml(liveName(e.by) || 'Member')}</b>`;
             const q = text => `<b class="font-bold text-slate-800">"${escapeHtml(text || '')}"</b>`;
             const label = e.target?.label || '';
             const changes = e.changes || [];
@@ -9988,22 +10089,27 @@
             const count = document.getElementById('users-count');
             if (count) count.textContent = `${pluralize(list.length, 'user')}${list.length !== membersList.length ? ` of ${membersList.length}` : ''}`;
             if (!list.length) {
-                body.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-500 text-xs">${membersList.length ? 'No users match.' : 'Loading users...'}</td></tr>`;
+                body.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-slate-500 text-xs">${membersList.length ? 'No users match.' : 'Loading users...'}</td></tr>`;
                 return;
             }
             body.innerHTML = list.map(m => {
                 const email = m.email || m.id;
                 const isMe = email === myEmail();
+                const dir = peopleDir.get(email);
+                const posSelect = extra => `<select aria-label="Position for ${escapeHtml(m.name || email)}" data-position-email="${escapeHtml(email)}" onchange="setMemberPosition(this)" class="user-position ${extra} text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white max-w-[9rem]"><option value="">No position</option>${positionsList.map(p => `<option value="${escapeHtml(p.id)}" ${dir?.positionId === p.id ? 'selected' : ''}>${escapeHtml(p.label)}</option>`).join('')}</select>`;
+                const canClear = !isMe && (dir?.nickname || (dir?.photoMode === 'upload' && dir?.photo));
                 return `
                     <tr class="hover:bg-slate-50">
                         <td class="py-2.5 px-3">
-                            <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">${escapeHtml(m.name || email)}
+                            <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">${avatarHtml({ email }, '', 'sm')}${escapeHtml(dir?.name || m.name || email)}${dir?.nickname && dir.fullName !== dir.name ? `<span class="font-normal text-slate-400">· ${escapeHtml(dir.fullName)}</span>` : ''}
+                                ${canClear ? `<button type="button" onclick="openProfileClearMenu(this, '${escapeHtml(email)}')" aria-label="Profile options for ${escapeHtml(dir.name)}" title="Clear photo or nickname" class="ml-auto px-1.5 rounded text-slate-500 hover:bg-slate-100">⋯</button>` : ''}
                                 ${isRecent(m) ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">New</span>' : ''}
                                 ${isMe ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">You</span>' : ''}
                                 ${m.emailNotify === false && EMAIL_RELAY_URL ? '<i class="email-off ph ph-envelope-simple-slash text-slate-400 font-normal" title="Email notifications off" aria-label="Email notifications off"></i>' : ''}
                             </div>
                             <div class="text-[11px] text-slate-500 break-all">${escapeHtml(email)}</div>
                             <div class="sm:hidden text-[11px] text-slate-400">Active ${escapeHtml(formatRelativeTime(m.lastSeenAt))}</div>
+                            <div class="sm:hidden mt-1">${posSelect('')}</div>
                         </td>
                         <td class="py-2.5 px-3">
                             <select aria-label="Role for ${escapeHtml(m.name || email)}" data-email="${escapeHtml(email)}" onchange="changeMemberRole(this)" ${isMe ? 'disabled title="Another admin must change your role"' : ''}
@@ -10011,6 +10117,7 @@
                                 ${['admin', 'editor', 'viewer', 'blocked'].map(r => `<option value="${r}" ${m.role === r ? 'selected' : ''}>${ROLE_LABELS[r]}</option>`).join('')}
                             </select>
                         </td>
+                        <td class="hidden sm:table-cell py-2.5 px-3">${posSelect('')}</td>
                         <td class="hidden sm:table-cell py-2.5 px-3 text-[11px] text-slate-600 whitespace-nowrap" title="${escapeHtml(formatPHT(m.joinedAt))}">${escapeHtml(formatRelativeTime(m.joinedAt))}</td>
                         <td class="hidden sm:table-cell py-2.5 px-3 text-[11px] text-slate-600 whitespace-nowrap" title="${escapeHtml(formatPHT(m.lastSeenAt))}">${escapeHtml(formatRelativeTime(m.lastSeenAt))}</td>
                     </tr>`;
@@ -10272,6 +10379,277 @@
             // After this click is done, or the menu's "click outside closes it" handler would shut it again
             setTimeout(() => { openAccountMenu(); document.getElementById('email-notify-btn')?.focus(); }, 0);
         };
+        // =======================================================
+        // MY PROFILE (2.17.0, specs/profile.md, design/profile.md): photo, nickname, position; Positions list (Admins)
+        // =======================================================
+        function positionLabel(id) { return id ? positionsList.find(p => p.id === id)?.label || '' : ''; }
+        function onPositionsSnapshot(snap) {
+            positionsList = ((snap.exists() ? snap.data()?.positions : null) || []).filter(p => p?.id && p?.label).map(p => ({ id: String(p.id), label: String(p.label) }));
+            refreshMeUI();
+            scheduleRender();
+            if (!document.getElementById('profile-modal')?.classList.contains('hidden')) renderProfileForm();
+            if (!document.getElementById('users-modal')?.classList.contains('hidden')) window.renderUsers?.();
+            if (!document.getElementById('edit-people-picker')?.classList.contains('hidden')) renderPeoplePicker();
+        }
+        // Header chip + account menu: your photo, shown name and position
+        function refreshMeUI() {
+            if (!currentUser) return;
+            updateUserHeaderUI();
+            const p = personOf({ email: myEmail() });
+            const pos = document.getElementById('header-user-position');
+            if (pos) { pos.textContent = p?.position || ''; pos.classList.toggle('hidden', !p?.position); }
+            const av = document.getElementById('account-avatar');
+            if (av) av.innerHTML = avatarHtml({ email: myEmail() }, '', 'md');
+            document.getElementById('my-profile-btn')?.classList.toggle('hidden', !useCloudPersistence);
+        }
+
+        // ---- My profile window (D-2) ----
+        const PROFILE_PHOTO_MAX = 39000;           // characters of the JPEG data URL (rules allow 40,000)
+        const NICK_OK = /^[\p{L}][\p{L} .'-]{1,39}$/u;
+        let profileDraft = null, profileOriginal = null, profileDrag = null;
+        window.openMyProfile = function() {
+            if (!useCloudPersistence || !currentUser) return;
+            closeAccountMenu();
+            const d = peopleDir.get(myEmail()) || {};
+            profileOriginal = { nickname: d.nickname || '', positionId: d.positionId || '', photoMode: d.photoMode || 'google', photo: d.photo || '' };
+            profileDraft = { ...profileOriginal, googlePhoto: d.googlePhoto ?? (currentUser.photoURL || ''), fullName: d.fullName || currentUser.displayName || myEmail().split('@')[0], img: null, zoom: 1, dx: 0, dy: 0, error: '' };
+            const nick = document.getElementById('profile-nickname');
+            if (nick) nick.value = profileDraft.nickname;
+            const zoom = document.getElementById('profile-zoom');
+            if (zoom) zoom.value = '1';
+            renderProfileForm();
+            document.getElementById('profile-modal')?.classList.remove('hidden');
+        };
+        window.closeMyProfile = function() { document.getElementById('profile-modal')?.classList.add('hidden'); profileDraft = null; };
+        function profileShown() {
+            const d = profileDraft;
+            const photo = d.photoMode === 'upload' && d.photo ? d.photo : d.photoMode === 'none' ? '' : d.googlePhoto;
+            return { email: myEmail(), name: d.nickname.trim() || d.fullName, fullName: d.fullName, nickname: d.nickname.trim(), position: positionLabel(d.positionId), photoURL: photo };
+        }
+        function renderProfileForm() {
+            const d = profileDraft;
+            if (!d) return;
+            const p = profileShown();
+            const box = document.getElementById('profile-photo-box');
+            if (box) {
+                box.style.background = p.photoURL ? '#f1f5f9' : avatarColor(p.email);
+                box.classList.toggle('cursor-move', !!d.img);
+                box.title = d.img ? 'Drag to move the photo' : '';
+                box.innerHTML = p.photoURL ? `<img src="${escapeHtml(p.photoURL)}" alt="" referrerpolicy="no-referrer" draggable="false" class="w-full h-full object-cover pointer-events-none">` : `<span class="w-full h-full flex items-center justify-center text-3xl font-black text-white">${escapeHtml(initialsOf(p.name))}</span>`;
+            }
+            document.getElementById('profile-zoom-wrap')?.classList.toggle('hidden', !d.img);
+            const note = document.getElementById('profile-photo-note');
+            if (note) { note.classList.toggle('hidden', !d.img); note.textContent = d.img ? `Drag the photo to move it · saved small (about ${Math.max(1, Math.round(d.photo.length * 0.75 / 1024))} KB)` : ''; }
+            const err = document.getElementById('profile-photo-error');
+            if (err) { err.textContent = d.error; err.classList.toggle('hidden', !d.error); }
+            const g = document.getElementById('profile-google-btn');
+            if (g) { g.classList.toggle('hidden', !d.googlePhoto); g.disabled = d.photoMode === 'google'; }
+            const rm = document.getElementById('profile-remove-btn');
+            if (rm) rm.disabled = !p.photoURL;
+            const nick = d.nickname.trim(), nickBad = !!nick && !NICK_OK.test(nick);
+            const count = document.getElementById('profile-nickname-count');
+            if (count) count.textContent = `${d.nickname.length}/40`;
+            const help = document.getElementById('profile-nickname-help'), nickInput = document.getElementById('profile-nickname');
+            if (help) { help.textContent = nickBad ? "Use 2–40 letters, spaces, . ' or -" : 'Shown instead of your full name. People still see your full name when they hover.'; help.classList.toggle('text-rose-600', nickBad); help.classList.toggle('text-slate-400', !nickBad); }
+            nickInput?.classList.toggle('border-rose-400', nickBad);
+            nickInput?.setAttribute('placeholder', d.fullName.split(/\s+/)[0] || '');
+            const sel = document.getElementById('profile-position');
+            if (sel) {
+                const missing = d.positionId && !positionsList.some(x => x.id === d.positionId);
+                sel.innerHTML = `<option value="">No position</option>${positionsList.map(x => `<option value="${escapeHtml(x.id)}" ${x.id === d.positionId ? 'selected' : ''}>${escapeHtml(x.label)}</option>`).join('')}${missing ? '<option value="" selected>No position (removed)</option>' : ''}`;
+                sel.disabled = !positionsList.length;
+            }
+            const ph = document.getElementById('profile-position-help');
+            if (ph) ph.innerHTML = positionsList.length ? 'Positions come from the list Admins keep.' : `No positions yet. An Admin adds them in ${isAdmin() ? '<button type="button" onclick="closeMyProfile(); openPositionsWindow()" class="font-semibold text-brand-700 hover:underline">Positions…</button>' : 'Positions…'}`;
+            document.getElementById('profile-fullname').textContent = d.fullName;
+            document.getElementById('profile-email').textContent = myEmail();
+            const prev = document.getElementById('profile-preview');
+            if (prev) prev.innerHTML = `${profileAvatarHtml(p, 28)}<span class="text-xs"><b class="text-slate-900">${escapeHtml(p.name)}</b>${p.position ? ` <span class="text-slate-500">· ${escapeHtml(p.position)}</span>` : ''}</span>`;
+            const hov = document.getElementById('profile-preview-hover');
+            if (hov) hov.textContent = `${personLabel(p)} · Owner`;
+            const changed = ['nickname', 'positionId', 'photoMode', 'photo'].some(k => (k === 'nickname' ? d.nickname.trim() : d[k]) !== profileOriginal[k]);
+            const save = document.getElementById('profile-save-btn');
+            if (save) save.disabled = !changed || nickBad;
+        }
+        // The preview avatar (the draft isn't in the directory yet)
+        function profileAvatarHtml(p, px) {
+            const inner = p.photoURL ? `<img src="${escapeHtml(p.photoURL)}" alt="" referrerpolicy="no-referrer" class="w-full h-full rounded-full object-cover">` : escapeHtml(initialsOf(p.name));
+            return `<span class="rounded-full inline-flex items-center justify-center font-bold text-white text-[11px] ring-2 ring-brand-600 border-2 border-white shrink-0 overflow-hidden" style="width:${px}px;height:${px}px;background:${avatarColor(p.email)}" aria-hidden="true">${inner}</span>`;
+        }
+        window.profileNickInput = function(v) { profileDraft.nickname = v; renderProfileForm(); };
+        window.profileSetPosition = function(v) { if (!profileDraft) return; profileDraft.positionId = v; renderProfileForm(); };
+        window.profilePickPhoto = function(input) {
+            const file = input.files?.[0];
+            input.value = '';
+            if (!file || !profileDraft) return;
+            if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 10 * 1024 * 1024) { profileDraft.error = 'Use a JPG, PNG or WebP photo under 10 MB.'; renderProfileForm(); return; }
+            const img = new Image();
+            img.onload = () => {
+                if (!profileDraft) return;
+                Object.assign(profileDraft, { img, zoom: 1, dx: 0, dy: 0, photoMode: 'upload', error: '' });
+                document.getElementById('profile-zoom').value = '1';
+                profileCrop();
+                renderProfileForm();
+                URL.revokeObjectURL(img.src);
+            };
+            img.onerror = () => { profileDraft.error = "That photo couldn't be read. Try another one."; renderProfileForm(); };
+            img.src = URL.createObjectURL(file);
+        };
+        // Centre square, zoom 1–3×, moved by dragging; 128 × 128 JPEG, quality lowered until it fits the limit
+        function profileCrop() {
+            const d = profileDraft, im = d?.img;
+            if (!im) return;
+            const w = im.naturalWidth, h = im.naturalHeight, side = Math.min(w, h) / d.zoom, k = side / 96;
+            const sx = Math.max(0, Math.min(w - side, (w - side) / 2 - d.dx * k)), sy = Math.max(0, Math.min(h - side, (h - side) / 2 - d.dy * k));
+            d.dx = ((w - side) / 2 - sx) / k; d.dy = ((h - side) / 2 - sy) / k;   // can't drag the photo out of the circle
+            const c = document.createElement('canvas');
+            c.width = c.height = 128;
+            const g = c.getContext('2d');
+            g.fillStyle = '#ffffff'; g.fillRect(0, 0, 128, 128);
+            g.drawImage(im, sx, sy, side, side, 0, 0, 128, 128);
+            let q = 0.85, url = c.toDataURL('image/jpeg', q);
+            while (url.length > PROFILE_PHOTO_MAX && q > 0.3) { q -= 0.1; url = c.toDataURL('image/jpeg', q); }
+            d.photo = url;
+        }
+        window.profileZoom = function(v) { if (!profileDraft?.img) return; profileDraft.zoom = Number(v) || 1; profileCrop(); renderProfileForm(); };
+        window.profileDragStart = function(e) {
+            if (!profileDraft?.img) return;
+            e.preventDefault();
+            profileDrag = { x: e.clientX, y: e.clientY, dx: profileDraft.dx, dy: profileDraft.dy };
+        };
+        window.addEventListener('pointermove', e => {
+            if (!profileDrag || !profileDraft?.img) return;
+            profileDraft.dx = profileDrag.dx + (e.clientX - profileDrag.x);
+            profileDraft.dy = profileDrag.dy + (e.clientY - profileDrag.y);
+            profileCrop();
+            renderProfileForm();
+        });
+        window.addEventListener('pointerup', () => { profileDrag = null; });
+        window.profileUseGoogle = function() { Object.assign(profileDraft, { photoMode: 'google', photo: '', img: null, error: '' }); renderProfileForm(); };
+        window.profileRemovePhoto = function() { Object.assign(profileDraft, { photoMode: 'none', photo: '', img: null, error: '' }); renderProfileForm(); };
+        window.saveMyProfile = async function() {
+            const d = profileDraft;
+            if (!d) return;
+            const nickname = d.nickname.trim();
+            if (nickname && !NICK_OK.test(nickname)) return;
+            const email = myEmail();
+            const data = { email, name: clip(d.fullName, 200), nickname, positionId: d.positionId || '', photoMode: d.photoMode, photo: d.photoMode === 'upload' ? d.photo : '', updatedAt: serverTimestamp() };
+            const ok = await commitBatch(b => b.set(wsRef('people', email), data, { merge: true }), 'save your profile');
+            if (!ok) return;
+            closeMyProfile();
+            showSaveStatus('info', 'Profile saved');
+        };
+
+        // ---- Positions window (Admins, D-3) ----
+        let positionsDraft = [];
+        const positionUsers = id => [...peopleDir.values()].filter(p => p.positionId === id).length;
+        window.openPositionsWindow = function() {
+            if (!isAdmin()) return;
+            positionsDraft = positionsList.map(p => ({ ...p }));
+            document.getElementById('positions-error')?.classList.add('hidden');
+            renderPositionsRows();
+            document.getElementById('positions-modal')?.classList.remove('hidden');
+        };
+        window.closePositionsWindow = function() { document.getElementById('positions-modal')?.classList.add('hidden'); };
+        function renderPositionsRows(focusIndex = -1) {
+            const box = document.getElementById('positions-rows');
+            if (!box) return;
+            const dup = new Set(), seen = new Set();
+            positionsDraft.forEach(p => { const k = p.label.trim().toLowerCase(); if (k && seen.has(k)) dup.add(k); seen.add(k); });
+            box.innerHTML = positionsDraft.length ? positionsDraft.map((p, i) => {
+                const n = positionUsers(p.id), bad = !p.label.trim() || dup.has(p.label.trim().toLowerCase());
+                return `<div class="position-row flex items-center gap-2" data-position-id="${escapeHtml(p.id)}">
+                    <input type="text" maxlength="60" value="${escapeHtml(p.label)}" aria-label="Position ${i + 1}" oninput="setPositionLabel(${i}, this.value)" onchange="renderPositionsRows()" class="flex-1 min-w-0 px-2.5 py-1.5 border ${bad ? 'border-rose-400' : 'border-slate-200'} rounded-lg focus:border-brand-500 outline-none">
+                    <span class="w-16 text-right text-[11px] ${bad ? 'text-rose-600 font-semibold' : 'text-slate-500'}">${bad ? (p.label.trim() ? 'Duplicate' : 'Empty') : pluralize(n, 'person', 'people')}</span>
+                    <button type="button" onclick="movePosition(${i}, -1)" ${i ? '' : 'disabled'} aria-label="Move up" class="px-1 text-slate-500 hover:text-slate-800 disabled:opacity-30">↑</button>
+                    <button type="button" onclick="movePosition(${i}, 1)" ${i < positionsDraft.length - 1 ? '' : 'disabled'} aria-label="Move down" class="px-1 text-slate-500 hover:text-slate-800 disabled:opacity-30">↓</button>
+                    <button type="button" onclick="removePosition(${i})" aria-label="Remove ${escapeHtml(p.label)}" class="px-1 text-slate-400 hover:text-rose-600"><i class="ph ph-trash" aria-hidden="true"></i></button>
+                </div>`;
+            }).join('') : '<p class="py-3 text-center text-slate-500 italic">No positions yet.</p>';
+            if (focusIndex >= 0) box.querySelectorAll('input')[focusIndex]?.focus();
+        }
+        window.setPositionLabel = function(i, v) { if (positionsDraft[i]) positionsDraft[i].label = v; };
+        window.addPositionRow = function() { positionsDraft.push({ id: newId('pos'), label: '' }); renderPositionsRows(positionsDraft.length - 1); };
+        window.movePosition = function(i, dir) { const j = i + dir; if (j < 0 || j >= positionsDraft.length) return; [positionsDraft[i], positionsDraft[j]] = [positionsDraft[j], positionsDraft[i]]; renderPositionsRows(); };
+        window.removePosition = function(i) { positionsDraft.splice(i, 1); renderPositionsRows(); };
+        window.savePositions = async function() {
+            if (!isAdmin()) return;
+            const err = document.getElementById('positions-error');
+            const fail = m => { err.textContent = m; err.classList.remove('hidden'); renderPositionsRows(); };
+            const next = positionsDraft.map(p => ({ id: p.id, label: clip(p.label.trim(), 60) }));
+            if (next.some(p => !p.label)) return fail('Every position needs a name (or remove the empty one).');
+            const keys = next.map(p => p.label.toLowerCase());
+            if (keys.some((k, i) => keys.indexOf(k) !== i)) return fail('Two positions have the same name.');
+            if (next.length > 100) return fail('Up to 100 positions.');
+            const removed = positionsList.filter(p => !next.some(n => n.id === p.id));
+            const inUse = removed.filter(p => positionUsers(p.id));
+            if (inUse.length && !(await confirmAction({ title: 'Remove positions in use', confirmLabel: 'Remove',
+                messageHtml: inUse.map(p => `<strong>${escapeHtml(p.label)}</strong> is used by ${pluralize(positionUsers(p.id), 'person', 'people')}.`).join('<br>') + ' They\'ll show no position until they pick another, or an Admin sets one.' }))) return;
+            const before = new Map(positionsList.map(p => [p.id, p.label]));
+            const added = next.filter(p => !before.has(p.id)).length, renamed = next.filter(p => before.has(p.id) && before.get(p.id) !== p.label).length;
+            const moved = JSON.stringify(next.filter(p => before.has(p.id)).map(p => p.id)) !== JSON.stringify(positionsList.filter(p => next.some(n => n.id === p.id)).map(p => p.id));
+            closePositionsWindow();
+            const summary = [added && `${added} added`, renamed && `${renamed} renamed`, removed.length && `${removed.length} removed`, moved && 'reordered'].filter(Boolean).join(', ');
+            if (!summary) return;
+            const entry = auditEntry(null, 'workspace.positions_changed', { type: 'workspace', id: 'positions', label: 'Positions' }, [{ f: 'positions', to: summary }]);
+            if (!useCloudPersistence) { positionsList = next; logDemo(entry); scheduleRender(); return; }
+            const aid = newId('a');
+            await commitBatch(batch => {
+                batch.set(wsRef('settings', 'positions'), { positions: next, ...stamp(aid) });
+                batch.set(auditRef(aid), entry);
+            }, 'save the positions');
+        };
+
+        // ---- Users (Admins, D-4): set a position; clear a photo or nickname ----
+        function writePersonFields(email, fields, action, change) {
+            const dir = peopleDir.get(email);
+            const member = membersList.find(m => (m.email || m.id) === email);
+            const name = dir?.name || member?.name || email;
+            const own = email === myEmail();
+            const entry = own ? null : auditEntry(null, action, { type: 'person', id: email, label: clip(name, 200) }, [change]);
+            const aid = newId('a');
+            return commitBatch(batch => {
+                batch.set(wsRef('people', email), { email, name: clip(dir?.fullName || member?.name || email.split('@')[0], 200), ...fields, updatedAt: serverTimestamp() }, { merge: true });
+                if (entry) batch.set(auditRef(aid), entry);
+            }, 'save the change');
+        }
+        window.setMemberPosition = async function(select) {
+            const email = select.dataset.positionEmail, positionId = select.value;
+            if (!isAdmin() || !email) return;
+            const dir = peopleDir.get(email);
+            if ((dir?.positionId || '') === positionId) return;
+            const ok = await writePersonFields(email, { positionId }, 'profile.position', { f: 'position', from: positionLabel(dir?.positionId) || '—', to: positionLabel(positionId) || '—' });
+            if (ok) showSaveStatus('info', positionId ? `Position set for ${dir?.name || email}` : `Position cleared for ${dir?.name || email}`);
+        };
+        window.openProfileClearMenu = function(btn, email) {
+            document.getElementById('profile-clear-menu')?.remove();
+            const dir = peopleDir.get(email);
+            if (!dir || !isAdmin() || email === myEmail()) return;
+            const menu = document.createElement('div');
+            menu.id = 'profile-clear-menu';
+            menu.setAttribute('role', 'menu');
+            menu.className = 'fixed z-[70] w-52 bg-white border border-slate-200 rounded-xl shadow-lg py-1 text-xs';
+            menu.innerHTML = (dir.photoMode === 'upload' && dir.photo ? `<button type="button" role="menuitem" data-clear="photo" class="w-full text-left px-3 py-2 hover:bg-slate-50">Clear photo</button>` : '')
+                + (dir.nickname ? `<button type="button" role="menuitem" data-clear="nickname" class="w-full text-left px-3 py-2 hover:bg-slate-50">Clear nickname "${escapeHtml(dir.nickname)}"</button>` : '');
+            const b = btn.getBoundingClientRect();
+            menu.style.top = `${Math.min(window.innerHeight - 90, b.bottom + 4)}px`;
+            menu.style.left = `${Math.max(8, Math.min(window.innerWidth - 216, b.right - 208))}px`;
+            document.body.appendChild(menu);
+            menu.querySelector('button')?.focus();
+            const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('pointerdown', close, true); } };
+            setTimeout(() => document.addEventListener('pointerdown', close, true), 0);
+            menu.addEventListener('click', async e => {
+                const what = e.target.closest('[data-clear]')?.dataset.clear;
+                if (!what) return;
+                menu.remove();
+                const label = what === 'photo' ? 'photo' : `nickname "${dir.nickname}"`;
+                if (!(await confirmAction({ title: what === 'photo' ? 'Clear photo' : 'Clear nickname', confirmLabel: 'Clear',
+                    messageHtml: `Clear <strong>${escapeHtml(dir.fullName)}</strong>'s ${escapeHtml(label)}? ${what === 'photo' ? 'Their Google photo (or initials) shows instead.' : 'Their full name shows instead.'} They can set a new one in My profile.` }))) return;
+                const ok = await writePersonFields(email, what === 'photo' ? { photo: '', photoMode: 'google' } : { nickname: '' }, 'profile.cleared', { f: what, from: what === 'photo' ? 'uploaded photo' : dir.nickname, to: '—' });
+                if (ok) showSaveStatus('info', what === 'photo' ? `Photo cleared for ${dir.fullName}` : `Nickname cleared for ${dir.fullName}`);
+            });
+        };
+
         window.openAccountMenu = function() {
             const menu = document.getElementById('account-menu');
             if (!menu) return;
