@@ -23,7 +23,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://inventi-arkin.github.io/mapit/icons/og-image.png">
     <!-- App version: bump on every release and add a line to CHANGELOG.md (shown in the header and on the login screen) -->
-    <meta name="mapit-version" content="2.15.2" data-released="2026-11-28">
+    <meta name="mapit-version" content="2.16.0" data-released="2026-11-28">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -121,6 +121,26 @@
         .rm-item:hover, .rm-item:focus { background: #f8fafc; }
         .rm-item > i { font-size: 1rem; color: #64748b; }
         .rm-item.text-rose-600 > i { color: inherit; }
+        /* 2.16.0 Roadmap deliverable rows (design/row-layout.md): one fixed height, no wrapping; details that don't fit fold into "+N".
+           Phones / tablets: 3 lines (name / status · stage … month / module · pd · sprints · comments · people). Desktop (xl): one grid row, 2 lines per cell.
+           The line wrappers (.lr-status, .lr-meta) become display: contents on desktop, so their items are the table's cells. */
+        .list-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: 20px 18px 18px; grid-template-areas: "rank name moves" "status status month" "meta meta meta"; column-gap: .5rem; row-gap: 2px; height: 70px; align-content: center; }
+        .list-row .lr-handle { display: none; }
+        .list-row .lr-rank { grid-area: rank; } .list-row .lr-name { grid-area: name; } .list-row .lr-moves { grid-area: moves; } .list-row .lr-month { grid-area: month; }
+        .list-row .lr-status { grid-area: status; padding-left: 2rem; display: flex; align-items: center; gap: .375rem; min-width: 0; }
+        .list-row .lr-meta { grid-area: meta; padding-left: 2rem; display: flex; align-items: center; gap: .375rem; min-width: 0; overflow: hidden; }
+        .list-row .lr-meta > *, .list-row .lr-chips > * { flex-shrink: 0; }
+        .list-row .lr-meta > .lr-module { flex-shrink: 1; min-width: 0; }   /* fitListRows keeps it at least 3rem (or its full width) */
+        @media (min-width: 1280px) {
+            .list-row { grid-template-columns: 18px 84px minmax(0, 1fr) 120px 60px 176px 60px 76px 52px; grid-template-rows: 20px 20px; height: 56px;
+                grid-template-areas: "handle rank name module effort status people month moves" "handle rank chips module effort stage people month moves"; }
+            .list-row .lr-handle { display: block; grid-area: handle; }
+            .list-row .lr-status, .list-row .lr-meta { display: contents; }
+            .list-row .lr-state { grid-area: status; } .list-row .lr-stage { grid-area: stage; } .list-row .lr-module { grid-area: module; }
+            .list-row .lr-effort { grid-area: effort; } .list-row .lr-chips { grid-area: chips; overflow: hidden; } .list-row .lr-people { grid-area: people; }
+        }
+        /* "+N": details that didn't fit (hover / screen readers: what they are) */
+        .fit-more { display: inline-flex; align-items: center; height: 1.125rem; padding: 0 .35rem; border-radius: 9999px; font-size: 10px; font-weight: 700; background: #f1f5f9; color: #475569; border: 1px dashed #94a3b8; white-space: nowrap; cursor: help; }
         /* 2.14.1 phones: no zoom on focus, no sideways page, bar above the home indicator */
         html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
         @media (max-width: 639px) {
@@ -2563,26 +2583,73 @@
             return listColumnsHtml() + `<div data-rank-list="${escapeHtml(listKey)}">` + rows.map((item, n) => {
                 const effort = effortOf(item);
                 const tint = overTint(roadmap, item);
-                const badge = overFlagHtml(roadmap, item);
+                const over = overInfo(roadmap, item);
+                const id = currentStageId(item), status = statusForStage(id), pct = stageProgress(item);
+                const stageText = id === 'done' ? 'All stages complete' : stageLabel(id);
+                const month = escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD');
+                const team = (item.team || []).filter(t => t?.email);
+                const sprintsOf = itemSprints(item);
+                const comments = commentChipHtml('milestone', item);
+                // ⚠: one per layout (phones by the month, desktop after the %); hover / screen readers get the full reason
+                const warn = cls => over ? `<span class="over-tag ${cls} items-center text-rose-600 shrink-0" title="${escapeHtml(over)}"><i class="over-icon ph-bold ph-warning text-[13px]" aria-hidden="true"></i><span class="sr-only">${escapeHtml(over)}</span></span>` : '';
                 return `<div onclick="openItemDetails('${escapeHtml(item.id)}')" role="button" tabindex="0" data-rank-id="${escapeHtml(item.id)}" ${item.description ? `title="${escapeHtml(item.description)}"` : ''}
-                    class="list-row group/row flex flex-wrap items-center gap-x-2 gap-y-0.5 xl:grid ${LIST_COLS} xl:gap-2 px-3 py-2 text-xs border-t border-slate-100 border-l-2 border-l-transparent ${tint || 'hover:bg-slate-50'} cursor-pointer">
-                    <span class="hidden xl:block">${reorder ? reorderHtml(item) : ''}</span>
-                    <span class="flex items-center gap-1 shrink-0">${rankChipHtml(roadmap, item, withPlace ? n + 1 : 0)}</span>
-                    <span class="list-name font-bold text-slate-900 truncate min-w-0 flex-1 xl:flex-none flex items-center gap-1.5"><span class="truncate min-w-0">${escapeHtml(item.name)}</span><span class="hidden xl:inline-flex items-center gap-1.5">${sprintChipsHtml(roadmap, item, 2)}${commentChipHtml('milestone', item)}</span></span>
-                    <span class="hidden xl:block text-brand-600 font-semibold truncate">${escapeHtml(item.module)}</span>
-                    <span class="hidden xl:block ${effort ? 'text-slate-700' : 'text-slate-400'}" ${effort ? '' : 'title="Not estimated"'}>${effort ? fmtDays(effort) : '—'}</span>
-                    <span class="hidden xl:flex min-w-0">${statusCellHtml(roadmap, item)}</span>
-                    <span class="list-people hidden xl:flex items-center" onclick="event.stopPropagation()">${listPeopleHtml(item)}</span>
-                    <span class="hidden xl:block text-slate-600 whitespace-nowrap">${escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD')}</span>
-                    <span class="flex justify-end">${reorder ? moveButtonsHtml(item) : ''}</span>
-                    <span class="xl:hidden w-full pl-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-slate-500">
-                        ${sprintChipsHtml(roadmap, item, 1)}${commentChipHtml('milestone', item)}<span class="text-brand-600 font-semibold">${escapeHtml(item.module)}</span>${effort ? `<span>· ${fmtDays(effort)}</span>` : ''}
-                        <span class="flex items-center gap-1">· ${statusShortHtml(item)}</span>
-                        <span>· ${escapeHtml(item.date ? formatMonthYear(item.date) : 'TBD')}</span>${item.owner?.email ? `<span class="inline-flex items-center gap-1">· ${listPeopleHtml(item)}</span>` : ''}${badge ? `<span class="over-tag-phone">${badge}</span>` : ''}
+                    class="list-row group/row px-3 py-1.5 xl:py-2 text-xs border-t border-slate-100 border-l-2 border-l-transparent ${tint || 'hover:bg-slate-50'} cursor-pointer">
+                    <span class="lr-handle self-center">${reorder ? reorderHtml(item) : ''}</span>
+                    <span class="lr-rank flex items-center gap-1 shrink-0 self-center">${rankChipHtml(roadmap, item, withPlace ? n + 1 : 0)}</span>
+                    <span class="lr-name list-name font-bold text-slate-900 min-w-0 flex items-center"><span class="truncate min-w-0">${escapeHtml(item.name)}</span></span>
+                    <span class="lr-status text-[11px] text-slate-500">
+                        <span class="lr-state flex items-center gap-1.5 min-w-0 shrink-0 xl:shrink" title="${escapeHtml(`Status: ${STATUS_LABELS[status]} · Stage: ${stageName(id)} · ${pct}%`)}"><span class="w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[status]}" aria-hidden="true"></span><span class="status-text text-slate-700 xl:font-semibold">${escapeHtml(STATUS_LABELS[status])}</span><span class="hidden xl:block flex-1 min-w-[1.5rem] h-1.5 bg-slate-100 rounded-full overflow-hidden" aria-hidden="true"><span class="block h-full rounded-full ${stageColor(id)[1]}" style="width:${pct}%"></span></span><span class="status-pct tabular-nums ${pct >= 100 ? 'text-emerald-600' : 'text-slate-700'}">${pct}%</span>${warn('hidden xl:inline-flex')}</span>
+                        <span class="lr-stage stage-line min-w-0 truncate xl:self-start"><span class="xl:hidden">· </span>${escapeHtml(stageText)}</span>
                     </span>
+                    <span class="lr-month flex items-center justify-end xl:justify-start gap-1 whitespace-nowrap text-[11px] xl:text-xs ${over ? 'text-rose-700 font-semibold' : 'text-slate-600'} self-center">${warn('inline-flex xl:hidden')}${month}</span>
+                    <span class="lr-meta text-[11px] text-slate-500">
+                        <span class="lr-module truncate text-brand-600 font-semibold xl:self-center" title="${escapeHtml(item.module)}">${escapeHtml(item.module)}</span>
+                        <span class="lr-effort xl:self-center ${effort ? 'xl:text-slate-700' : 'text-slate-400'}" ${effort ? 'data-fit="4" data-fit-label="' + escapeHtml(fmtDays(effort)) + '"' : 'title="Not estimated"'}>${effort ? '<span class="xl:hidden">· </span>' + fmtDays(effort) : '<span class="hidden xl:inline">—</span>'}</span>
+                        <span class="lr-chips flex items-center gap-1 min-w-0">${sprintsOf.map(x => `<span data-fit="3" data-fit-label="${escapeHtml(x.name)}">${sprintChipsHtml(roadmap, { ...item, sprintIds: [x.id] }, 1)}</span>`).join('')}${comments ? `<span data-fit="2" data-fit-label="${escapeHtml(pluralize(item.commentCount || 0, 'comment'))}">${comments}</span>` : ''}<span class="fit-more hidden" role="note"></span></span>
+                        <span class="lr-people list-people flex items-center xl:self-center" onclick="event.stopPropagation()" ${item.owner?.email || team.length ? `data-fit="1" data-fit-label="${escapeHtml([item.owner?.email ? personOf(item.owner).name + ' (Owner)' : '', ...team.map(t => personOf(t).name)].filter(Boolean).join(', '))}"` : ''}>${item.owner?.email || team.length ? listPeopleHtml(item) : '<span class="hidden xl:inline text-slate-400">—</span>'}</span>
+                    </span>
+                    <span class="lr-moves flex justify-end self-center">${reorder ? moveButtonsHtml(item) : ''}</span>
                 </div>`;
             }).join('') + '</div>';
         }
+        // 2.16.0 (design/row-layout.md R-4): hide data-fit parts (1 = first) until the line fits; "+N" counts and names them
+        function fitListRows(root = document.getElementById('roadmap-container')) {
+            if (!root) return;
+            const desk = window.matchMedia('(min-width: 1280px)').matches;
+            root.querySelectorAll('.list-row').forEach(row => {
+                if (!row.offsetParent) return;
+                const line = row.querySelector(desk ? '.lr-chips' : '.lr-meta');
+                const more = row.querySelector('.fit-more');
+                const all = [...row.querySelectorAll('[data-fit]')];
+                all.forEach(p => p.classList.remove('hidden'));
+                more?.classList.add('hidden');
+                if (!line || !more) return;
+                const parts = all.filter(p => line.contains(p)).sort((a, b) => a.dataset.fit - b.dataset.fit);
+                const hidden = [];
+                // Phones: the module may shrink (…) but not below 3rem or its full width; past that, the trailing parts give way
+                const mod = desk ? null : row.querySelector('.lr-module');
+                const fits = () => line.scrollWidth <= line.clientWidth + 1 && (!mod || mod.clientWidth >= Math.min(48, mod.scrollWidth) - 1);
+                for (const p of parts) {
+                    if (fits()) break;
+                    p.classList.add('hidden');
+                    hidden.unshift(p.dataset.fitLabel);
+                    more.textContent = '+' + hidden.length;
+                    more.title = 'Also: ' + hidden.join(' · ');
+                    more.setAttribute('aria-label', more.title);
+                    more.classList.remove('hidden');
+                }
+            });
+        }
+        let fitRowsQueued = false;
+        function queueFitListRows() {
+            if (fitRowsQueued) return;
+            fitRowsQueued = true;
+            requestAnimationFrame(() => { fitRowsQueued = false; fitListRows(); });
+        }
+        window.addEventListener('resize', queueFitListRows);
+        // Rows are drawn by several paths (render, opening a card, Show done…): fit after any of them
+        new MutationObserver(queueFitListRows).observe(document.getElementById('roadmap-container') || document.body, { childList: true, subtree: true });
+
         // A collapsible header (level 1 = card header, level 2 = sub-period row) and its body
         function listBlockHtml({ key, defaultOpen, title, sub, items, loadHtml, drill, level, body, attrs = '' }) {
             listKeys.set(key, defaultOpen);
@@ -5999,7 +6066,7 @@
             const status = g.item.status || 'planned';
             const canAdd = canEdit() && !g.roadmap.deletedAt && !g.roadmap.isPreview;
             return `<div class="sv-row border-b border-slate-100 last:border-0" data-key="${escapeHtml(g.key)}">
-                <button type="button" data-row-key="${escapeHtml(k)}" onclick="toggleSprintRow(this.dataset.rowKey)" aria-expanded="${open}" class="sv-row-btn w-full text-left flex items-center gap-2 px-3 py-2 text-xs hover:bg-slate-50 focus:outline-none focus-visible:bg-brand-50/60">
+                <button type="button" data-row-key="${escapeHtml(k)}" onclick="toggleSprintRow(this.dataset.rowKey)" aria-expanded="${open}" class="sv-row-btn w-full text-left flex items-center gap-2 px-3 h-10 overflow-hidden text-xs hover:bg-slate-50 focus:outline-none focus-visible:bg-brand-50/60">
                     <i class="ph-bold ${open ? 'ph-caret-down' : 'ph-caret-right'} text-slate-400 shrink-0" aria-hidden="true"></i>
                     ${rankChipHtml(g.roadmap, g.item)}
                     ${svScope === 'all' ? `<span class="sv-roadmap max-sm:hidden shrink-0 max-w-[7rem] truncate px-1.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-semibold" title="${escapeHtml(g.roadmap.title)}">${escapeHtml(g.roadmap.title)}</span>${svOtherSprintHtml(g.roadmap, sid)}` : ''}
